@@ -14,7 +14,203 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      alert_logs: {
+        Row: {
+          alert_rule_id: string
+          id: string
+          notification_sent_to: Json
+          triggered_at: string
+          value_at_trigger: number | null
+        }
+        Insert: {
+          alert_rule_id: string
+          id?: string
+          notification_sent_to?: Json
+          triggered_at?: string
+          value_at_trigger?: number | null
+        }
+        Update: {
+          alert_rule_id?: string
+          id?: string
+          notification_sent_to?: Json
+          triggered_at?: string
+          value_at_trigger?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alert_logs_alert_rule_id_fkey"
+            columns: ["alert_rule_id"]
+            isOneToOne: false
+            referencedRelation: "alert_rules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      alert_rules: {
+        Row: {
+          condition_type: Database["public"]["Enums"]["condition_type"]
+          conditions: Json
+          cooldown_minutes: number
+          created_at: string
+          id: string
+          is_active: boolean
+          kpi_indicator_id: string
+          notification_channels: Json
+          user_id: string
+        }
+        Insert: {
+          condition_type?: Database["public"]["Enums"]["condition_type"]
+          conditions?: Json
+          cooldown_minutes?: number
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          kpi_indicator_id: string
+          notification_channels?: Json
+          user_id: string
+        }
+        Update: {
+          condition_type?: Database["public"]["Enums"]["condition_type"]
+          conditions?: Json
+          cooldown_minutes?: number
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          kpi_indicator_id?: string
+          notification_channels?: Json
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alert_rules_kpi_indicator_id_fkey"
+            columns: ["kpi_indicator_id"]
+            isOneToOne: false
+            referencedRelation: "kpi_indicators"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      data_sources: {
+        Row: {
+          data_schema: Json
+          endpoint_path: string
+          id: string
+          integration_id: string
+          is_enabled: boolean
+          label: string
+          last_synced_at: string | null
+          sync_interval: number
+        }
+        Insert: {
+          data_schema?: Json
+          endpoint_path: string
+          id?: string
+          integration_id: string
+          is_enabled?: boolean
+          label: string
+          last_synced_at?: string | null
+          sync_interval?: number
+        }
+        Update: {
+          data_schema?: Json
+          endpoint_path?: string
+          id?: string
+          integration_id?: string
+          is_enabled?: boolean
+          label?: string
+          last_synced_at?: string | null
+          sync_interval?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "data_sources_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "integrations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      integrations: {
+        Row: {
+          auth_type: Database["public"]["Enums"]["auth_type"]
+          config: Json
+          created_at: string
+          credentials: Json
+          id: string
+          name: string
+          platform: Database["public"]["Enums"]["platform_type"]
+          status: string
+          user_id: string
+        }
+        Insert: {
+          auth_type?: Database["public"]["Enums"]["auth_type"]
+          config?: Json
+          created_at?: string
+          credentials?: Json
+          id?: string
+          name: string
+          platform: Database["public"]["Enums"]["platform_type"]
+          status?: string
+          user_id: string
+        }
+        Update: {
+          auth_type?: Database["public"]["Enums"]["auth_type"]
+          config?: Json
+          created_at?: string
+          credentials?: Json
+          id?: string
+          name?: string
+          platform?: Database["public"]["Enums"]["platform_type"]
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      kpi_indicators: {
+        Row: {
+          chart_type: Database["public"]["Enums"]["chart_type"]
+          created_at: string
+          data_source_id: string | null
+          filters: Json
+          formula: string | null
+          id: string
+          metric_type: Database["public"]["Enums"]["metric_type"]
+          name: string
+          user_id: string
+        }
+        Insert: {
+          chart_type?: Database["public"]["Enums"]["chart_type"]
+          created_at?: string
+          data_source_id?: string | null
+          filters?: Json
+          formula?: string | null
+          id?: string
+          metric_type?: Database["public"]["Enums"]["metric_type"]
+          name: string
+          user_id: string
+        }
+        Update: {
+          chart_type?: Database["public"]["Enums"]["chart_type"]
+          created_at?: string
+          data_source_id?: string | null
+          filters?: Json
+          formula?: string | null
+          id?: string
+          metric_type?: Database["public"]["Enums"]["metric_type"]
+          name?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kpi_indicators_data_source_id_fkey"
+            columns: ["data_source_id"]
+            isOneToOne: false
+            referencedRelation: "data_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +219,19 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      auth_type: "api_key" | "oauth" | "token"
+      chart_type: "line" | "bar" | "donut" | "number"
+      condition_type: "threshold" | "percentage_change" | "compound"
+      metric_type: "count" | "sum" | "avg" | "percentage" | "custom"
+      platform_type:
+        | "gist"
+        | "stripe"
+        | "linear"
+        | "notion"
+        | "tudo1"
+        | "whatsapp"
+        | "slack"
+        | "custom"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +358,21 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      auth_type: ["api_key", "oauth", "token"],
+      chart_type: ["line", "bar", "donut", "number"],
+      condition_type: ["threshold", "percentage_change", "compound"],
+      metric_type: ["count", "sum", "avg", "percentage", "custom"],
+      platform_type: [
+        "gist",
+        "stripe",
+        "linear",
+        "notion",
+        "tudo1",
+        "whatsapp",
+        "slack",
+        "custom",
+      ],
+    },
   },
 } as const
