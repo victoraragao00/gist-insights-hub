@@ -4,9 +4,9 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
-import Conversations from "./pages/Conversations";
-import Contacts from "./pages/Contacts";
-import Campaigns from "./pages/Campaigns";
+import Integrations from "./pages/Integrations";
+import Indicators from "./pages/Indicators";
+import Audits from "./pages/Audits";
 import Insights from "./pages/Insights";
 import SettingsPage from "./pages/SettingsPage";
 import NotFound from "./pages/NotFound";
@@ -21,9 +21,9 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
-          <Route path="/conversations" element={<Conversations />} />
-          <Route path="/contacts" element={<Contacts />} />
-          <Route path="/campaigns" element={<Campaigns />} />
+          <Route path="/integrations" element={<Integrations />} />
+          <Route path="/indicators" element={<Indicators />} />
+          <Route path="/audits" element={<Audits />} />
           <Route path="/insights" element={<Insights />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="*" element={<NotFound />} />

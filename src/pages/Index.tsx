@@ -1,56 +1,74 @@
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { MessageSquare, Users, Megaphone, TrendingUp } from "lucide-react";
-
-const stats = [
-  { label: "Conversas Abertas", value: "—", icon: MessageSquare, change: "" },
-  { label: "Total de Contatos", value: "—", icon: Users, change: "" },
-  { label: "Campanhas Ativas", value: "—", icon: Megaphone, change: "" },
-  { label: "Taxa de Resposta", value: "—", icon: TrendingUp, change: "" },
-];
+import { Plug, BarChart3, ShieldAlert, ArrowRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useNavigate } from "react-router-dom";
 
 const Index = () => {
+  const navigate = useNavigate();
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground">Visão geral das suas integrações Gist</p>
+          <p className="text-muted-foreground">
+            Visão centralizada de todas as suas integrações e indicadores
+          </p>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {stats.map((stat) => (
-            <Card key={stat.label} className="border-0 shadow-sm">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  {stat.label}
-                </CardTitle>
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent">
-                  <stat.icon className="h-4 w-4 text-accent-foreground" />
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold">{stat.value}</div>
-                {stat.change && (
-                  <p className="text-xs text-muted-foreground mt-1">{stat.change}</p>
-                )}
-              </CardContent>
-            </Card>
-          ))}
+        <div className="grid gap-4 md:grid-cols-3">
+          <Card className="border-0 shadow-sm cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate("/integrations")}>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Integrações Ativas</CardTitle>
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent">
+                <Plug className="h-4 w-4 text-accent-foreground" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">0</div>
+              <p className="text-xs text-muted-foreground mt-1">Conecte suas plataformas</p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-0 shadow-sm cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate("/indicators")}>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Indicadores</CardTitle>
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent">
+                <BarChart3 className="h-4 w-4 text-accent-foreground" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">0</div>
+              <p className="text-xs text-muted-foreground mt-1">Crie KPIs customizados</p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-0 shadow-sm cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate("/audits")}>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Auditorias Ativas</CardTitle>
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent">
+                <ShieldAlert className="h-4 w-4 text-accent-foreground" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">0</div>
+              <p className="text-xs text-muted-foreground mt-1">Alertas automáticos</p>
+            </CardContent>
+          </Card>
         </div>
 
         <Card className="border-0 shadow-sm">
           <CardHeader>
-            <CardTitle className="text-lg">Conecte sua API</CardTitle>
+            <CardTitle className="text-lg">Comece conectando suas plataformas</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-3">
             <p className="text-muted-foreground">
-              Configure sua API Key do Gist nas{" "}
-              <a href="/settings" className="text-primary font-medium hover:underline">
-                Configurações
-              </a>{" "}
-              para começar a visualizar seus dados.
+              Conecte Stripe, Linear, Notion, WhatsApp, Slack e outras plataformas para centralizar seus dados, criar indicadores e configurar alertas automáticos.
             </p>
+            <Button onClick={() => navigate("/integrations")}>
+              Ver Integrações <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
           </CardContent>
         </Card>
       </div>
