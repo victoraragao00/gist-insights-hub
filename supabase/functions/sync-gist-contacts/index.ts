@@ -138,6 +138,7 @@ Deno.serve(async (req) => {
     for (const c of (existingClients ?? []) as ClientRecord[]) {
       clientsBySlug.set(c.slug, c);
     }
+    console.log(`[sync] pre-loaded ${clientsBySlug.size} clients`);
 
     const result: SyncResult = {
       contacts_processed: 0,
