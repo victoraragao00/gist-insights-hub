@@ -129,6 +129,7 @@ Deno.serve(async (req) => {
       });
     }
     const callerUserId = claimsData.claims.sub as string;
+    console.log(`[sync] user=${callerUserId}, startPage=${startPage}, maxPages=${maxPages}`);
 
     // 1. Pre-load all clients
     const clientsBySlug = new Map<string, ClientRecord>();
