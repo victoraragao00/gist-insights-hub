@@ -190,6 +190,7 @@ Deno.serve(async (req) => {
         convosResponse = await gistGet<GistConversationsResponse>(apiKey, 'conversations', {
           page: String(currentPage),
           per_page: '20',
+          state: 'all',
         });
       } catch (err: unknown) {
         if (err && typeof err === 'object' && 'retryable' in err) {
@@ -197,6 +198,7 @@ Deno.serve(async (req) => {
           convosResponse = await gistGet<GistConversationsResponse>(apiKey, 'conversations', {
             page: String(currentPage),
             per_page: '20',
+            state: 'all',
           });
         } else {
           throw err;
