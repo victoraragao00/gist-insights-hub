@@ -49,12 +49,24 @@ Deno.serve(async (req) => {
       },
     });
 
-    const data = await gistResponse.json();
+    const responseText = await gistResponse.text();
 
     if (!gistResponse.ok) {
+      let details: unknown = responseText;
+      try { details = JSON.parse(responseText); } catch { /* keep as text */ }
       return new Response(
-        JSON.stringify({ error: 'Gist API error', status: gistResponse.status, details: data }),
+        JSON.stringify({ error: 'Gist API error', status: gistResponse.status, details }),
         { status: gistResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    let data: unknown;
+    try {
+      data = JSON.parse(responseText);
+    } catch {
+      return new Response(
+        JSON.stringify({ error: 'Gist returned invalid JSON', raw: responseText.substring(0, 500) }),
+        { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
