@@ -7,11 +7,25 @@ import { KPICard } from "@/components/KPICard";
 import { MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
+interface SyncResult {
+  contacts_processed: number;
+  contacts_unresolved: number;
+  clients_created: number;
+  clients_updated: number;
+  clients_inactivated: number;
+  participants_created: number;
+  participants_updated: number;
+  errors: string[];
+  has_more: boolean;
+  next_page: number | null;
+  total_pages: number | null;
+}
+
 const InteractionsPage = () => {
   const { user } = useAuth();
   const { selectedClient } = useClient();
   const [syncing, setSyncing] = useState(false);
-  const [syncResult, setSyncResult] = useState<string | null>(null);
+  const [syncLog, setSyncLog] = useState<string[]>([]);
 
   const { data: count = 0, isLoading } = useQuery<number>({
     queryKey: ["interactions_count", selectedClient?.id, user?.id],
@@ -27,23 +41,71 @@ const InteractionsPage = () => {
     },
   });
 
-  const handleSyncTest = async () => {
+  const handleSyncAll = async () => {
     setSyncing(true);
-    setSyncResult(null);
+    setSyncLog([]);
+
+    const totals: Partial<SyncResult> = {
+      contacts_processed: 0,
+      contacts_unresolved: 0,
+      clients_created: 0,
+      clients_updated: 0,
+      participants_created: 0,
+      participants_updated: 0,
+      errors: [],
+    };
+
+    let page = 1;
+    let batch = 0;
+
     try {
-      const { data, error } = await supabase.functions.invoke("sync-gist-contacts", {
-        body: { page: 1, max_pages: 1 },
-      });
-      const result = JSON.stringify({ data, error }, null, 2);
-      console.log("SYNC RESULT:", result);
-      setSyncResult(result);
+      while (true) {
+        batch++;
+        setSyncLog((prev) => [...prev, `⏳ Batch ${batch} — página ${page}...`]);
+
+        const { data, error } = await supabase.functions.invoke("sync-gist-contacts", {
+          body: { page, max_pages: 50 },
+        });
+
+        if (error) {
+          setSyncLog((prev) => [...prev, `❌ Erro: ${error.message}`]);
+          break;
+        }
+
+        const result = data?.result as SyncResult | undefined;
+        if (!result) {
+          setSyncLog((prev) => [...prev, `❌ Resposta inesperada: ${JSON.stringify(data)}`]);
+          break;
+        }
+
+        // Accumulate
+        totals.contacts_processed! += result.contacts_processed;
+        totals.contacts_unresolved! += result.contacts_unresolved;
+        totals.clients_created! += result.clients_created;
+        totals.clients_updated! += result.clients_updated;
+        totals.participants_created! += result.participants_created;
+        totals.participants_updated! += result.participants_updated;
+        if (result.errors?.length) totals.errors!.push(...result.errors);
+
+        setSyncLog((prev) => [
+          ...prev,
+          `✅ Batch ${batch}: +${result.contacts_processed} contatos (total: ${totals.contacts_processed})`,
+        ]);
+
+        if (!result.has_more || !result.next_page) {
+          setSyncLog((prev) => [...prev, `🏁 Sync completa! Total: ${totals.contacts_processed} contatos processados.`]);
+          break;
+        }
+
+        page = result.next_page;
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      console.error("SYNC ERROR:", msg);
-      setSyncResult(`ERROR: ${msg}`);
-    } finally {
-      setSyncing(false);
+      setSyncLog((prev) => [...prev, `❌ Erro fatal: ${msg}`]);
     }
+
+    setSyncLog((prev) => [...prev, `\n📊 Resumo final:\n${JSON.stringify(totals, null, 2)}`]);
+    setSyncing(false);
   };
 
   return (
@@ -65,15 +127,15 @@ const InteractionsPage = () => {
         />
       </div>
 
-      {/* Temporary sync test button */}
+      {/* Sync test */}
       <div className="border border-dashed border-muted-foreground/30 rounded-lg p-4 space-y-3">
-        <p className="text-sm font-medium text-muted-foreground">🧪 Teste: sync-gist-contacts</p>
-        <Button onClick={handleSyncTest} disabled={syncing} variant="outline" size="sm">
-          {syncing ? "Sincronizando..." : "Invocar sync-gist-contacts (1 página)"}
+        <p className="text-sm font-medium text-muted-foreground">🧪 Teste: sync-gist-contacts (loop automático)</p>
+        <Button onClick={handleSyncAll} disabled={syncing} variant="outline" size="sm">
+          {syncing ? "Sincronizando..." : "Iniciar sync completa"}
         </Button>
-        {syncResult && (
+        {syncLog.length > 0 && (
           <pre className="text-xs bg-muted p-3 rounded-md overflow-auto max-h-96 whitespace-pre-wrap">
-            {syncResult}
+            {syncLog.join("\n")}
           </pre>
         )}
       </div>
