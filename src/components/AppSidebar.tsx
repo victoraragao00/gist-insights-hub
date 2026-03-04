@@ -1,4 +1,4 @@
-import { LayoutDashboard, Plug, BarChart3, ShieldAlert, Sparkles, Settings } from "lucide-react";
+import { LayoutDashboard, Plug, BarChart3, ShieldAlert, Sparkles, Settings, Users } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import {
@@ -17,6 +17,7 @@ import {
 
 const modules = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
+  { title: "Clientes", url: "/clients", icon: Users },
   { title: "Integrações", url: "/integrations", icon: Plug },
   { title: "Indicadores", url: "/indicators", icon: BarChart3 },
   { title: "Auditorias", url: "/audits", icon: ShieldAlert },
