@@ -1,38 +1,42 @@
 
 
-## Problem
+# Wizard de Contatos Gist: Separar em 2 etapas
 
-The `ingest-gist-historical` function only fetched 20 conversations (1 page) because:
-1. **No logging** — we can't see what Gist's API returned for `total_count` / `totalPages`
-2. **Likely API default** — Gist's `/conversations` endpoint probably defaults to `state=open`, returning only active conversations instead of the full history
+## Problema
+Atualmente, o Step A ("Discovery") mostra tudo junto: a lista de domínios/empresas com as opções de vincular/criar/ignorar E os contatos individuais de cada grupo. Isso é confuso quando há muitos domínios com dezenas de contatos.
 
-## Plan
+## Nova estrutura do wizard
 
-### 1. Add console.log debugging to the edge function
+### Step 1 — "Clientes" (novo)
+Lista apenas os **domínios/empresas** encontrados. Para cada grupo, o usuário escolhe:
+- **Vincular a cliente existente** (select de clientes)
+- **Criar novo cliente** (input de nome)
+- **Ignorar** (novo — não importa contatos desse domínio)
 
-Add strategic logs so we can see:
-- The raw `pages` object from Gist's response (`total_count`, `per_page`, `page`)
-- Calculated `totalPages` vs `currentPage`
-- The `has_more` / `nextPage` decision
+Sem tabela de contatos. Apenas mostra o domínio, nome da empresa (se houver) e quantidade de contatos como informação contextual (ex: "nkstore.com.br — 42 contatos").
 
-### 2. Fetch ALL conversation states
+Botão "Próximo" avança ao Step 2 (filtrando apenas os grupos não-ignorados).
 
-Change the Gist API call to include closed/archived conversations:
-```
-GET /conversations?page=1&per_page=20&state=all
-```
-If `state=all` doesn't work in the Gist API, try omitting `state` or using multiple states.
+### Step 2 — "Contatos" (novo)
+Para cada grupo **não ignorado**, mostra a tabela de contatos com checkbox individual para selecionar quais contatos importar. Também mostra a seção de Teammates.
 
-### 3. Redeploy and test
+Botão "Confirmar Vínculos" avança ao Step 3 (atual "confirmation").
 
-Deploy the updated function, then run the import again to see the actual numbers.
+### Step 3 — "Confirmação" (atual)
+Sem alterações significativas, apenas ajusta os contadores para refletir apenas os selecionados.
 
-### Changes
+### Step 4 — "Importação" (atual, só onboarding)
+Sem alterações.
 
-**File: `supabase/functions/ingest-gist-historical/index.ts`**
-- Add `console.log` for API response metadata (pages object, totalPages calc, hasMore decision)
-- Add `state: 'all'` (or equivalent) to the conversations API call parameters
-- Redeploy
+## Alterações em `src/pages/ClientsPage.tsx`
 
-No frontend changes needed — the loop logic is already correct.
+1. Alterar `WizardStep` para `"clients" | "contacts" | "confirmation" | "import"`
+2. Step inicial passa de `"discovery"` para `"clients"`
+3. Adicionar opção `"ignore"` ao `GroupMapping.type` (tipo `"existing" | "new" | "ignore"`)
+4. **Step "clients"**: renderiza cards compactos por domínio — só domínio, empresa, count, e select (vincular/criar/ignorar) + input/select conforme tipo
+5. **Step "contacts"**: para cada grupo não-ignorado, mostra tabela de contatos com checkboxes. Novo state `selectedContacts: Map<number, boolean>` para controle individual. Também mostra teammates aqui.
+6. Ajustar `handleConfirmMappings` para filtrar apenas contatos selecionados e grupos não-ignorados
+7. Ajustar `summaryContactCount` para contar apenas selecionados
+
+Nenhum outro arquivo será alterado.
 

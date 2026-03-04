@@ -190,6 +190,7 @@ Deno.serve(async (req) => {
         convosResponse = await gistGet<GistConversationsResponse>(apiKey, 'conversations', {
           page: String(currentPage),
           per_page: '20',
+          state: 'all',
         });
       } catch (err: unknown) {
         if (err && typeof err === 'object' && 'retryable' in err) {
@@ -197,6 +198,7 @@ Deno.serve(async (req) => {
           convosResponse = await gistGet<GistConversationsResponse>(apiKey, 'conversations', {
             page: String(currentPage),
             per_page: '20',
+            state: 'all',
           });
         } else {
           throw err;
@@ -206,6 +208,8 @@ Deno.serve(async (req) => {
       const conversations = convosResponse.conversations ?? [];
       const totalConvos = convosResponse.pages?.total_count ?? 0;
       const totalPages = Math.ceil(totalConvos / 20);
+
+      console.log(`[ingest] Page ${currentPage}/${totalPages} — ${conversations.length} convos on page, total_count=${totalConvos}, raw pages=`, JSON.stringify(convosResponse.pages));
 
       conversationsFetched += conversations.length;
       pagesProcessed++;
@@ -330,15 +334,18 @@ Deno.serve(async (req) => {
       }
 
       // Check if there are more pages beyond current
+      console.log(`[ingest] Decision: currentPage=${currentPage}, totalPages=${totalPages}, pagesProcessed=${pagesProcessed}/${maxPages}`);
       if (currentPage < totalPages) {
         currentPage++;
         // If we've hit maxPages, signal has_more for the frontend to continue
         if (pagesProcessed >= maxPages) {
           hasMore = true;
           nextPage = currentPage;
+          console.log(`[ingest] Yielding: has_more=true, next_page=${nextPage}`);
         }
       } else {
         // No more conversation pages
+        console.log(`[ingest] All pages processed, no more.`);
         break;
       }
     }
