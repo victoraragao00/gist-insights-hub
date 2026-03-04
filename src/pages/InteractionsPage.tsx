@@ -1,13 +1,17 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { useClient } from "@/context/ClientContext";
 import { KPICard } from "@/components/KPICard";
 import { MessageSquare } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 const InteractionsPage = () => {
   const { user } = useAuth();
   const { selectedClient } = useClient();
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<string | null>(null);
 
   const { data: count = 0, isLoading } = useQuery<number>({
     queryKey: ["interactions_count", selectedClient?.id, user?.id],
@@ -22,6 +26,25 @@ const InteractionsPage = () => {
       return total ?? 0;
     },
   });
+
+  const handleSyncTest = async () => {
+    setSyncing(true);
+    setSyncResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("sync-gist-contacts", {
+        body: { page: 1, max_pages: 1 },
+      });
+      const result = JSON.stringify({ data, error }, null, 2);
+      console.log("SYNC RESULT:", result);
+      setSyncResult(result);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("SYNC ERROR:", msg);
+      setSyncResult(`ERROR: ${msg}`);
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -40,6 +63,19 @@ const InteractionsPage = () => {
           icon={MessageSquare}
           isLoading={isLoading}
         />
+      </div>
+
+      {/* Temporary sync test button */}
+      <div className="border border-dashed border-muted-foreground/30 rounded-lg p-4 space-y-3">
+        <p className="text-sm font-medium text-muted-foreground">🧪 Teste: sync-gist-contacts</p>
+        <Button onClick={handleSyncTest} disabled={syncing} variant="outline" size="sm">
+          {syncing ? "Sincronizando..." : "Invocar sync-gist-contacts (1 página)"}
+        </Button>
+        {syncResult && (
+          <pre className="text-xs bg-muted p-3 rounded-md overflow-auto max-h-96 whitespace-pre-wrap">
+            {syncResult}
+          </pre>
+        )}
       </div>
 
       {!isLoading && count === 0 && (
