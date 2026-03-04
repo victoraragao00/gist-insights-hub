@@ -71,6 +71,12 @@ export function ClientProvider({ children }: { children: ReactNode }) {
   }
 
   const handleImportHistory = useCallback(async () => {
+    const targetClientId = selectedClient?.id;
+    if (!targetClientId) {
+      toast.error("Selecione um cliente antes de importar o histórico");
+      return;
+    }
+
     setImporting(true);
     setImportProgress({ currentPage: 1, conversationsTotal: 0, messagesTotal: 0, done: false });
 
@@ -89,7 +95,7 @@ export function ClientProvider({ children }: { children: ReactNode }) {
         });
 
         const { data, error } = await supabase.functions.invoke("ingest-gist-historical", {
-          body: { page },
+          body: { page, client_id: targetClientId },
         });
 
         if (error) throw new Error(typeof error === "string" ? error : "Erro na importação");
@@ -119,7 +125,7 @@ export function ClientProvider({ children }: { children: ReactNode }) {
     } finally {
       setImporting(false);
     }
-  }, []);
+  }, [queryClient, selectedClient?.id]);
 
   return (
     <ClientContext.Provider
