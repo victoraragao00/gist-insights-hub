@@ -209,6 +209,8 @@ Deno.serve(async (req) => {
       const totalConvos = convosResponse.pages?.total_count ?? 0;
       const totalPages = Math.ceil(totalConvos / 20);
 
+      console.log(`[ingest] Page ${currentPage}/${totalPages} — ${conversations.length} convos on page, total_count=${totalConvos}, raw pages=`, JSON.stringify(convosResponse.pages));
+
       conversationsFetched += conversations.length;
       pagesProcessed++;
 
