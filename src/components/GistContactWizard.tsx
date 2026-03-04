@@ -217,6 +217,32 @@ export function GistContactWizard({ open, onClose, mode, clientId }: GistContact
     });
   };
 
+  const handleBulkAction = useCallback(
+    (action: string) => {
+      if (!discoveryData) return;
+      for (const group of discoveryData.contact_groups) {
+        if (action === "ignore") {
+          updateMapping(group.domain, { type: "ignore" });
+        } else if (action === "existing") {
+          if (group.suggested_client_id) {
+            updateMapping(group.domain, {
+              type: "existing",
+              existing_client_id: group.suggested_client_id,
+            });
+          } else {
+            updateMapping(group.domain, { type: "ignore" });
+          }
+        } else if (action === "new") {
+          updateMapping(group.domain, {
+            type: "new",
+            new_client_name: group.company ?? group.domain,
+          });
+        }
+      }
+    },
+    [discoveryData, updateMapping],
+  );
+
   const toggleAllGroupContacts = (domain: string, checked: boolean) => {
     const group = discoveryData?.contact_groups.find((g) => g.domain === domain);
     if (!group) return;
@@ -381,6 +407,21 @@ export function GistContactWizard({ open, onClose, mode, clientId }: GistContact
           {/* ═══ STEP 1: Clients ═══ */}
           {!loading && step === "clients" && discoveryData && (
             <>
+              <div className="flex items-center justify-between rounded-lg border bg-muted/30 px-4 py-2.5">
+                <span className="text-sm text-muted-foreground">
+                  {discoveryData.contact_groups.length} domínios encontrados
+                </span>
+                <Select onValueChange={handleBulkAction}>
+                  <SelectTrigger className="w-[200px] h-8 text-xs">
+                    <SelectValue placeholder="Aplicar a todos..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ignore">Ignorar todos</SelectItem>
+                    <SelectItem value="existing">Vincular todos (com match)</SelectItem>
+                    <SelectItem value="new">Criar todos</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="space-y-3">
                 {discoveryData.contact_groups.map((group) => {
                   const mapping = groupMappings.get(group.domain);
