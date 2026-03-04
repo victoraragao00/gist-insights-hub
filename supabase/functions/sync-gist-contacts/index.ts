@@ -11,8 +11,7 @@ const GENERIC_DOMAINS = new Set([
   'protonmail.com', 'aol.com', 'mail.com',
 ]);
 
-const TWO_YEARS_MS = 2 * 365.25 * 24 * 60 * 60 * 1000;
-const DEFAULT_MAX_PAGES = 5;
+const DEFAULT_MAX_PAGES = 50;
 
 interface GistContact {
   id: number;
