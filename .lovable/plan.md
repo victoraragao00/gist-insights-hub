@@ -1,42 +1,30 @@
 
 
-# Wizard de Contatos Gist: Separar em 2 etapas
+## Plan: Fix ingest-gist-historical timeout + add frontend auto-loop
 
-## Problema
-Atualmente, o Step A ("Discovery") mostra tudo junto: a lista de domínios/empresas com as opções de vincular/criar/ignorar E os contatos individuais de cada grupo. Isso é confuso quando há muitos domínios com dezenas de contatos.
+### 1. Backend: `supabase/functions/ingest-gist-historical/index.ts`
 
-## Nova estrutura do wizard
+- Add `max_pages` parameter (default 5) to `RequestBody`
+- Replace single-page fetch with a loop that processes up to `max_pages` conversation pages per invocation
+- Accumulate totals across pages within the batch
+- Return `has_more` / `next_page` based on whether more conversation pages exist beyond what was processed
+- Keep existing per-conversation message pagination (fetch all messages for each conversation) unchanged
 
-### Step 1 — "Clientes" (novo)
-Lista apenas os **domínios/empresas** encontrados. Para cada grupo, o usuário escolhe:
-- **Vincular a cliente existente** (select de clientes)
-- **Criar novo cliente** (input de nome)
-- **Ignorar** (novo — não importa contatos desse domínio)
+### 2. Frontend: `src/pages/InteractionsPage.tsx`
 
-Sem tabela de contatos. Apenas mostra o domínio, nome da empresa (se houver) e quantidade de contatos como informação contextual (ex: "nkstore.com.br — 42 contatos").
+- Add a second test button "Importar histórico Gist" that:
+  1. First DELETEs interactions for client `a333ad32-6295-4ac5-a15f-6d3931130315` via supabase client (using service role through edge function, or direct delete if RLS allows — will use the admin's auth context)
+  2. Loops calling `ingest-gist-historical` with `{ page, max_pages: 5 }` 
+  3. Chains calls while `has_more === true`, using `next_page`
+  4. Accumulates and displays: `conversations_fetched`, `messages_inserted`, `messages_quarantined`, `errors`
+  5. Shows real-time progress log (same pattern as sync-gist-contacts)
+  6. 1s delay between batches
 
-Botão "Próximo" avança ao Step 2 (filtrando apenas os grupos não-ignorados).
+### 3. Delete approach
 
-### Step 2 — "Contatos" (novo)
-Para cada grupo **não ignorado**, mostra a tabela de contatos com checkbox individual para selecionar quais contatos importar. Também mostra a seção de Teammates.
+Since the interactions table has no DELETE RLS policy for authenticated users, the delete will be done inside the edge function itself (using service role). Add an optional `delete_client_id` parameter — if provided, delete all interactions for that client before starting ingestion.
 
-Botão "Confirmar Vínculos" avança ao Step 3 (atual "confirmation").
+### 4. Deploy
 
-### Step 3 — "Confirmação" (atual)
-Sem alterações significativas, apenas ajusta os contadores para refletir apenas os selecionados.
-
-### Step 4 — "Importação" (atual, só onboarding)
-Sem alterações.
-
-## Alterações em `src/pages/ClientsPage.tsx`
-
-1. Alterar `WizardStep` para `"clients" | "contacts" | "confirmation" | "import"`
-2. Step inicial passa de `"discovery"` para `"clients"`
-3. Adicionar opção `"ignore"` ao `GroupMapping.type` (tipo `"existing" | "new" | "ignore"`)
-4. **Step "clients"**: renderiza cards compactos por domínio — só domínio, empresa, count, e select (vincular/criar/ignorar) + input/select conforme tipo
-5. **Step "contacts"**: para cada grupo não-ignorado, mostra tabela de contatos com checkboxes. Novo state `selectedContacts: Map<number, boolean>` para controle individual. Também mostra teammates aqui.
-6. Ajustar `handleConfirmMappings` para filtrar apenas contatos selecionados e grupos não-ignorados
-7. Ajustar `summaryContactCount` para contar apenas selecionados
-
-Nenhum outro arquivo será alterado.
+Redeploy `ingest-gist-historical` after changes.
 
