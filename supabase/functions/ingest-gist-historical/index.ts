@@ -334,15 +334,18 @@ Deno.serve(async (req) => {
       }
 
       // Check if there are more pages beyond current
+      console.log(`[ingest] Decision: currentPage=${currentPage}, totalPages=${totalPages}, pagesProcessed=${pagesProcessed}/${maxPages}`);
       if (currentPage < totalPages) {
         currentPage++;
         // If we've hit maxPages, signal has_more for the frontend to continue
         if (pagesProcessed >= maxPages) {
           hasMore = true;
           nextPage = currentPage;
+          console.log(`[ingest] Yielding: has_more=true, next_page=${nextPage}`);
         }
       } else {
         // No more conversation pages
+        console.log(`[ingest] All pages processed, no more.`);
         break;
       }
     }
