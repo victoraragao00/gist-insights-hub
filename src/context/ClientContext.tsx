@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
@@ -45,6 +45,7 @@ const ClientContext = createContext<ClientContextValue | undefined>(undefined);
 
 export function ClientProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [importing, setImporting] = useState(false);
   const [importProgress, setImportProgress] = useState<ImportProgress | null>(null);
@@ -109,6 +110,7 @@ export function ClientProvider({ children }: { children: ReactNode }) {
         done: true,
       });
 
+      queryClient.invalidateQueries({ queryKey: ["interactions_count"] });
       toast.success(`✓ Importação concluída: ${totalConversations} conversas, ${totalMessages} mensagens`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Erro desconhecido";
