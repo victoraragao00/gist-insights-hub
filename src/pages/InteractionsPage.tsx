@@ -98,6 +98,7 @@ const InteractionsPage = () => {
         }
 
         page = result.next_page;
+        await new Promise((r) => setTimeout(r, 1000));
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
