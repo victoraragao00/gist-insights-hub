@@ -1,31 +1,29 @@
 
 
-# Fix: ingest-gist-historical timeout
+# Fix: Importação interrompida ao navegar para outra página
 
 ## Problema
-A função tenta processar TODAS as conversas do Gist em uma única execução. Com centenas de conversas × mensagens paginadas × delays de rate-limit, ultrapassa o timeout de 150s das Edge Functions.
-
-Além disso, dentro do loop de conversas há uma query desnecessária ao banco por conversa (`participants.select("client_id")`), adicionando latência.
+O `handleImportHistory` executa um loop `while` assíncrono dentro do componente `ClientsPage`. Quando o usuário navega para outra rota (ex: "Interações"), o React desmonta o componente, o loop morre silenciosamente, e ao voltar o estado reinicia zerado mostrando o botão "Importar Histórico" como se nada tivesse acontecido.
 
 ## Solução
 
-### 1. Remover query redundante no loop de conversas
-A função já carrega todos os `participants` e `channel_bindings` no início. A query extra por conversa para buscar `client_id` é redundante — o `client_id` já está disponível nos dados do participante carregados inicialmente.
+Duas melhorias complementares:
 
-Alterar a interface `ParticipantRow` para incluir `client_id`, e carregá-lo no `.select()` inicial. Remover a query individual dentro do loop.
+### 1. Prevenir navegação durante importação
+Adicionar um alerta/bloqueio visual quando `importing === true`. Usar `window.onbeforeunload` e interceptar cliques na sidebar durante importação com um `toast.warning("Importação em andamento, aguarde...")`.
 
-### 2. Adicionar suporte a paginação por request (chunked processing)
-Aceitar um parâmetro opcional `page` no body da requisição. A função processará apenas N conversas por invocação (ex: 20). Se houver mais, retorna `has_more: true` e o `next_page`.
+### 2. Continuar importação mesmo ao navegar (abordagem robusta)
+Mover o estado da importação para o `ClientContext` (que vive acima das rotas e não desmonta). Assim o loop continua rodando mesmo se o usuário trocar de página, e ao voltar para `/clients` o progresso aparece atualizado.
 
-O frontend chama a função em loop, acumulando resultados, até `has_more === false`.
+### Alterações
 
-### 3. Atualizar o frontend para chamar em loop
-O `handleImportHistory` passa a chamar a função repetidamente com `page` incrementando, mostrando progresso parcial ao usuário ("Importando página 1... 2... 3...").
+**`src/context/ClientContext.tsx`**
+- Adicionar ao contexto: `importing`, `importProgress`, `handleImportHistory()` 
+- Mover a lógica do loop de importação para cá
 
-### Arquivos modificados
-- `supabase/functions/ingest-gist-historical/index.ts` — chunked processing + remove redundant query
-- `src/pages/ClientsPage.tsx` — loop de chamadas com progresso
+**`src/pages/ClientsPage.tsx`**
+- Consumir `importing`, `importProgress`, `handleImportHistory` do `ClientContext` em vez de estado local
+- Remover a lógica duplicada
 
-### Arquivos NÃO modificados
-- Nenhum outro arquivo será alterado
+Nenhum outro arquivo será alterado.
 
