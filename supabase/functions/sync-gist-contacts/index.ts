@@ -324,9 +324,9 @@ Deno.serve(async (req) => {
     }
 
     // Set has_more / next_page
-    if (!hitCutoff && result.total_pages && currentPage < result.total_pages) {
+    if (result.total_pages && currentPage < result.total_pages) {
       result.has_more = true;
-      result.next_page = currentPage; // already incremented
+      result.next_page = currentPage;
     }
 
     // Post-loop: update clients.metadata.last_seen_at
