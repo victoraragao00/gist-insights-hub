@@ -104,7 +104,8 @@ export function GistContactWizard({ open, onClose, mode, clientId }: GistContact
         .from("clients")
         .select("id, name")
         .eq("active", true)
-        .order("name");
+        .order("name")
+        .limit(100);
       if (error) {
         toast.error("Erro ao carregar clientes: " + error.message);
         return;
