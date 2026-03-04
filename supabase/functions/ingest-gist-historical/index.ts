@@ -4,6 +4,7 @@ const corsHeaders = {
 };
 
 const GIST_BASE = 'https://api.getgist.com';
+const DEFAULT_MAX_PAGES = 5;
 
 interface GistMessage {
   id: number;
@@ -52,6 +53,8 @@ interface ParticipantInfo {
 
 interface RequestBody {
   page?: number;
+  max_pages?: number;
+  delete_client_id?: string;
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -115,7 +118,22 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json().catch(() => ({})) as RequestBody;
-    const requestedPage = body.page ?? 1;
+    let currentPage = body.page ?? 1;
+    const maxPages = body.max_pages ?? DEFAULT_MAX_PAGES;
+
+    // Optional: delete interactions for a client before ingestion
+    if (body.delete_client_id) {
+      const { error: delErr } = await supaAdmin
+        .from('interactions')
+        .delete()
+        .eq('client_id', body.delete_client_id);
+      if (delErr) {
+        return new Response(JSON.stringify({ error: 'Delete failed: ' + delErr.message }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
 
     // 1. Load all gist channel bindings (keyed by client_id)
     const { data: bindings, error: bindErr } = await supaAdmin
@@ -131,7 +149,7 @@ Deno.serve(async (req) => {
       bindingByClientId.set(b.client_id, b);
     }
 
-    // 2. Load participants with gist identifiers — include side field
+    // 2. Load participants with gist identifiers
     const { data: participants, error: partErr } = await supaAdmin
       .from('participants')
       .select('id, client_id, side, identifiers')
@@ -154,175 +172,187 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 3. Fetch conversations page
-    let convosResponse: GistConversationsResponse;
-
-    try {
-      convosResponse = await gistGet<GistConversationsResponse>(apiKey, 'conversations', {
-        page: String(requestedPage),
-        per_page: '20',
-      });
-    } catch (err: unknown) {
-      if (err && typeof err === 'object' && 'retryable' in err) {
-        await sleep(2000);
-        convosResponse = await gistGet<GistConversationsResponse>(apiKey, 'conversations', {
-          page: String(requestedPage),
-          per_page: '20',
-        });
-      } else {
-        throw err;
-      }
-    }
-
-    const conversations = convosResponse.conversations ?? [];
-    const totalConvos = convosResponse.pages?.total_count ?? 0;
-    const totalPages = Math.ceil(totalConvos / 20);
-    const hasMore = requestedPage < totalPages;
-
+    // 3. Process up to maxPages of conversations
     let messagesFetched = 0;
     let messagesInserted = 0;
     let messagesSkipped = 0;
     let messagesQuarantined = 0;
+    let conversationsFetched = 0;
     const errors: string[] = [];
+    let hasMore = false;
+    let nextPage: number | undefined;
+    let pagesProcessed = 0;
 
-    // 4. Process each conversation
-    for (const convo of conversations) {
+    while (pagesProcessed < maxPages) {
+      let convosResponse: GistConversationsResponse;
+
       try {
-        // Fetch ALL messages for this conversation
-        let msgPage = 1;
-        let msgHasMore = true;
-        const allMessages: GistMessage[] = [];
+        convosResponse = await gistGet<GistConversationsResponse>(apiKey, 'conversations', {
+          page: String(currentPage),
+          per_page: '20',
+        });
+      } catch (err: unknown) {
+        if (err && typeof err === 'object' && 'retryable' in err) {
+          await sleep(2000);
+          convosResponse = await gistGet<GistConversationsResponse>(apiKey, 'conversations', {
+            page: String(currentPage),
+            per_page: '20',
+          });
+        } else {
+          throw err;
+        }
+      }
 
-        while (msgHasMore) {
-          let msgRes: GistMessagesResponse;
+      const conversations = convosResponse.conversations ?? [];
+      const totalConvos = convosResponse.pages?.total_count ?? 0;
+      const totalPages = Math.ceil(totalConvos / 20);
 
-          try {
-            msgRes = await gistGet<GistMessagesResponse>(apiKey, `conversations/${convo.id}/messages`, {
-              page: String(msgPage),
-              per_page: '50',
-            });
-          } catch (retryErr: unknown) {
-            if (retryErr && typeof retryErr === 'object' && 'retryable' in retryErr) {
-              await sleep(2000);
+      conversationsFetched += conversations.length;
+      pagesProcessed++;
+
+      // Process each conversation on this page
+      for (const convo of conversations) {
+        try {
+          let msgPage = 1;
+          let msgHasMore = true;
+          const allMessages: GistMessage[] = [];
+
+          while (msgHasMore) {
+            let msgRes: GistMessagesResponse;
+
+            try {
               msgRes = await gistGet<GistMessagesResponse>(apiKey, `conversations/${convo.id}/messages`, {
                 page: String(msgPage),
                 per_page: '50',
               });
-            } else {
-              throw retryErr;
+            } catch (retryErr: unknown) {
+              if (retryErr && typeof retryErr === 'object' && 'retryable' in retryErr) {
+                await sleep(2000);
+                msgRes = await gistGet<GistMessagesResponse>(apiKey, `conversations/${convo.id}/messages`, {
+                  page: String(msgPage),
+                  per_page: '50',
+                });
+              } else {
+                throw retryErr;
+              }
+            }
+
+            const msgs = msgRes.messages ?? [];
+            allMessages.push(...msgs);
+
+            const msgTotalPages = msgRes.pages ? Math.ceil(msgRes.pages.total_count / 50) : 1;
+            msgHasMore = msgPage < msgTotalPages;
+            msgPage++;
+          }
+
+          messagesFetched += allMessages.length;
+
+          // Resolve client_id from the first contact-type author
+          let resolvedClientId: string | null = null;
+          let resolvedBindingId: string | null = null;
+
+          const contactMsg = allMessages.find(
+            (m) => m.author?.type === 'contact' || m.author?.type === 'user'
+          );
+
+          if (contactMsg?.author?.id) {
+            const contactGistId = String(contactMsg.author.id);
+            const participantInfo = gistIdToParticipant.get(contactGistId);
+
+            if (participantInfo) {
+              if (participantInfo.side === 'umode') {
+                resolvedClientId = null;
+              } else if (participantInfo.clientId) {
+                resolvedClientId = participantInfo.clientId;
+                const binding = bindingByClientId.get(participantInfo.clientId);
+                resolvedBindingId = binding?.id ?? null;
+              }
             }
           }
 
-          const msgs = msgRes.messages ?? [];
-          allMessages.push(...msgs);
-
-          const msgTotalPages = msgRes.pages ? Math.ceil(msgRes.pages.total_count / 50) : 1;
-          msgHasMore = msgPage < msgTotalPages;
-          msgPage++;
-        }
-
-        messagesFetched += allMessages.length;
-
-        // --- NEW: Resolve client_id from the first contact-type author ---
-        let resolvedClientId: string | null = null;
-        let resolvedBindingId: string | null = null;
-        let resolvedParticipantSide: string | null = null;
-
-        // Find first message from a contact (inbound participant)
-        const contactMsg = allMessages.find(
-          (m) => m.author?.type === 'contact' || m.author?.type === 'user'
-        );
-
-        if (contactMsg?.author?.id) {
-          const contactGistId = String(contactMsg.author.id);
-          const participantInfo = gistIdToParticipant.get(contactGistId);
-
-          if (participantInfo) {
-            resolvedParticipantSide = participantInfo.side;
-
-            if (participantInfo.side === 'umode') {
-              // Internal message — quarantine (skip)
-              resolvedClientId = null;
-            } else if (participantInfo.clientId) {
-              resolvedClientId = participantInfo.clientId;
-              const binding = bindingByClientId.get(participantInfo.clientId);
-              resolvedBindingId = binding?.id ?? null;
-            }
+          if (!resolvedClientId) {
+            messagesQuarantined += allMessages.length;
+            await sleep(100);
+            continue;
           }
-          // If participant not found, resolvedClientId stays null (quarantine)
-        }
 
-        // If no client resolved, skip this entire conversation (quarantine)
-        if (!resolvedClientId) {
-          messagesQuarantined += allMessages.length;
+          const rows = allMessages.map((msg) => {
+            const isInbound = msg.is_inbound ?? (msg.author?.type === 'user' || msg.author?.type === 'contact');
+            const senderSide = isInbound ? 'client' : 'umode';
+            const senderGistId = msg.author?.id ? String(msg.author.id) : null;
+            const senderInfo = senderGistId ? gistIdToParticipant.get(senderGistId) : undefined;
+            const senderParticipantId = senderInfo?.participantId ?? null;
+
+            return {
+              channel: 'gist' as const,
+              external_id: String(msg.id),
+              client_id: resolvedClientId!,
+              channel_binding_id: resolvedBindingId,
+              content: msg.body ?? null,
+              sender_side: senderSide,
+              sender_raw: msg.author?.name ?? msg.author?.email ?? null,
+              sender_participant_id: senderParticipantId,
+              occurred_at: new Date(msg.created_at * 1000).toISOString(),
+              interaction_type: 'text' as const,
+              tone: 'ok' as const,
+              classified_at: null,
+              raw_payload: msg as unknown,
+              attachments: msg.attachments ?? [],
+            };
+          });
+
+          if (rows.length > 0) {
+            let convoUpserted = 0;
+
+            for (let i = 0; i < rows.length; i += 100) {
+              const batch = rows.slice(i, i + 100);
+              const { data: inserted, error: insertErr } = await supaAdmin
+                .from('interactions')
+                .upsert(batch, { onConflict: 'channel,external_id' })
+                .select('id');
+
+              if (insertErr) {
+                errors.push(`Conv ${convo.id} batch ${i}: ${insertErr.message}`);
+              } else {
+                convoUpserted += (inserted ?? []).length;
+              }
+            }
+
+            messagesInserted += convoUpserted;
+            messagesSkipped += Math.max(0, rows.length - convoUpserted);
+          }
+
           await sleep(100);
-          continue;
+        } catch (convoErr) {
+          const msg = convoErr instanceof Error ? convoErr.message : 'Unknown error';
+          errors.push(`Conv ${convo.id}: ${msg}`);
         }
+      }
 
-        // Map messages to interactions
-        const rows = allMessages.map((msg) => {
-          const isInbound = msg.is_inbound ?? (msg.author?.type === 'user' || msg.author?.type === 'contact');
-          const senderSide = isInbound ? 'client' : 'umode';
-          const senderGistId = msg.author?.id ? String(msg.author.id) : null;
-          const senderInfo = senderGistId ? gistIdToParticipant.get(senderGistId) : undefined;
-          const senderParticipantId = senderInfo?.participantId ?? null;
-
-          return {
-            channel: 'gist' as const,
-            external_id: String(msg.id),
-            client_id: resolvedClientId!,
-            channel_binding_id: resolvedBindingId,
-            content: msg.body ?? null,
-            sender_side: senderSide,
-            sender_raw: msg.author?.name ?? msg.author?.email ?? null,
-            sender_participant_id: senderParticipantId,
-            occurred_at: new Date(msg.created_at * 1000).toISOString(),
-            interaction_type: 'text' as const,
-            tone: 'ok' as const,
-            classified_at: null,
-            raw_payload: msg as unknown,
-            attachments: msg.attachments ?? [],
-          };
-        });
-
-        if (rows.length > 0) {
-          let convoUpserted = 0;
-
-          for (let i = 0; i < rows.length; i += 100) {
-            const batch = rows.slice(i, i + 100);
-            const { data: inserted, error: insertErr } = await supaAdmin
-              .from('interactions')
-              .upsert(batch, { onConflict: 'channel,external_id' })
-              .select('id');
-
-            if (insertErr) {
-              errors.push(`Conv ${convo.id} batch ${i}: ${insertErr.message}`);
-            } else {
-              convoUpserted += (inserted ?? []).length;
-            }
-          }
-
-          messagesInserted += convoUpserted;
-          messagesSkipped += Math.max(0, rows.length - convoUpserted);
+      // Check if there are more pages beyond current
+      if (currentPage < totalPages) {
+        currentPage++;
+        // If we've hit maxPages, signal has_more for the frontend to continue
+        if (pagesProcessed >= maxPages) {
+          hasMore = true;
+          nextPage = currentPage;
         }
-
-        await sleep(100);
-      } catch (convoErr) {
-        const msg = convoErr instanceof Error ? convoErr.message : 'Unknown error';
-        errors.push(`Conv ${convo.id}: ${msg}`);
+      } else {
+        // No more conversation pages
+        break;
       }
     }
 
     return new Response(
       JSON.stringify({
-        conversations_fetched: conversations.length,
+        conversations_fetched: conversationsFetched,
         messages_fetched: messagesFetched,
         messages_inserted: messagesInserted,
         messages_skipped: messagesSkipped,
         messages_quarantined: messagesQuarantined,
         errors,
         has_more: hasMore,
-        next_page: hasMore ? requestedPage + 1 : undefined,
+        next_page: nextPage,
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );

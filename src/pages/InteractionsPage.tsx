@@ -21,11 +21,26 @@ interface SyncResult {
   total_pages: number | null;
 }
 
+interface IngestResult {
+  conversations_fetched: number;
+  messages_fetched: number;
+  messages_inserted: number;
+  messages_skipped: number;
+  messages_quarantined: number;
+  errors: string[];
+  has_more: boolean;
+  next_page?: number;
+}
+
+const DELETE_CLIENT_ID = "a333ad32-6295-4ac5-a15f-6d3931130315";
+
 const InteractionsPage = () => {
   const { user } = useAuth();
   const { selectedClient } = useClient();
   const [syncing, setSyncing] = useState(false);
   const [syncLog, setSyncLog] = useState<string[]>([]);
+  const [ingesting, setIngesting] = useState(false);
+  const [ingestLog, setIngestLog] = useState<string[]>([]);
 
   const { data: count = 0, isLoading } = useQuery<number>({
     queryKey: ["interactions_count", selectedClient?.id, user?.id],
@@ -41,6 +56,7 @@ const InteractionsPage = () => {
     },
   });
 
+  // --- Sync contacts loop ---
   const handleSyncAll = async () => {
     setSyncing(true);
     setSyncLog([]);
@@ -78,7 +94,6 @@ const InteractionsPage = () => {
           break;
         }
 
-        // Accumulate
         totals.contacts_processed! += result.contacts_processed;
         totals.contacts_unresolved! += result.contacts_unresolved;
         totals.clients_created! += result.clients_created;
@@ -109,6 +124,89 @@ const InteractionsPage = () => {
     setSyncing(false);
   };
 
+  // --- Ingest historical loop ---
+  const handleIngestHistory = async () => {
+    setIngesting(true);
+    setIngestLog([]);
+
+    const totals = {
+      conversations_fetched: 0,
+      messages_fetched: 0,
+      messages_inserted: 0,
+      messages_quarantined: 0,
+      errors: [] as string[],
+    };
+
+    let page = 1;
+    let batch = 0;
+    let isFirstCall = true;
+
+    try {
+      while (true) {
+        batch++;
+        const bodyPayload: Record<string, unknown> = { page, max_pages: 5 };
+
+        // First call includes delete_client_id to clean up
+        if (isFirstCall) {
+          bodyPayload.delete_client_id = DELETE_CLIENT_ID;
+          setIngestLog((prev) => [...prev, `🗑️ Deletando interações do client ${DELETE_CLIENT_ID}...`]);
+          isFirstCall = false;
+        }
+
+        setIngestLog((prev) => [...prev, `⏳ Batch ${batch} — página ${page}...`]);
+
+        const { data, error } = await supabase.functions.invoke("ingest-gist-historical", {
+          body: bodyPayload,
+        });
+
+        if (error) {
+          setIngestLog((prev) => [...prev, `❌ Erro: ${error.message}`]);
+          break;
+        }
+
+        const result = data as IngestResult | null;
+        if (!result) {
+          setIngestLog((prev) => [...prev, `❌ Resposta inesperada: ${JSON.stringify(data)}`]);
+          break;
+        }
+
+        totals.conversations_fetched += result.conversations_fetched;
+        totals.messages_fetched += result.messages_fetched;
+        totals.messages_inserted += result.messages_inserted;
+        totals.messages_quarantined += result.messages_quarantined;
+        if (result.errors?.length) totals.errors.push(...result.errors);
+
+        setIngestLog((prev) => [
+          ...prev,
+          `✅ Batch ${batch}: ${result.conversations_fetched} conversas, +${result.messages_inserted} inseridas, ${result.messages_quarantined} quarentena`,
+        ]);
+
+        if (!result.has_more || !result.next_page) {
+          setIngestLog((prev) => [...prev, `🏁 Importação completa!`]);
+          break;
+        }
+
+        page = result.next_page;
+        await new Promise((r) => setTimeout(r, 1000));
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setIngestLog((prev) => [...prev, `❌ Erro fatal: ${msg}`]);
+    }
+
+    setIngestLog((prev) => [
+      ...prev,
+      `\n📊 Resumo final:`,
+      `  Conversas: ${totals.conversations_fetched}`,
+      `  Mensagens inseridas: ${totals.messages_inserted}`,
+      `  Mensagens quarentena: ${totals.messages_quarantined}`,
+      `  Erros: ${totals.errors.length}`,
+      totals.errors.length > 0 ? `  ${totals.errors.join('\n  ')}` : '',
+    ].filter(Boolean));
+
+    setIngesting(false);
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -128,7 +226,7 @@ const InteractionsPage = () => {
         />
       </div>
 
-      {/* Sync test */}
+      {/* Sync contacts test */}
       <div className="border border-dashed border-muted-foreground/30 rounded-lg p-4 space-y-3">
         <p className="text-sm font-medium text-muted-foreground">🧪 Teste: sync-gist-contacts (loop automático)</p>
         <Button onClick={handleSyncAll} disabled={syncing} variant="outline" size="sm">
@@ -137,6 +235,20 @@ const InteractionsPage = () => {
         {syncLog.length > 0 && (
           <pre className="text-xs bg-muted p-3 rounded-md overflow-auto max-h-96 whitespace-pre-wrap">
             {syncLog.join("\n")}
+          </pre>
+        )}
+      </div>
+
+      {/* Ingest historical test */}
+      <div className="border border-dashed border-muted-foreground/30 rounded-lg p-4 space-y-3">
+        <p className="text-sm font-medium text-muted-foreground">🧪 Teste: ingest-gist-historical (loop automático)</p>
+        <p className="text-xs text-muted-foreground">Deleta interações do client {DELETE_CLIENT_ID} e reimporta todo histórico.</p>
+        <Button onClick={handleIngestHistory} disabled={ingesting} variant="outline" size="sm">
+          {ingesting ? "Importando..." : "Importar histórico Gist"}
+        </Button>
+        {ingestLog.length > 0 && (
+          <pre className="text-xs bg-muted p-3 rounded-md overflow-auto max-h-96 whitespace-pre-wrap">
+            {ingestLog.join("\n")}
           </pre>
         )}
       </div>
