@@ -64,7 +64,7 @@ const InteractionsPage = () => {
         setSyncLog((prev) => [...prev, `⏳ Batch ${batch} — página ${page}...`]);
 
         const { data, error } = await supabase.functions.invoke("sync-gist-contacts", {
-          body: { page, max_pages: 50 },
+          body: { page, max_pages: 5 },
         });
 
         if (error) {
@@ -98,6 +98,7 @@ const InteractionsPage = () => {
         }
 
         page = result.next_page;
+        await new Promise((r) => setTimeout(r, 1000));
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
