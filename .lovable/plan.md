@@ -1,29 +1,42 @@
 
 
-# Fix: Importação interrompida ao navegar para outra página
+# Wizard de Contatos Gist: Separar em 2 etapas
 
 ## Problema
-O `handleImportHistory` executa um loop `while` assíncrono dentro do componente `ClientsPage`. Quando o usuário navega para outra rota (ex: "Interações"), o React desmonta o componente, o loop morre silenciosamente, e ao voltar o estado reinicia zerado mostrando o botão "Importar Histórico" como se nada tivesse acontecido.
+Atualmente, o Step A ("Discovery") mostra tudo junto: a lista de domínios/empresas com as opções de vincular/criar/ignorar E os contatos individuais de cada grupo. Isso é confuso quando há muitos domínios com dezenas de contatos.
 
-## Solução
+## Nova estrutura do wizard
 
-Duas melhorias complementares:
+### Step 1 — "Clientes" (novo)
+Lista apenas os **domínios/empresas** encontrados. Para cada grupo, o usuário escolhe:
+- **Vincular a cliente existente** (select de clientes)
+- **Criar novo cliente** (input de nome)
+- **Ignorar** (novo — não importa contatos desse domínio)
 
-### 1. Prevenir navegação durante importação
-Adicionar um alerta/bloqueio visual quando `importing === true`. Usar `window.onbeforeunload` e interceptar cliques na sidebar durante importação com um `toast.warning("Importação em andamento, aguarde...")`.
+Sem tabela de contatos. Apenas mostra o domínio, nome da empresa (se houver) e quantidade de contatos como informação contextual (ex: "nkstore.com.br — 42 contatos").
 
-### 2. Continuar importação mesmo ao navegar (abordagem robusta)
-Mover o estado da importação para o `ClientContext` (que vive acima das rotas e não desmonta). Assim o loop continua rodando mesmo se o usuário trocar de página, e ao voltar para `/clients` o progresso aparece atualizado.
+Botão "Próximo" avança ao Step 2 (filtrando apenas os grupos não-ignorados).
 
-### Alterações
+### Step 2 — "Contatos" (novo)
+Para cada grupo **não ignorado**, mostra a tabela de contatos com checkbox individual para selecionar quais contatos importar. Também mostra a seção de Teammates.
 
-**`src/context/ClientContext.tsx`**
-- Adicionar ao contexto: `importing`, `importProgress`, `handleImportHistory()` 
-- Mover a lógica do loop de importação para cá
+Botão "Confirmar Vínculos" avança ao Step 3 (atual "confirmation").
 
-**`src/pages/ClientsPage.tsx`**
-- Consumir `importing`, `importProgress`, `handleImportHistory` do `ClientContext` em vez de estado local
-- Remover a lógica duplicada
+### Step 3 — "Confirmação" (atual)
+Sem alterações significativas, apenas ajusta os contadores para refletir apenas os selecionados.
+
+### Step 4 — "Importação" (atual, só onboarding)
+Sem alterações.
+
+## Alterações em `src/pages/ClientsPage.tsx`
+
+1. Alterar `WizardStep` para `"clients" | "contacts" | "confirmation" | "import"`
+2. Step inicial passa de `"discovery"` para `"clients"`
+3. Adicionar opção `"ignore"` ao `GroupMapping.type` (tipo `"existing" | "new" | "ignore"`)
+4. **Step "clients"**: renderiza cards compactos por domínio — só domínio, empresa, count, e select (vincular/criar/ignorar) + input/select conforme tipo
+5. **Step "contacts"**: para cada grupo não-ignorado, mostra tabela de contatos com checkboxes. Novo state `selectedContacts: Map<number, boolean>` para controle individual. Também mostra teammates aqui.
+6. Ajustar `handleConfirmMappings` para filtrar apenas contatos selecionados e grupos não-ignorados
+7. Ajustar `summaryContactCount` para contar apenas selecionados
 
 Nenhum outro arquivo será alterado.
 
