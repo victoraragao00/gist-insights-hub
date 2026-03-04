@@ -11,8 +11,7 @@ const GENERIC_DOMAINS = new Set([
   'protonmail.com', 'aol.com', 'mail.com',
 ]);
 
-const TWO_YEARS_MS = 2 * 365.25 * 24 * 60 * 60 * 1000;
-const DEFAULT_MAX_PAGES = 5;
+const DEFAULT_MAX_PAGES = 50;
 
 interface GistContact {
   id: number;
@@ -287,8 +286,6 @@ Deno.serve(async (req) => {
     // 2. Paginate Gist contacts (limited by maxPages)
     let currentPage = startPage;
     let pagesProcessed = 0;
-    const cutoffDate = new Date(Date.now() - TWO_YEARS_MS);
-    let hitCutoff = false;
 
     while (pagesProcessed < maxPages) {
       const url = `${GIST_BASE}/contacts?order_by=last_seen_at&order=desc&per_page=60&page=${currentPage}`;
@@ -311,15 +308,6 @@ Deno.serve(async (req) => {
 
       result.total_pages = contactsRes.pages.total_pages;
 
-      // Check if last contact on page is too old
-      const lastContact = contacts[contacts.length - 1];
-      const lastSeen = parseLastSeen(lastContact.last_seen_at);
-      if (lastSeen && lastSeen < cutoffDate) {
-        await processContacts(contacts);
-        hitCutoff = true;
-        break;
-      }
-
       await processContacts(contacts);
       pagesProcessed++;
 
@@ -336,9 +324,9 @@ Deno.serve(async (req) => {
     }
 
     // Set has_more / next_page
-    if (!hitCutoff && result.total_pages && currentPage < result.total_pages) {
+    if (result.total_pages && currentPage < result.total_pages) {
       result.has_more = true;
-      result.next_page = currentPage; // already incremented
+      result.next_page = currentPage;
     }
 
     // Post-loop: update clients.metadata.last_seen_at
