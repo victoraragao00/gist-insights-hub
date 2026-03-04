@@ -222,6 +222,8 @@ const Integrations = () => {
             </div>
           </div>
         ))}
+
+        {gistTestOpen && <GistTestPanel onClose={() => setGistTestOpen(false)} />}
       </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
