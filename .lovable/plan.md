@@ -1,117 +1,114 @@
 
 
-# Hub de Integrações — Plataforma Multi-App
+# CX Hub — Steps 1, 2, 3 Implementation Plan
 
-A arquitetura atual está orientada ao Gist como produto único. Precisa ser reestruturada para um **hub genérico** onde o usuário conecta qualquer plataforma, cria indicadores customizados e configura alertas automáticos.
+## Step 1: Authentication
 
-## Nova Arquitetura
+### Create files:
 
-```text
-┌──────────────────────────────────────────────────┐
-│                   HUB CENTRAL                    │
-├──────────┬───────────┬───────────┬───────────────┤
-│ Conexões │ Dashboard │ Indicadores│  Auditorias  │
-│ (Apps)   │ (Visão)   │ (Builder)  │  (Alertas)   │
-├──────────┴───────────┴───────────┴───────────────┤
-│              Edge Functions (Proxy)              │
-│  gist-proxy │ stripe-proxy │ generic-api-proxy   │
-├──────────────────────────────────────────────────┤
-│           Database (integrations, kpis,          │
-│           alert_rules, alert_logs)               │
-└──────────────────────────────────────────────────┘
-```
+**`src/context/AuthContext.tsx`**
+- React context with `user`, `session`, `loading`, `signOut`
+- Sets up `onAuthStateChange` BEFORE `getSession()` 
+- Typed interfaces for context value
 
-## Fase 1 — Banco de Dados e Modelo de Integrações
+**`src/components/ProtectedRoute.tsx`**
+- Shows spinner while `loading`
+- Redirects to `/login` if no user
+- Renders `children` otherwise
 
-Criar tabelas:
-- **integrations**: id, user_id, platform (gist/stripe/linear/notion/whatsapp/custom), name, auth_type (api_key/oauth/token), credentials (encrypted), config (JSON com endpoints habilitados), status (active/inactive), created_at
-- **data_sources**: id, integration_id, endpoint_path, label, data_schema (JSON), sync_interval, last_synced_at
-- **kpi_indicators**: id, user_id, name, data_source_id, metric_type (count/sum/avg/percentage/custom), formula (expressão customizada), filters (JSON), chart_type (line/bar/donut/number), created_at
-- **alert_rules**: id, user_id, kpi_indicator_id, condition_type (threshold/percentage_change/compound), conditions (JSON com regras compostas), notification_channels (JSON: whatsapp/email/slack/push), is_active, cooldown_minutes
-- **alert_logs**: id, alert_rule_id, triggered_at, value_at_trigger, notification_sent_to
+**`src/components/ErrorBoundary.tsx`**
+- Class component with `getDerivedStateFromError`
+- Fallback UI with retry button
 
-RLS policies por user_id em todas as tabelas.
+**`src/pages/LoginPage.tsx`**
+- Email + password form using sonner for toasts
+- Link to `/signup`
+- Calls `supabase.auth.signInWithPassword`
+- Redirects to `/` on success
 
-## Fase 2 — Marketplace de Integrações
+**`src/pages/SignupPage.tsx`**
+- Email + password + confirm password
+- Link to `/login`
+- Calls `supabase.auth.signUp`
+- Shows "check your email" message
 
-Reestruturar a navegação:
-- **Sidebar**: Dashboard, Integrações, Indicadores, Auditorias, Insights IA, Configurações
-- Remover páginas Conversas/Contatos/Campanhas (eram específicas do Gist)
+### Modify files:
 
-Nova página **Integrações** (/integrations):
-- Grid de cards com plataformas disponíveis (Gist, Stripe, Linear, Notion, TUDO1, WhatsApp, Slack, Custom API)
-- Cada card mostra: logo, nome, status (conectado/desconectado), botão conectar
-- Ao conectar: modal pede API Key/Token (ou inicia OAuth quando disponível)
-- Após conectar: lista de data sources disponíveis para aquela plataforma com toggles
+**`src/App.tsx`**
+- Wrap in `<AuthProvider>`
+- Remove `@/components/ui/toaster` import and `<Toaster />` (keep only sonner)
+- Add `/login` and `/signup` routes (public)
+- Wrap all other routes in `<ProtectedRoute>` + `<ErrorBoundary>`
 
-Edge Function **generic-api-proxy**:
-- Recebe integration_id + endpoint, busca credenciais do banco, faz a chamada e retorna dados
-- Suporta diferentes auth types (Bearer, API Key header, query param)
+---
 
-## Fase 3 — Builder de Indicadores
+## Step 2: Database Migration
 
-Nova página **Indicadores** (/indicators):
-- Lista de KPIs criados pelo usuário em cards
-- Botão "Novo Indicador" abre builder visual:
-  1. Selecionar fonte de dados (integração + endpoint)
-  2. Escolher métrica (contagem, soma, média, % de variação)
-  3. Aplicar filtros (campo, operador, valor)
-  4. Escolher tipo de visualização (número grande, linha, barra, donut)
-  5. Nomear e salvar
+Single migration that:
+1. Drops old tables: `alert_logs`, `alert_rules`, `kpi_indicators`, `data_sources`, `integrations` (CASCADE)
+2. Drops old enums: `metric_type`, `chart_type`, `condition_type`, `platform_type`, `auth_type`
+3. Creates new enums: `channel_type`, `interaction_type`, `tone_severity`, `alert_channel`
+4. Creates 7 tables: `clients`, `channel_bindings`, `participants`, `interactions`, `audit_rules`, `audit_alerts`, `user_client_access`
+5. Creates indexes for dedup, performance, and full-text search
+6. Enables RLS on all tables with appropriate policies
+7. Inserts seed data: `By NV` client
 
-Templates prontos por plataforma:
-- Gist: "Conversas abertas", "Total de contatos", "Campanhas ativas"
-- Stripe: "MRR", "Churn rate", "Novos assinantes"
-- Linear: "Issues abertas", "Cycle velocity"
-- Ao selecionar template, preenche automaticamente o builder
+The `user_client_access` seed row will need to be inserted manually after first login (user UUID unknown until then). Will add a note about this.
 
-Dashboard principal mostra os indicadores criados em grid editável.
+---
 
-## Fase 4 — Sistema de Auditorias e Alertas
+## Step 3: Sidebar + Routes + ClientContext
 
-Nova página **Auditorias** (/audits):
-- Lista de regras de alerta ativas/inativas
-- Botão "Nova Auditoria" abre wizard:
-  1. Selecionar indicador(es) a monitorar
-  2. Definir condição: simples ("se > 50") ou composta ("se X caiu 20% E Y > 30")
-  3. Selecionar canais de notificação (WhatsApp, Email, Slack, Push)
-  4. Definir cooldown (evitar spam de alertas)
-  5. Ativar
+### Create files:
 
-Edge Function **check-alerts** (executada via cron a cada 5min):
-- Percorre regras ativas, puxa dados atuais via proxy, avalia condições
-- Se trigger: envia notificação nos canais configurados e registra no alert_logs
+**`src/context/ClientContext.tsx`**
+- Fetches clients from `clients` table filtered by `user_client_access`
+- Query key: `["clients", user.id]`
+- Exposes: `clients`, `selectedClient`, `setSelectedClient`, `loading`
+- staleTime: 5 minutes
 
-Edge Function **send-notification**:
-- Envia via WhatsApp (API), Email, Slack (connector) conforme canal
+**`src/pages/InteractionsPage.tsx`** — placeholder with title "Interações"
 
-## Fase 5 — Insights IA com Gemini
+**`src/pages/ClientsPage.tsx`** — placeholder with title "Clientes"
 
-- Mantém a página Insights mas agora analisa dados de TODAS as integrações conectadas
-- Botão "Gerar Análise" envia KPIs atuais ao Gemini (externo, via secret GEMINI_API_KEY)
-- Chat para perguntas sobre dados cross-platform
+### Modify files:
 
-## Fase 6 — Refinamentos
+**`src/components/AppSidebar.tsx`**
+- Replace menu items: Dashboard, Interações, Clientes, Auditorias, Configurações
+- Add client selector dropdown at top (from ClientContext)
+- Icons: LayoutDashboard, MessageSquare, Building2, ShieldAlert, Settings
 
-- Filtros de período globais
-- Skeletons e estados de erro
-- Responsividade
-- Logs de sincronização por integração
+**`src/App.tsx`**
+- Wrap authenticated content in `<ClientProvider>`
+- Update routes: `/interactions`, `/clients`, `/audits`, `/settings`
+- Remove `/integrations`, `/indicators`, `/insights` routes
 
-## Secrets Necessários
+**`src/pages/Index.tsx`**
+- Simplify to CX Hub dashboard placeholder (remove Gist KPI references for now)
 
-- **GIST_API_KEY**: quando usuário conectar Gist
-- **GEMINI_API_KEY**: para insights IA
-- Demais keys: armazenadas criptografadas no banco por integração
+### Delete files:
+- `src/pages/Indicators.tsx`
+- `src/pages/Insights.tsx`
+- `src/pages/Integrations.tsx`
+- `src/hooks/useGistKPIs.ts`
+- `src/components/GistTestPanel.tsx`
 
-## Ordem de Implementação
+### Keep untouched:
+- `supabase/functions/gist-proxy/index.ts`
+- `src/components/ui/*`
+- `src/components/KPICard.tsx`
+- `src/components/NavLink.tsx`
+- `src/components/DashboardLayout.tsx`
+- `src/integrations/supabase/client.ts`
 
-1. Banco de dados (tabelas + RLS)
-2. Reestruturar sidebar e rotas
-3. Página de Integrações (marketplace + modal de conexão)
-4. Edge Function generic-api-proxy
-5. Builder de Indicadores + templates
-6. Dashboard dinâmico com KPIs do usuário
-7. Sistema de Auditorias (regras + cron + notificações)
-8. Insights IA cross-platform
+---
+
+## Summary of changes
+
+| Action | Files |
+|--------|-------|
+| **Create** | `AuthContext.tsx`, `ClientContext.tsx`, `ProtectedRoute.tsx`, `ErrorBoundary.tsx`, `LoginPage.tsx`, `SignupPage.tsx`, `InteractionsPage.tsx`, `ClientsPage.tsx` |
+| **Modify** | `App.tsx`, `AppSidebar.tsx`, `Index.tsx` |
+| **Delete** | `Indicators.tsx`, `Insights.tsx`, `Integrations.tsx`, `useGistKPIs.ts`, `GistTestPanel.tsx` |
+| **Migration** | Drop 5 old tables + 5 enums, create 7 new tables + 4 enums + indexes + RLS + seed |
 
