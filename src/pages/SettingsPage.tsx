@@ -10,7 +10,11 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Users, MessageCircle, Phone, Hash, Mail, Mic, Download, Loader2, Check, Upload } from "lucide-react";
+import { Users, MessageCircle, Phone, Hash, Mail, Mic, Download, Loader2, Check, Upload, MoreHorizontal } from "lucide-react";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { GistContactWizard } from "@/components/GistContactWizard";
@@ -116,42 +120,54 @@ const SettingsPage = () => {
 
         {/* ═══ Tab: Integrações ═══ */}
         <TabsContent value="integrations" className="space-y-4 mt-4">
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {integrations.map((integ) => (
-              <Card key={integ.id} className={`border shadow-sm ${!integ.enabled ? "opacity-60" : ""} ${integ.connected ? "sm:col-span-2" : ""}`}>
-                <CardContent className="p-5 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent">
-                        <integ.icon className="h-5 w-5 text-accent-foreground" />
-                      </div>
-                      <span className="font-semibold text-sm">{integ.name}</span>
+              <Card key={integ.id} className={`border shadow-sm ${!integ.enabled ? "opacity-60" : ""}`}>
+                <CardContent className="flex items-center justify-between p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent">
+                      <integ.icon className="h-4 w-4 text-accent-foreground" />
                     </div>
+                    <span className="font-semibold text-sm">{integ.name}</span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
                     <Badge variant={integ.connected ? "default" : "outline"} className="text-xs">
                       {integ.connected ? "Conectado" : integ.enabled ? "Desconectado" : "Em breve"}
                     </Badge>
+
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        {integ.id === "gist" && integ.connected ? (
+                          <>
+                            <DropdownMenuItem onClick={handleImportHistory} disabled={importing}>
+                              <Download className="h-4 w-4 mr-2" />
+                              Importar Histórico
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setWizardOpen(true)}>
+                              <Users className="h-4 w-4 mr-2" />
+                              Gerenciar Contatos
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem disabled>
+                              Configurar Webhook
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem disabled className="text-destructive focus:text-destructive">
+                              Desconectar
+                            </DropdownMenuItem>
+                          </>
+                        ) : (
+                          <DropdownMenuItem disabled>Em breve...</DropdownMenuItem>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
-
-                  {integ.id === "gist" && integ.connected && (
-                    <div className="grid grid-cols-2 gap-2">
-                      <Button size="sm" variant="outline" className="text-xs" onClick={handleImportHistory} disabled={importing}>
-                        {importing ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Download className="h-3.5 w-3.5 mr-1" />}
-                        Importar Histórico
-                      </Button>
-                      <Button size="sm" variant="outline" className="text-xs" onClick={() => setWizardOpen(true)} disabled={wizardOpen}>
-                        <Users className="h-3.5 w-3.5 mr-1" /> Gerenciar Contatos
-                      </Button>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button size="sm" variant="outline" className="text-xs" disabled>Configurar Webhook</Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Em breve</TooltipContent>
-                      </Tooltip>
-                      <Button size="sm" variant="destructive" className="text-xs" disabled>Desconectar</Button>
-                    </div>
-                  )}
-
-                  {!integ.enabled && <p className="text-xs text-muted-foreground">Em breve</p>}
                 </CardContent>
               </Card>
             ))}
