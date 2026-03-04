@@ -38,7 +38,13 @@ interface ChannelBinding {
 
 interface Participant {
   id: string;
+  client_id: string | null;
   identifiers: Array<{ channel: string; value: string }> | null;
+}
+
+interface RequestBody {
+  page?: number;
+  client_id?: string;
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -69,8 +75,9 @@ Deno.serve(async (req) => {
     const apiKey = Deno.env.get('GIST_API_KEY');
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
 
-    if (!apiKey || !serviceKey || !supabaseUrl) {
+    if (!apiKey || !serviceKey || !supabaseUrl || !anonKey) {
       return new Response(JSON.stringify({ error: 'Missing environment variables' }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -80,49 +87,97 @@ Deno.serve(async (req) => {
     const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
     const supaAdmin = createClient(supabaseUrl, serviceKey);
 
-    const body = await req.json().catch(() => ({})) as { page?: number };
-    const requestedPage = body.page ?? 1;
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
-    // 1. Load channel_bindings for gist
+    const supaAuth = createClient(supabaseUrl, anonKey, {
+      global: {
+        headers: { Authorization: authHeader },
+      },
+    });
+
+    const { data: authData, error: authError } = await supaAuth.auth.getUser();
+    if (authError || !authData.user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const body = await req.json().catch(() => ({})) as RequestBody;
+    const requestedPage = body.page ?? 1;
+    const targetClientId = body.client_id;
+
+    if (!targetClientId) {
+      return new Response(JSON.stringify({ error: 'client_id is required' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const { data: accessRows, error: accessError } = await supaAdmin
+      .from('user_client_access')
+      .select('id')
+      .eq('user_id', authData.user.id)
+      .eq('client_id', targetClientId)
+      .eq('role', 'admin')
+      .limit(1);
+
+    if (accessError) {
+      throw new Error('Failed to validate client access: ' + accessError.message);
+    }
+
+    if (!accessRows || accessRows.length === 0) {
+      return new Response(JSON.stringify({ error: 'Forbidden' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // 1. Load active gist channel binding for target client
     const { data: bindings, error: bindErr } = await supaAdmin
       .from('channel_bindings')
       .select('id, client_id')
       .eq('channel', 'gist')
-      .limit(500);
+      .eq('client_id', targetClientId)
+      .eq('active', true)
+      .limit(1);
 
-    if (bindErr) throw new Error('Failed to load channel_bindings: ' + bindErr.message);
+    if (bindErr) throw new Error('Failed to load channel_binding: ' + bindErr.message);
 
-    const bindingList = (bindings ?? []) as ChannelBinding[];
-    if (bindingList.length === 0) {
+    const targetBinding = bindings?.[0];
+    if (!targetBinding) {
       return new Response(
-        JSON.stringify({ error: 'No gist channel bindings found. Run contact discovery first.' }),
+        JSON.stringify({ error: 'No active gist channel binding found for this client.' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
 
-    // Use first binding's client_id as default (multi-client handled by binding lookup)
-    const bindingByClientId = new Map<string, string>();
-    for (const b of bindingList) {
-      bindingByClientId.set(b.client_id, b.id);
-    }
-    const defaultClientId = bindingList[0].client_id;
-    const defaultBindingId = bindingList[0].id;
+    const targetBindingId = targetBinding.id;
 
     // 2. Load participants with gist identifiers into memory map
     const { data: participants, error: partErr } = await supaAdmin
       .from('participants')
-      .select('id, identifiers')
+      .select('id, client_id, identifiers')
       .not('identifiers', 'is', null)
       .limit(1000);
 
     if (partErr) throw new Error('Failed to load participants: ' + partErr.message);
 
-    const gistIdToParticipant = new Map<string, string>();
+    const gistIdToParticipant = new Map<string, { participantId: string; clientId: string | null }>();
     for (const p of (participants ?? []) as Participant[]) {
       if (!p.identifiers) continue;
       for (const ident of p.identifiers) {
         if (ident.channel === 'gist') {
-          gistIdToParticipant.set(ident.value, p.id);
+          gistIdToParticipant.set(ident.value, {
+            participantId: p.id,
+            clientId: p.client_id ?? null,
+          });
         }
       }
     }
@@ -195,18 +250,29 @@ Deno.serve(async (req) => {
 
         messagesFetched += allMessages.length;
 
+        const belongsToTargetClient = allMessages.some((msg) => {
+          const senderGistId = msg.author?.id ? String(msg.author.id) : null;
+          if (!senderGistId) return false;
+          return gistIdToParticipant.get(senderGistId)?.clientId === targetClientId;
+        });
+
+        if (!belongsToTargetClient) {
+          continue;
+        }
+
         // Map messages to interactions
         const rows = allMessages.map((msg) => {
           const isInbound = msg.is_inbound ?? (msg.author?.type === 'user');
           const senderSide = isInbound ? 'client' : 'umode';
           const senderGistId = msg.author?.id ? String(msg.author.id) : null;
-          const senderParticipantId = senderGistId ? gistIdToParticipant.get(senderGistId) ?? null : null;
+          const senderInfo = senderGistId ? gistIdToParticipant.get(senderGistId) : undefined;
+          const senderParticipantId = senderInfo?.participantId ?? null;
 
           return {
             channel: 'gist' as const,
             external_id: String(msg.id),
-            client_id: defaultClientId,
-            channel_binding_id: defaultBindingId,
+            client_id: targetClientId,
+            channel_binding_id: targetBindingId,
             content: msg.body ?? null,
             sender_side: senderSide,
             sender_raw: msg.author?.name ?? msg.author?.email ?? null,
@@ -221,22 +287,25 @@ Deno.serve(async (req) => {
         });
 
         if (rows.length > 0) {
+          let convoUpserted = 0;
+
           // Insert in batches of 100
           for (let i = 0; i < rows.length; i += 100) {
             const batch = rows.slice(i, i + 100);
             const { data: inserted, error: insertErr } = await supaAdmin
               .from('interactions')
-              .upsert(batch, { onConflict: 'channel,external_id', ignoreDuplicates: true })
+              .upsert(batch, { onConflict: 'channel,external_id' })
               .select('id');
 
             if (insertErr) {
               errors.push(`Conv ${convo.id} batch ${i}: ${insertErr.message}`);
             } else {
-              messagesInserted += (inserted ?? []).length;
+              convoUpserted += (inserted ?? []).length;
             }
           }
 
-          messagesSkipped += rows.length - messagesInserted;
+          messagesInserted += convoUpserted;
+          messagesSkipped += Math.max(0, rows.length - convoUpserted);
         }
 
         // Rate limit: 100ms delay between conversations
