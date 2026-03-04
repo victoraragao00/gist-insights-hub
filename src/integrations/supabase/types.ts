@@ -14,199 +14,359 @@ export type Database = {
   }
   public: {
     Tables: {
-      alert_logs: {
+      audit_alerts: {
         Row: {
-          alert_rule_id: string
+          client_id: string | null
+          created_at: string | null
+          delivered_at: string | null
+          delivery_status: string | null
           id: string
-          notification_sent_to: Json
-          triggered_at: string
-          value_at_trigger: number | null
+          message: string
+          metric_value: number
+          rule_id: string
+          threshold: number
         }
         Insert: {
-          alert_rule_id: string
+          client_id?: string | null
+          created_at?: string | null
+          delivered_at?: string | null
+          delivery_status?: string | null
           id?: string
-          notification_sent_to?: Json
-          triggered_at?: string
-          value_at_trigger?: number | null
+          message: string
+          metric_value: number
+          rule_id: string
+          threshold: number
         }
         Update: {
-          alert_rule_id?: string
+          client_id?: string | null
+          created_at?: string | null
+          delivered_at?: string | null
+          delivery_status?: string | null
           id?: string
-          notification_sent_to?: Json
-          triggered_at?: string
-          value_at_trigger?: number | null
+          message?: string
+          metric_value?: number
+          rule_id?: string
+          threshold?: number
         }
         Relationships: [
           {
-            foreignKeyName: "alert_logs_alert_rule_id_fkey"
-            columns: ["alert_rule_id"]
+            foreignKeyName: "audit_alerts_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: "alert_rules"
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "audit_alerts_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "audit_rules"
             referencedColumns: ["id"]
           },
         ]
       }
-      alert_rules: {
+      audit_rules: {
         Row: {
-          condition_type: Database["public"]["Enums"]["condition_type"]
-          conditions: Json
-          cooldown_minutes: number
-          created_at: string
+          active: boolean | null
+          alert_channel: Database["public"]["Enums"]["alert_channel"] | null
+          alert_recipients: Json
+          client_id: string | null
+          cooldown_hours: number | null
+          created_at: string | null
+          description: string | null
           id: string
-          is_active: boolean
-          kpi_indicator_id: string
-          notification_channels: Json
-          user_id: string
-        }
-        Insert: {
-          condition_type?: Database["public"]["Enums"]["condition_type"]
-          conditions?: Json
-          cooldown_minutes?: number
-          created_at?: string
-          id?: string
-          is_active?: boolean
-          kpi_indicator_id: string
-          notification_channels?: Json
-          user_id: string
-        }
-        Update: {
-          condition_type?: Database["public"]["Enums"]["condition_type"]
-          conditions?: Json
-          cooldown_minutes?: number
-          created_at?: string
-          id?: string
-          is_active?: boolean
-          kpi_indicator_id?: string
-          notification_channels?: Json
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "alert_rules_kpi_indicator_id_fkey"
-            columns: ["kpi_indicator_id"]
-            isOneToOne: false
-            referencedRelation: "kpi_indicators"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      data_sources: {
-        Row: {
-          data_schema: Json
-          endpoint_path: string
-          id: string
-          integration_id: string
-          is_enabled: boolean
-          label: string
-          last_synced_at: string | null
-          sync_interval: number
-        }
-        Insert: {
-          data_schema?: Json
-          endpoint_path: string
-          id?: string
-          integration_id: string
-          is_enabled?: boolean
-          label: string
-          last_synced_at?: string | null
-          sync_interval?: number
-        }
-        Update: {
-          data_schema?: Json
-          endpoint_path?: string
-          id?: string
-          integration_id?: string
-          is_enabled?: boolean
-          label?: string
-          last_synced_at?: string | null
-          sync_interval?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "data_sources_integration_id_fkey"
-            columns: ["integration_id"]
-            isOneToOne: false
-            referencedRelation: "integrations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      integrations: {
-        Row: {
-          auth_type: Database["public"]["Enums"]["auth_type"]
-          config: Json
-          created_at: string
-          credentials: Json
-          id: string
+          metric: string
           name: string
-          platform: Database["public"]["Enums"]["platform_type"]
-          status: string
-          user_id: string
+          operator: string
+          threshold: number
+          window_hours: number | null
         }
         Insert: {
-          auth_type?: Database["public"]["Enums"]["auth_type"]
-          config?: Json
-          created_at?: string
-          credentials?: Json
+          active?: boolean | null
+          alert_channel?: Database["public"]["Enums"]["alert_channel"] | null
+          alert_recipients?: Json
+          client_id?: string | null
+          cooldown_hours?: number | null
+          created_at?: string | null
+          description?: string | null
           id?: string
+          metric: string
           name: string
-          platform: Database["public"]["Enums"]["platform_type"]
-          status?: string
-          user_id: string
+          operator: string
+          threshold: number
+          window_hours?: number | null
         }
         Update: {
-          auth_type?: Database["public"]["Enums"]["auth_type"]
-          config?: Json
-          created_at?: string
-          credentials?: Json
+          active?: boolean | null
+          alert_channel?: Database["public"]["Enums"]["alert_channel"] | null
+          alert_recipients?: Json
+          client_id?: string | null
+          cooldown_hours?: number | null
+          created_at?: string | null
+          description?: string | null
           id?: string
+          metric?: string
           name?: string
-          platform?: Database["public"]["Enums"]["platform_type"]
-          status?: string
-          user_id?: string
+          operator?: string
+          threshold?: number
+          window_hours?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_rules_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      channel_bindings: {
+        Row: {
+          active: boolean | null
+          channel: Database["public"]["Enums"]["channel_type"]
+          channel_identifier: string
+          client_id: string
+          config: Json | null
+          created_at: string | null
+          id: string
+          label: string | null
+        }
+        Insert: {
+          active?: boolean | null
+          channel: Database["public"]["Enums"]["channel_type"]
+          channel_identifier: string
+          client_id: string
+          config?: Json | null
+          created_at?: string | null
+          id?: string
+          label?: string | null
+        }
+        Update: {
+          active?: boolean | null
+          channel?: Database["public"]["Enums"]["channel_type"]
+          channel_identifier?: string
+          client_id?: string
+          config?: Json | null
+          created_at?: string | null
+          id?: string
+          label?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "channel_bindings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      clients: {
+        Row: {
+          active: boolean | null
+          created_at: string | null
+          id: string
+          metadata: Json | null
+          name: string
+          slug: string
+        }
+        Insert: {
+          active?: boolean | null
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          name: string
+          slug: string
+        }
+        Update: {
+          active?: boolean | null
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          name?: string
+          slug?: string
         }
         Relationships: []
       }
-      kpi_indicators: {
+      interactions: {
         Row: {
-          chart_type: Database["public"]["Enums"]["chart_type"]
-          created_at: string
-          data_source_id: string | null
-          filters: Json
-          formula: string | null
+          attachments: Json | null
+          channel: Database["public"]["Enums"]["channel_type"]
+          channel_binding_id: string | null
+          classification_model: string | null
+          classified_at: string | null
+          client_id: string
+          content: string | null
+          created_at: string | null
+          external_id: string | null
           id: string
-          metric_type: Database["public"]["Enums"]["metric_type"]
+          ingested_at: string | null
+          interaction_type:
+            | Database["public"]["Enums"]["interaction_type"]
+            | null
+          is_out_of_scope: boolean | null
+          occurred_at: string
+          raw_payload: Json | null
+          search_vector: unknown
+          sender_participant_id: string | null
+          sender_raw: string | null
+          sender_side: string | null
+          sentiment: number | null
+          theme: string | null
+          theme_detail: string | null
+          tone: Database["public"]["Enums"]["tone_severity"] | null
+          tone_detail: string | null
+        }
+        Insert: {
+          attachments?: Json | null
+          channel: Database["public"]["Enums"]["channel_type"]
+          channel_binding_id?: string | null
+          classification_model?: string | null
+          classified_at?: string | null
+          client_id: string
+          content?: string | null
+          created_at?: string | null
+          external_id?: string | null
+          id?: string
+          ingested_at?: string | null
+          interaction_type?:
+            | Database["public"]["Enums"]["interaction_type"]
+            | null
+          is_out_of_scope?: boolean | null
+          occurred_at: string
+          raw_payload?: Json | null
+          search_vector?: unknown
+          sender_participant_id?: string | null
+          sender_raw?: string | null
+          sender_side?: string | null
+          sentiment?: number | null
+          theme?: string | null
+          theme_detail?: string | null
+          tone?: Database["public"]["Enums"]["tone_severity"] | null
+          tone_detail?: string | null
+        }
+        Update: {
+          attachments?: Json | null
+          channel?: Database["public"]["Enums"]["channel_type"]
+          channel_binding_id?: string | null
+          classification_model?: string | null
+          classified_at?: string | null
+          client_id?: string
+          content?: string | null
+          created_at?: string | null
+          external_id?: string | null
+          id?: string
+          ingested_at?: string | null
+          interaction_type?:
+            | Database["public"]["Enums"]["interaction_type"]
+            | null
+          is_out_of_scope?: boolean | null
+          occurred_at?: string
+          raw_payload?: Json | null
+          search_vector?: unknown
+          sender_participant_id?: string | null
+          sender_raw?: string | null
+          sender_side?: string | null
+          sentiment?: number | null
+          theme?: string | null
+          theme_detail?: string | null
+          tone?: Database["public"]["Enums"]["tone_severity"] | null
+          tone_detail?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "interactions_channel_binding_id_fkey"
+            columns: ["channel_binding_id"]
+            isOneToOne: false
+            referencedRelation: "channel_bindings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "interactions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "interactions_sender_participant_id_fkey"
+            columns: ["sender_participant_id"]
+            isOneToOne: false
+            referencedRelation: "participants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      participants: {
+        Row: {
+          active: boolean | null
+          client_id: string | null
+          created_at: string | null
+          id: string
+          identifiers: Json | null
           name: string
+          role: string | null
+          side: string
+        }
+        Insert: {
+          active?: boolean | null
+          client_id?: string | null
+          created_at?: string | null
+          id?: string
+          identifiers?: Json | null
+          name: string
+          role?: string | null
+          side: string
+        }
+        Update: {
+          active?: boolean | null
+          client_id?: string | null
+          created_at?: string | null
+          id?: string
+          identifiers?: Json | null
+          name?: string
+          role?: string | null
+          side?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "participants_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_client_access: {
+        Row: {
+          client_id: string
+          created_at: string | null
+          id: string
+          role: string | null
           user_id: string
         }
         Insert: {
-          chart_type?: Database["public"]["Enums"]["chart_type"]
-          created_at?: string
-          data_source_id?: string | null
-          filters?: Json
-          formula?: string | null
+          client_id: string
+          created_at?: string | null
           id?: string
-          metric_type?: Database["public"]["Enums"]["metric_type"]
-          name: string
+          role?: string | null
           user_id: string
         }
         Update: {
-          chart_type?: Database["public"]["Enums"]["chart_type"]
-          created_at?: string
-          data_source_id?: string | null
-          filters?: Json
-          formula?: string | null
+          client_id?: string
+          created_at?: string | null
           id?: string
-          metric_type?: Database["public"]["Enums"]["metric_type"]
-          name?: string
+          role?: string | null
           user_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "kpi_indicators_data_source_id_fkey"
-            columns: ["data_source_id"]
+            foreignKeyName: "user_client_access_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: "data_sources"
+            referencedRelation: "clients"
             referencedColumns: ["id"]
           },
         ]
@@ -216,22 +376,23 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      user_accessible_client_ids: {
+        Args: { _user_id: string }
+        Returns: string[]
+      }
     }
     Enums: {
-      auth_type: "api_key" | "oauth" | "token"
-      chart_type: "line" | "bar" | "donut" | "number"
-      condition_type: "threshold" | "percentage_change" | "compound"
-      metric_type: "count" | "sum" | "avg" | "percentage" | "custom"
-      platform_type:
+      alert_channel: "email" | "whatsapp" | "both"
+      channel_type:
         | "gist"
-        | "stripe"
-        | "linear"
-        | "notion"
-        | "tudo1"
+        | "discord"
         | "whatsapp"
-        | "slack"
-        | "custom"
+        | "email"
+        | "transcription_gemini"
+        | "transcription_tactiq"
+        | "manual"
+      interaction_type: "text" | "audio" | "image" | "file" | "system"
+      tone_severity: "ok" | "atencao" | "alerta" | "critico"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -359,20 +520,18 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      auth_type: ["api_key", "oauth", "token"],
-      chart_type: ["line", "bar", "donut", "number"],
-      condition_type: ["threshold", "percentage_change", "compound"],
-      metric_type: ["count", "sum", "avg", "percentage", "custom"],
-      platform_type: [
+      alert_channel: ["email", "whatsapp", "both"],
+      channel_type: [
         "gist",
-        "stripe",
-        "linear",
-        "notion",
-        "tudo1",
+        "discord",
         "whatsapp",
-        "slack",
-        "custom",
+        "email",
+        "transcription_gemini",
+        "transcription_tactiq",
+        "manual",
       ],
+      interaction_type: ["text", "audio", "image", "file", "system"],
+      tone_severity: ["ok", "atencao", "alerta", "critico"],
     },
   },
 } as const
