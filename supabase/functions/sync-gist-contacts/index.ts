@@ -306,6 +306,7 @@ Deno.serve(async (req) => {
       }
 
       const contacts = contactsRes.contacts ?? [];
+      console.log(`[sync] page ${currentPage}: ${contacts.length} contacts, total_pages=${contactsRes.pages.total_pages}`);
       if (contacts.length === 0) break;
 
       result.total_pages = contactsRes.pages.total_pages;
