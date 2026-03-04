@@ -1,1 +1,4 @@
 project_id = "qyfwbmukylyfsgzgocfo"
+
+[functions.gist-proxy]
+verify_jwt = false
