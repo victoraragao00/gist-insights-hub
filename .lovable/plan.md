@@ -1,41 +1,42 @@
 
-Objetivo: fazer a sync continuar além de 60 contatos e só parar quando acabar paginação real da API (contatos vazios ou sem próxima página), mantendo batch-safe para evitar timeout.
 
-1) Diagnóstico confirmado
-- O botão de teste em `/interactions` está chamando com `body: { page: 1, max_pages: 1 }`, então sempre começa da página 1.
-- Nos logs da função, `total_pages` aparece `undefined`, então a lógica atual de fallback por `total_pages` é frágil.
-- Resultado atual `has_more: false` após 60 contatos indica que a detecção de próxima página no runtime não está robusta para o formato real retornado pela API.
+# Wizard de Contatos Gist: Separar em 2 etapas
 
-2) Mudanças no backend (`sync-gist-contacts`)
-- Reescrever o bloco de paginação para depender de metadados reais da resposta:
-  - prioridade 1: `pages.next` (URL da próxima página)
-  - prioridade 2: sem `next` => encerrar (`has_more=false`)
-  - encerrar também quando `contacts.length === 0`
-- Remover qualquer break/return baseado em `last_seen_at` (garantir 100% sem corte por data).
-- Manter:
-  - retry 429 com 2s
-  - delay de 150ms entre páginas
-- Garantir `DEFAULT_MAX_PAGES = 50`.
-- Ao atingir limite do batch (`pagesProcessed >= maxPages`) e existir próxima página:
-  - retornar `has_more=true` e `next_page=<página seguinte>`.
+## Problema
+Atualmente, o Step A ("Discovery") mostra tudo junto: a lista de domínios/empresas com as opções de vincular/criar/ignorar E os contatos individuais de cada grupo. Isso é confuso quando há muitos domínios com dezenas de contatos.
 
-3) Mudanças no frontend para “continuar” de verdade
-- Atualizar o fluxo de teste em `InteractionsPage` para loop automático:
-  - iniciar `page=1`
-  - invocar `sync-gist-contacts`
-  - enquanto `result.has_more === true`, chamar novamente com `page=result.next_page`
-  - acumular totais e exibir JSON consolidado no `<pre>`
-- Resultado: um clique continua a sync em múltiplas invocações, sem ficar travado em apenas 60.
+## Nova estrutura do wizard
 
-4) Validação
-- Validar no console/network:
-  - chamadas sequenciais com `page=1,2,3...`
-  - `contacts_processed` acumulado > 60
-  - final com `has_more=false`
-- Conferir logs da função:
-  - linhas de `fetching page X` avançando
-  - ausência total de condição de parada por data
-- Teste de regressão:
-  - inativação no fim só roda no último batch (`!has_more`), como esperado.
+### Step 1 — "Clientes" (novo)
+Lista apenas os **domínios/empresas** encontrados. Para cada grupo, o usuário escolhe:
+- **Vincular a cliente existente** (select de clientes)
+- **Criar novo cliente** (input de nome)
+- **Ignorar** (novo — não importa contatos desse domínio)
 
-Se aprovado, implemento exatamente esse ajuste (backend + continuidade no botão de teste) para você conseguir rodar o sync completo de ponta a ponta sem intervenção manual.
+Sem tabela de contatos. Apenas mostra o domínio, nome da empresa (se houver) e quantidade de contatos como informação contextual (ex: "nkstore.com.br — 42 contatos").
+
+Botão "Próximo" avança ao Step 2 (filtrando apenas os grupos não-ignorados).
+
+### Step 2 — "Contatos" (novo)
+Para cada grupo **não ignorado**, mostra a tabela de contatos com checkbox individual para selecionar quais contatos importar. Também mostra a seção de Teammates.
+
+Botão "Confirmar Vínculos" avança ao Step 3 (atual "confirmation").
+
+### Step 3 — "Confirmação" (atual)
+Sem alterações significativas, apenas ajusta os contadores para refletir apenas os selecionados.
+
+### Step 4 — "Importação" (atual, só onboarding)
+Sem alterações.
+
+## Alterações em `src/pages/ClientsPage.tsx`
+
+1. Alterar `WizardStep` para `"clients" | "contacts" | "confirmation" | "import"`
+2. Step inicial passa de `"discovery"` para `"clients"`
+3. Adicionar opção `"ignore"` ao `GroupMapping.type` (tipo `"existing" | "new" | "ignore"`)
+4. **Step "clients"**: renderiza cards compactos por domínio — só domínio, empresa, count, e select (vincular/criar/ignorar) + input/select conforme tipo
+5. **Step "contacts"**: para cada grupo não-ignorado, mostra tabela de contatos com checkboxes. Novo state `selectedContacts: Map<number, boolean>` para controle individual. Também mostra teammates aqui.
+6. Ajustar `handleConfirmMappings` para filtrar apenas contatos selecionados e grupos não-ignorados
+7. Ajustar `summaryContactCount` para contar apenas selecionados
+
+Nenhum outro arquivo será alterado.
+
