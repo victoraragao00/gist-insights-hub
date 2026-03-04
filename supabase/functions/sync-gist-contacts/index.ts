@@ -12,6 +12,7 @@ const GENERIC_DOMAINS = new Set([
 ]);
 
 const TWO_YEARS_MS = 2 * 365.25 * 24 * 60 * 60 * 1000;
+const DEFAULT_MAX_PAGES = 5;
 
 interface GistContact {
   id: number;
@@ -37,6 +38,9 @@ interface SyncResult {
   participants_created: number;
   participants_updated: number;
   errors: string[];
+  has_more: boolean;
+  next_page: number | null;
+  total_pages: number | null;
 }
 
 interface ClientRecord {
@@ -91,6 +95,17 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Parse body for pagination params
+    let startPage = 1;
+    let maxPages = DEFAULT_MAX_PAGES;
+    let skipInactivation = false;
+    try {
+      const body = await req.json();
+      if (body.page) startPage = Number(body.page);
+      if (body.max_pages) maxPages = Number(body.max_pages);
+      if (body.skip_inactivation) skipInactivation = true;
+    } catch { /* no body or invalid JSON — use defaults */ }
+
     const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
     const supaAdmin = createClient(supabaseUrl, serviceKey);
 
@@ -132,10 +147,13 @@ Deno.serve(async (req) => {
       participants_created: 0,
       participants_updated: 0,
       errors: [],
+      has_more: false,
+      next_page: null,
+      total_pages: null,
     };
 
-    const clientLastSeen = new Map<string, Date>(); // client_id → most recent last_seen_at
-    const newClientIds = new Set<string>(); // track newly created clients for user_client_access
+    const clientLastSeen = new Map<string, Date>();
+    const newClientIds = new Set<string>();
 
     // Helper: find or create client by slug
     async function findOrCreateClient(name: string, slug: string): Promise<ClientRecord> {
@@ -202,63 +220,13 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 2. Paginate ALL Gist contacts
-    let nextUrl: string | null = `${GIST_BASE}/contacts?order_by=last_seen_at&order=desc&per_page=60&page=1`;
-    const cutoffDate = new Date(Date.now() - TWO_YEARS_MS);
-
-    while (nextUrl) {
-      let contactsRes: GistContactsResponse;
-      try {
-        contactsRes = await gistGet<GistContactsResponse>(apiKey, nextUrl);
-      } catch (err: unknown) {
-        if (err && typeof err === 'object' && 'retryable' in err) {
-          await sleep(2000);
-          contactsRes = await gistGet<GistContactsResponse>(apiKey, nextUrl);
-        } else {
-          throw err;
-        }
-      }
-
-      const contacts = contactsRes.contacts ?? [];
-      if (contacts.length === 0) break;
-
-      // Check if last contact on page is too old
-      const lastContact = contacts[contacts.length - 1];
-      const lastSeen = parseLastSeen(lastContact.last_seen_at);
-      if (lastSeen && lastSeen < cutoffDate) {
-        // Process this page but stop after
-        await processContacts(contacts, clientLastSeen, result);
-        break;
-      }
-
-      await processContacts(contacts, clientLastSeen, result);
-
-      // Next page
-      if (contactsRes.pages?.next) {
-        nextUrl = contactsRes.pages.next.startsWith('http')
-          ? contactsRes.pages.next
-          : `${GIST_BASE}${contactsRes.pages.next}`;
-      } else if (contactsRes.pages.page < contactsRes.pages.total_pages) {
-        nextUrl = `${GIST_BASE}/contacts?order_by=last_seen_at&order=desc&per_page=60&page=${contactsRes.pages.page + 1}`;
-      } else {
-        nextUrl = null;
-      }
-
-      await sleep(150);
-    }
-
-    // Process contacts helper (defined inline to share closure)
-    async function processContacts(
-      contacts: GistContact[],
-      clientLastSeen: Map<string, Date>,
-      result: SyncResult,
-    ) {
+    // Helper: process a batch of contacts
+    async function processContacts(contacts: GistContact[]) {
       for (const contact of contacts) {
         try {
           result.contacts_processed++;
           const contactLastSeen = parseLastSeen(contact.last_seen_at);
 
-          // Resolve company
           let companyName: string | null = null;
           let slug: string | null = null;
 
@@ -273,7 +241,6 @@ Deno.serve(async (req) => {
           if (!slug && contact.email?.includes('@')) {
             const domain = contact.email.split('@')[1].toLowerCase();
             if (!GENERIC_DOMAINS.has(domain)) {
-              // Try matching existing client by slug similarity
               const domainSlug = toSlug(domain.replace(/\.(com|net|org|io|co|com\.br|app|dev|tech)(\..+)?$/i, ''));
               let matched = false;
               for (const [existingSlug, client] of clientsBySlug) {
@@ -298,10 +265,8 @@ Deno.serve(async (req) => {
             continue;
           }
 
-          // Find or create client
           const client = await findOrCreateClient(companyName!, slug);
 
-          // Track last_seen_at per client
           if (contactLastSeen) {
             const current = clientLastSeen.get(client.id);
             if (!current || contactLastSeen > current) {
@@ -309,13 +274,67 @@ Deno.serve(async (req) => {
             }
           }
 
-          // Upsert participant
           await upsertParticipant(contact, client.id);
         } catch (err) {
           const msg = err instanceof Error ? err.message : 'Unknown error';
           result.errors.push(`Contact ${contact.id}: ${msg}`);
         }
       }
+    }
+
+    // 2. Paginate Gist contacts (limited by maxPages)
+    let currentPage = startPage;
+    let pagesProcessed = 0;
+    const cutoffDate = new Date(Date.now() - TWO_YEARS_MS);
+    let hitCutoff = false;
+
+    while (pagesProcessed < maxPages) {
+      const url = `${GIST_BASE}/contacts?order_by=last_seen_at&order=desc&per_page=60&page=${currentPage}`;
+      let contactsRes: GistContactsResponse;
+      try {
+        contactsRes = await gistGet<GistContactsResponse>(apiKey, url);
+      } catch (err: unknown) {
+        if (err && typeof err === 'object' && 'retryable' in err) {
+          await sleep(2000);
+          contactsRes = await gistGet<GistContactsResponse>(apiKey, url);
+        } else {
+          throw err;
+        }
+      }
+
+      const contacts = contactsRes.contacts ?? [];
+      if (contacts.length === 0) break;
+
+      result.total_pages = contactsRes.pages.total_pages;
+
+      // Check if last contact on page is too old
+      const lastContact = contacts[contacts.length - 1];
+      const lastSeen = parseLastSeen(lastContact.last_seen_at);
+      if (lastSeen && lastSeen < cutoffDate) {
+        await processContacts(contacts);
+        hitCutoff = true;
+        break;
+      }
+
+      await processContacts(contacts);
+      pagesProcessed++;
+
+      // Determine next page
+      if (currentPage < contactsRes.pages.total_pages) {
+        currentPage++;
+      } else {
+        break; // no more pages
+      }
+
+      if (pagesProcessed < maxPages) {
+        await sleep(150);
+      }
+    }
+
+    // Set has_more / next_page
+    if (!hitCutoff && result.total_pages && currentPage < result.total_pages) {
+      result.has_more = true;
+      result.next_page = currentPage; // already incremented
     }
 
     // Post-loop: update clients.metadata.last_seen_at
@@ -341,7 +360,6 @@ Deno.serve(async (req) => {
         role: 'admin',
       }));
 
-      // Batch in chunks of 100
       for (let i = 0; i < accessRows.length; i += 100) {
         const batch = accessRows.slice(i, i + 100);
         const { error: accessErr } = await supaAdmin
@@ -353,20 +371,22 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Inactivate auto-created clients not seen in >90 days
-    const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
-    const { data: inactivated, error: inactErr } = await supaAdmin
-      .from('clients')
-      .update({ active: false })
-      .eq('active', true)
-      .filter('metadata->>auto_created', 'eq', 'true')
-      .filter('metadata->>last_seen_at', 'lt', ninetyDaysAgo)
-      .select('id');
+    // Inactivate auto-created clients not seen in >90 days (only on last batch or explicit)
+    if (!result.has_more && !skipInactivation) {
+      const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+      const { data: inactivated, error: inactErr } = await supaAdmin
+        .from('clients')
+        .update({ active: false })
+        .eq('active', true)
+        .filter('metadata->>auto_created', 'eq', 'true')
+        .filter('metadata->>last_seen_at', 'lt', ninetyDaysAgo)
+        .select('id');
 
-    if (inactErr) {
-      result.errors.push(`Inactivation: ${inactErr.message}`);
-    } else {
-      result.clients_inactivated = (inactivated ?? []).length;
+      if (inactErr) {
+        result.errors.push(`Inactivation: ${inactErr.message}`);
+      } else {
+        result.clients_inactivated = (inactivated ?? []).length;
+      }
     }
 
     return new Response(JSON.stringify({ success: true, result }), {
