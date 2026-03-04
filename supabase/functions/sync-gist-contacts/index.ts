@@ -286,8 +286,6 @@ Deno.serve(async (req) => {
     // 2. Paginate Gist contacts (limited by maxPages)
     let currentPage = startPage;
     let pagesProcessed = 0;
-    const cutoffDate = new Date(Date.now() - TWO_YEARS_MS);
-    let hitCutoff = false;
 
     while (pagesProcessed < maxPages) {
       const url = `${GIST_BASE}/contacts?order_by=last_seen_at&order=desc&per_page=60&page=${currentPage}`;
@@ -309,15 +307,6 @@ Deno.serve(async (req) => {
       if (contacts.length === 0) break;
 
       result.total_pages = contactsRes.pages.total_pages;
-
-      // Check if last contact on page is too old
-      const lastContact = contacts[contacts.length - 1];
-      const lastSeen = parseLastSeen(lastContact.last_seen_at);
-      if (lastSeen && lastSeen < cutoffDate) {
-        await processContacts(contacts);
-        hitCutoff = true;
-        break;
-      }
 
       await processContacts(contacts);
       pagesProcessed++;
