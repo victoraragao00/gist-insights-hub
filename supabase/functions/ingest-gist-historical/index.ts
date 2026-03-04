@@ -34,6 +34,7 @@ interface GistMessagesResponse {
 interface ChannelBinding {
   id: string;
   client_id: string;
+  active: boolean | null;
 }
 
 interface Participant {
@@ -44,7 +45,6 @@ interface Participant {
 
 interface RequestBody {
   page?: number;
-  client_id?: string;
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -111,54 +111,30 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({})) as RequestBody;
     const requestedPage = body.page ?? 1;
-    const targetClientId = body.client_id;
 
-    if (!targetClientId) {
-      return new Response(JSON.stringify({ error: 'client_id is required' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    const { data: accessRows, error: accessError } = await supaAdmin
-      .from('user_client_access')
-      .select('id')
-      .eq('user_id', authData.user.id)
-      .eq('client_id', targetClientId)
-      .eq('role', 'admin')
-      .limit(1);
-
-    if (accessError) {
-      throw new Error('Failed to validate client access: ' + accessError.message);
-    }
-
-    if (!accessRows || accessRows.length === 0) {
-      return new Response(JSON.stringify({ error: 'Forbidden' }), {
-        status: 403,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    // 1. Load active gist channel binding for target client
+    // 1. Load all gist channel bindings
     const { data: bindings, error: bindErr } = await supaAdmin
       .from('channel_bindings')
-      .select('id, client_id')
+      .select('id, client_id, active')
       .eq('channel', 'gist')
-      .eq('client_id', targetClientId)
-      .eq('active', true)
-      .limit(1);
+      .limit(500);
 
-    if (bindErr) throw new Error('Failed to load channel_binding: ' + bindErr.message);
+    if (bindErr) throw new Error('Failed to load channel_bindings: ' + bindErr.message);
 
-    const targetBinding = bindings?.[0];
-    if (!targetBinding) {
+    const bindingList = (bindings ?? []) as ChannelBinding[];
+    if (bindingList.length === 0) {
       return new Response(
-        JSON.stringify({ error: 'No active gist channel binding found for this client.' }),
+        JSON.stringify({ error: 'No gist channel bindings found. Run contact discovery first.' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
 
-    const targetBindingId = targetBinding.id;
+    const bindingByClientId = new Map<string, ChannelBinding>();
+    for (const b of bindingList) {
+      bindingByClientId.set(b.client_id, b);
+    }
+
+    const firstActiveBinding = bindingList.find((b) => b.active !== false) ?? bindingList[0];
 
     // 2. Load participants with gist identifiers into memory map
     const { data: participants, error: partErr } = await supaAdmin
@@ -250,15 +226,24 @@ Deno.serve(async (req) => {
 
         messagesFetched += allMessages.length;
 
-        const belongsToTargetClient = allMessages.some((msg) => {
+        const clientFrequency = new Map<string, number>();
+        for (const msg of allMessages) {
           const senderGistId = msg.author?.id ? String(msg.author.id) : null;
-          if (!senderGistId) return false;
-          return gistIdToParticipant.get(senderGistId)?.clientId === targetClientId;
-        });
-
-        if (!belongsToTargetClient) {
-          continue;
+          if (!senderGistId) continue;
+          const senderInfo = gistIdToParticipant.get(senderGistId);
+          if (!senderInfo?.clientId) continue;
+          if (!bindingByClientId.has(senderInfo.clientId)) continue;
+          clientFrequency.set(senderInfo.clientId, (clientFrequency.get(senderInfo.clientId) ?? 0) + 1);
         }
+
+        const resolvedClientIdFromParticipants = Array.from(clientFrequency.entries()).sort(
+          (a, b) => b[1] - a[1],
+        )[0]?.[0];
+
+        const resolvedBinding =
+          (resolvedClientIdFromParticipants
+            ? bindingByClientId.get(resolvedClientIdFromParticipants)
+            : undefined) ?? firstActiveBinding;
 
         // Map messages to interactions
         const rows = allMessages.map((msg) => {
@@ -271,8 +256,8 @@ Deno.serve(async (req) => {
           return {
             channel: 'gist' as const,
             external_id: String(msg.id),
-            client_id: targetClientId,
-            channel_binding_id: targetBindingId,
+            client_id: resolvedBinding.client_id,
+            channel_binding_id: resolvedBinding.id,
             content: msg.body ?? null,
             sender_side: senderSide,
             sender_raw: msg.author?.name ?? msg.author?.email ?? null,
