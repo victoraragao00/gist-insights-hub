@@ -304,8 +304,8 @@ Deno.serve(async (req) => {
       }
 
       const contacts = contactsRes.contacts ?? [];
-      const pages = contactsRes.pages ?? { page: currentPage, per_page: 60, total_pages: 0, total_count: 0 };
-      console.log(`[sync] page ${currentPage}: ${contacts.length} contacts, next=${pages.next ?? 'none'}, total_pages=${pages.total_pages ?? 'n/a'}`);
+      const pages = contactsRes.pages;
+      console.log(`[sync] page ${currentPage}: ${contacts.length} contacts, raw pages=${JSON.stringify(pages)}`);
 
       // Natural stop: no contacts returned
       if (contacts.length === 0) {
@@ -314,33 +314,23 @@ Deno.serve(async (req) => {
         break;
       }
 
-      result.total_pages = Number.isFinite(Number(pages.total_pages)) ? Number(pages.total_pages) : null;
+      result.total_pages = pages?.total_pages ?? null;
 
       await processContacts(contacts);
       pagesProcessed++;
 
-      // Next page detection: prefer API next URL, fallback to total_pages when available
-      const nextUrl = typeof pages.next === 'string' && pages.next.trim() ? pages.next : null;
-      const nextFromUrl = nextUrl
-        ? Number(new URL(nextUrl, GIST_BASE).searchParams.get('page'))
-        : NaN;
+      // Next page detection: rely on pages.next existing
+      const hasNextPage = pages?.next != null && pages.next !== '';
 
-      let hasNext = false;
-      let nextPage: number | null = null;
-
-      if (Number.isFinite(nextFromUrl) && nextFromUrl > currentPage) {
-        hasNext = true;
-        nextPage = nextFromUrl;
-      } else if (typeof pages.total_pages === 'number' && pages.total_pages > currentPage) {
-        hasNext = true;
-        nextPage = currentPage + 1;
-      }
-
-      if (!hasNext || nextPage === null) {
+      if (!hasNextPage) {
+        // API says no more pages
         result.has_more = false;
         result.next_page = null;
         break;
       }
+
+      // There are more pages — check if we hit our batch limit
+      const nextPage = currentPage + 1;
 
       if (pagesProcessed >= maxPages) {
         result.has_more = true;
@@ -352,11 +342,7 @@ Deno.serve(async (req) => {
       await sleep(150);
     }
 
-    // If loop exits by reaching maxPages without explicit assignment, set continuation info conservatively
-    if (pagesProcessed >= maxPages && result.next_page === null && result.has_more === false) {
-      result.has_more = true;
-      result.next_page = currentPage + 1;
-    }
+    console.log(`[sync] done. processed=${result.contacts_processed}, has_more=${result.has_more}, next_page=${result.next_page}`);
 
     // Post-loop: update clients.metadata.last_seen_at
     for (const [clientId, lastSeen] of clientLastSeen) {
