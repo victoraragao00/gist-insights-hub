@@ -1,27 +1,42 @@
 
 
-# Clientes importados não aparecem — falta `user_client_access`
+# Wizard de Contatos Gist: Separar em 2 etapas
 
-## Diagnóstico
+## Problema
+Atualmente, o Step A ("Discovery") mostra tudo junto: a lista de domínios/empresas com as opções de vincular/criar/ignorar E os contatos individuais de cada grupo. Isso é confuso quando há muitos domínios com dezenas de contatos.
 
-O cliente **Osklen** existe no banco (dois registros: `osklen.com.br` e `Osklen`). Porém, a tabela `user_client_access` do seu usuário só contém acesso ao `By NV`. Como a RLS da tabela `clients` filtra por `user_accessible_client_ids(auth.uid())`, todos os clientes criados pela importação ficam invisíveis.
+## Nova estrutura do wizard
 
-**Causa raiz:** A edge function `gist-confirm-mapping` cria clientes novos usando `service_role` mas nunca insere uma linha em `user_client_access` para o usuário que disparou a importação.
+### Step 1 — "Clientes" (novo)
+Lista apenas os **domínios/empresas** encontrados. Para cada grupo, o usuário escolhe:
+- **Vincular a cliente existente** (select de clientes)
+- **Criar novo cliente** (input de nome)
+- **Ignorar** (novo — não importa contatos desse domínio)
 
-## Correção
+Sem tabela de contatos. Apenas mostra o domínio, nome da empresa (se houver) e quantidade de contatos como informação contextual (ex: "nkstore.com.br — 42 contatos").
 
-**Arquivo:** `supabase/functions/gist-confirm-mapping/index.ts`
+Botão "Próximo" avança ao Step 2 (filtrando apenas os grupos não-ignorados).
 
-1. Extrair o `user_id` do token JWT da request (via header `Authorization`)
-2. Após criar cada novo cliente (linha 61-73), inserir em `user_client_access`:
-   ```ts
-   await supaAdmin.from('user_client_access').insert({
-     user_id: callerUserId,
-     client_id: newClient.id,
-     role: 'admin',
-   });
-   ```
-3. Também inserir acesso para clientes `existing` que o usuário ainda não tenha acesso (caso de mapeamento para cliente existente criado por outro usuário)
+### Step 2 — "Contatos" (novo)
+Para cada grupo **não ignorado**, mostra a tabela de contatos com checkbox individual para selecionar quais contatos importar. Também mostra a seção de Teammates.
 
-**Dados existentes:** Corrigir os ~100+ clientes já criados que não têm `user_client_access`, inserindo acesso admin para o usuário atual via migration ou query pontual.
+Botão "Confirmar Vínculos" avança ao Step 3 (atual "confirmation").
+
+### Step 3 — "Confirmação" (atual)
+Sem alterações significativas, apenas ajusta os contadores para refletir apenas os selecionados.
+
+### Step 4 — "Importação" (atual, só onboarding)
+Sem alterações.
+
+## Alterações em `src/pages/ClientsPage.tsx`
+
+1. Alterar `WizardStep` para `"clients" | "contacts" | "confirmation" | "import"`
+2. Step inicial passa de `"discovery"` para `"clients"`
+3. Adicionar opção `"ignore"` ao `GroupMapping.type` (tipo `"existing" | "new" | "ignore"`)
+4. **Step "clients"**: renderiza cards compactos por domínio — só domínio, empresa, count, e select (vincular/criar/ignorar) + input/select conforme tipo
+5. **Step "contacts"**: para cada grupo não-ignorado, mostra tabela de contatos com checkboxes. Novo state `selectedContacts: Map<number, boolean>` para controle individual. Também mostra teammates aqui.
+6. Ajustar `handleConfirmMappings` para filtrar apenas contatos selecionados e grupos não-ignorados
+7. Ajustar `summaryContactCount` para contar apenas selecionados
+
+Nenhum outro arquivo será alterado.
 

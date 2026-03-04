@@ -35,6 +35,20 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Extract caller user_id from JWT
+    const authHeader = req.headers.get('Authorization') ?? '';
+    const token = authHeader.replace('Bearer ', '');
+    let callerUserId: string | null = null;
+    if (token) {
+      try {
+        const payloadB64 = token.split('.')[1];
+        const payload = JSON.parse(atob(payloadB64));
+        callerUserId = payload.sub ?? null;
+      } catch {
+        console.warn('Could not decode JWT');
+      }
+    }
+
     const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
     const supaAdmin = createClient(supabaseUrl, serviceKey);
 
@@ -71,9 +85,44 @@ Deno.serve(async (req) => {
 
       domainClientMap.set(domain, newClient.id);
       clientsCreated++;
+
+      // Grant caller access to new client
+      if (callerUserId) {
+        await supaAdmin.from('user_client_access').insert({
+          user_id: callerUserId,
+          client_id: newClient.id,
+          role: 'admin',
+        });
+      }
     }
 
-    // 2. Upsert contacts as participants
+    // 2. Grant access to existing clients the caller maps to (if not already granted)
+    if (callerUserId) {
+      const existingClientIds = new Set<string>();
+      for (const m of mappings) {
+        if (m.mapping_type === 'existing' && m.existing_client_id) {
+          existingClientIds.add(m.existing_client_id);
+        }
+      }
+      for (const clientId of existingClientIds) {
+        const { data: hasAccess } = await supaAdmin
+          .from('user_client_access')
+          .select('id')
+          .eq('user_id', callerUserId)
+          .eq('client_id', clientId)
+          .limit(1);
+
+        if (!hasAccess || hasAccess.length === 0) {
+          await supaAdmin.from('user_client_access').insert({
+            user_id: callerUserId,
+            client_id: clientId,
+            role: 'admin',
+          });
+        }
+      }
+    }
+
+    // 3. Upsert contacts as participants
     for (const m of mappings) {
       let clientId: string | undefined;
 
@@ -87,7 +136,6 @@ Deno.serve(async (req) => {
 
       const gistIdentifier = JSON.stringify([{ channel: 'gist', value: String(m.contact_id) }]);
 
-      // Check if participant already exists
       const { data: existing, error: lookupError } = await supaAdmin
         .from('participants')
         .select('id')
@@ -100,7 +148,6 @@ Deno.serve(async (req) => {
       }
 
       if (existing && existing.length > 0) {
-        // Update existing
         const { error: updateError } = await supaAdmin
           .from('participants')
           .update({ name: m.contact_name, client_id: clientId, active: true })
@@ -110,7 +157,6 @@ Deno.serve(async (req) => {
           console.error(`Update error for participant ${existing[0].id}:`, updateError.message);
         }
       } else {
-        // Insert new
         const { error: insertError } = await supaAdmin
           .from('participants')
           .insert({
@@ -129,7 +175,7 @@ Deno.serve(async (req) => {
       participantsUpserted++;
     }
 
-    // 3. Upsert teammates as participants (side = 'umode', client_id = null)
+    // 4. Upsert teammates as participants (side = 'umode', client_id = null)
     for (const t of teammates) {
       const gistIdentifier = JSON.stringify([{ channel: 'gist', value: String(t.teammate_id) }]);
 
@@ -168,7 +214,7 @@ Deno.serve(async (req) => {
       participantsUpserted++;
     }
 
-    // 4. Create channel_bindings for each client that has gist contacts
+    // 5. Create channel_bindings for each client that has gist contacts
     const clientsWithGist = new Set<string>();
     for (const m of mappings) {
       const cid = m.mapping_type === 'existing' ? m.existing_client_id : domainClientMap.get(m.domain);
@@ -176,7 +222,6 @@ Deno.serve(async (req) => {
     }
 
     for (const clientId of clientsWithGist) {
-      // Check if binding already exists
       const { data: existingBinding, error: bindLookupError } = await supaAdmin
         .from('channel_bindings')
         .select('id')
