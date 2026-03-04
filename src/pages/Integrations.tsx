@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { GistTestPanel } from "@/components/GistTestPanel";
 import {
   Dialog,
   DialogContent,
@@ -122,6 +123,7 @@ const platforms: Platform[] = [
 const Integrations = () => {
   const [selectedPlatform, setSelectedPlatform] = useState<Platform | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [gistTestOpen, setGistTestOpen] = useState(false);
   const [authType, setAuthType] = useState("api_key");
   const [credential, setCredential] = useState("");
   const [customName, setCustomName] = useState("");
@@ -203,9 +205,16 @@ const Integrations = () => {
                         <Badge variant="outline" className="text-xs">
                           Desconectado
                         </Badge>
-                        <Button size="sm" variant="outline" onClick={() => openConnect(platform)}>
-                          <Plus className="h-3.5 w-3.5 mr-1" /> Conectar
-                        </Button>
+                        <div className="flex gap-1">
+                          {platform.id === "gist" && (
+                            <Button size="sm" variant="secondary" onClick={() => setGistTestOpen(true)}>
+                              Testar
+                            </Button>
+                          )}
+                          <Button size="sm" variant="outline" onClick={() => openConnect(platform)}>
+                            <Plus className="h-3.5 w-3.5 mr-1" /> Conectar
+                          </Button>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
@@ -213,6 +222,8 @@ const Integrations = () => {
             </div>
           </div>
         ))}
+
+        {gistTestOpen && <GistTestPanel onClose={() => setGistTestOpen(false)} />}
       </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
