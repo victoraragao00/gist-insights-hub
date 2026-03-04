@@ -292,6 +292,7 @@ Deno.serve(async (req) => {
 
     while (pagesProcessed < maxPages) {
       const url = `${GIST_BASE}/contacts?order_by=last_seen_at&order=desc&per_page=60&page=${currentPage}`;
+      console.log(`[sync] fetching page ${currentPage}...`);
       let contactsRes: GistContactsResponse;
       try {
         contactsRes = await gistGet<GistContactsResponse>(apiKey, url);
