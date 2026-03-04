@@ -118,7 +118,7 @@ const SettingsPage = () => {
         <TabsContent value="integrations" className="space-y-4 mt-4">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {integrations.map((integ) => (
-              <Card key={integ.id} className={`border shadow-sm ${!integ.enabled ? "opacity-60" : ""}`}>
+              <Card key={integ.id} className={`border shadow-sm ${!integ.enabled ? "opacity-60" : ""} ${integ.connected ? "sm:col-span-2" : ""}`}>
                 <CardContent className="p-5 space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
