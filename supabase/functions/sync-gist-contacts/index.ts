@@ -283,7 +283,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 2. Paginate Gist contacts (limited by maxPages)
+    // 2. Paginate Gist contacts (batch-limited via maxPages)
     let currentPage = startPage;
     let pagesProcessed = 0;
 
@@ -291,6 +291,7 @@ Deno.serve(async (req) => {
       const url = `${GIST_BASE}/contacts?order_by=last_seen_at&order=desc&per_page=60&page=${currentPage}`;
       console.log(`[sync] fetching page ${currentPage}...`);
       let contactsRes: GistContactsResponse;
+
       try {
         contactsRes = await gistGet<GistContactsResponse>(apiKey, url);
       } catch (err: unknown) {
@@ -303,30 +304,58 @@ Deno.serve(async (req) => {
       }
 
       const contacts = contactsRes.contacts ?? [];
-      console.log(`[sync] page ${currentPage}: ${contacts.length} contacts, total_pages=${contactsRes.pages.total_pages}`);
-      if (contacts.length === 0) break;
+      const pages = contactsRes.pages ?? { page: currentPage, per_page: 60, total_pages: 0, total_count: 0 };
+      console.log(`[sync] page ${currentPage}: ${contacts.length} contacts, next=${pages.next ?? 'none'}, total_pages=${pages.total_pages ?? 'n/a'}`);
 
-      result.total_pages = contactsRes.pages.total_pages;
+      // Natural stop: no contacts returned
+      if (contacts.length === 0) {
+        result.has_more = false;
+        result.next_page = null;
+        break;
+      }
+
+      result.total_pages = Number.isFinite(Number(pages.total_pages)) ? Number(pages.total_pages) : null;
 
       await processContacts(contacts);
       pagesProcessed++;
 
-      // Determine next page
-      if (currentPage < contactsRes.pages.total_pages) {
-        currentPage++;
-      } else {
-        break; // no more pages
+      // Next page detection: prefer API next URL, fallback to total_pages when available
+      const nextUrl = typeof pages.next === 'string' && pages.next.trim() ? pages.next : null;
+      const nextFromUrl = nextUrl
+        ? Number(new URL(nextUrl, GIST_BASE).searchParams.get('page'))
+        : NaN;
+
+      let hasNext = false;
+      let nextPage: number | null = null;
+
+      if (Number.isFinite(nextFromUrl) && nextFromUrl > currentPage) {
+        hasNext = true;
+        nextPage = nextFromUrl;
+      } else if (typeof pages.total_pages === 'number' && pages.total_pages > currentPage) {
+        hasNext = true;
+        nextPage = currentPage + 1;
       }
 
-      if (pagesProcessed < maxPages) {
-        await sleep(150);
+      if (!hasNext || nextPage === null) {
+        result.has_more = false;
+        result.next_page = null;
+        break;
       }
+
+      if (pagesProcessed >= maxPages) {
+        result.has_more = true;
+        result.next_page = nextPage;
+        break;
+      }
+
+      currentPage = nextPage;
+      await sleep(150);
     }
 
-    // Set has_more / next_page
-    if (result.total_pages && currentPage < result.total_pages) {
+    // If loop exits by reaching maxPages without explicit assignment, set continuation info conservatively
+    if (pagesProcessed >= maxPages && result.next_page === null && result.has_more === false) {
       result.has_more = true;
-      result.next_page = currentPage;
+      result.next_page = currentPage + 1;
     }
 
     // Post-loop: update clients.metadata.last_seen_at
