@@ -1,47 +1,24 @@
 
 
-# Diagnóstico: gist-confirm-mapping falhando
+# Problema: Botão de importação não aparece quando o Gist já está vinculado
 
-## Problema real: NÃO é timeout
+O botão "Conectar Gist" só aparece quando **não existe** binding Gist. Como o binding já foi criado (screenshot mostra "Gist Chat - Ativo"), o botão sumiu e não há como acessar a importação histórica.
 
-Os logs mostram centenas de erros idênticos:
-```
-Error searching participant: {
-  code: "22P02",
-  details: 'Expected string or "}", but found "[".',
-  message: "invalid input syntax for type json"
-}
-```
+## Solução
 
-O `.contains("identifiers", [...])` do Supabase JS não está serializando corretamente o array JSONB para a query PostgREST. Cada busca de participante falha, então nenhum participante é atualizado, e a função eventualmente dá timeout por processar 200+ contatos individualmente com queries que falham.
+Adicionar um botão **"Importar Histórico"** na seção de Canais Vinculados, visível quando o binding Gist **já existe**. Esse botão chama diretamente a edge function `ingest-gist-historical` (Step C do wizard), sem precisar passar pela descoberta e vinculação novamente.
 
-## Correção (2 partes)
+### Alteração: `src/pages/ClientsPage.tsx`
 
-### 1. Fix JSONB query in `gist-confirm-mapping`
+Na seção de channel bindings (após a lista de bindings, ~linha 500-514), adicionar:
 
-Substituir `.contains("identifiers", [...])` por `.filter("identifiers", "cs", JSON.stringify([...]))` que serializa o JSON corretamente para o operador `@>` do PostgREST.
+- Quando `hasGistBinding` é `true`: mostrar botão "Importar Histórico do Gist" que chama `handleImportHistory` diretamente
+- Botão desabilitado enquanto `importing` é `true`
+- Spinner + mensagem "Importando conversas..." durante o loading
+- Manter o botão "Conectar Gist" apenas quando `!hasGistBinding`
 
-Linhas afetadas: ~119 e ~205.
+### Nenhum outro arquivo será alterado
 
-Antes:
-```ts
-.contains("identifiers", [{ channel: "gist", value: String(m.gist_contact_id) }])
-```
-
-Depois:
-```ts
-.filter("identifiers", "cs", JSON.stringify([{ channel: "gist", value: String(m.gist_contact_id) }]))
-```
-
-### 2. Same fix in `ingest-gist-historical`
-
-O mesmo padrão existe no `ingest-gist-historical` — o `participantsByGistId` lookup usa `.select()` que funciona diferente, mas a busca individual de `client_id` na linha ~165 também pode ter problemas. Verificar e aplicar o mesmo fix.
-
-### Arquivos modificados
-- `supabase/functions/gist-confirm-mapping/index.ts` — fix 2 `.contains()` calls
-- `supabase/functions/ingest-gist-historical/index.ts` — verify/fix similar patterns
-
-### Arquivos NÃO modificados
-- `src/pages/ClientsPage.tsx` — sem alteração
-- Todos os demais arquivos preservados
+- Edge functions permanecem iguais
+- Contextos, sidebar, layout — tudo preservado
 
