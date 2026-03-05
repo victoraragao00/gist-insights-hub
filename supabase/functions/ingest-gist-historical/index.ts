@@ -194,6 +194,7 @@ Deno.serve(async (req) => {
     let hasMore = false;
     let nextPage: number | undefined;
     let pagesProcessed = 0;
+    let totalPagesCount = 0;
 
     while (pagesProcessed < maxPages) {
       let convosResponse: GistConversationsResponse;
@@ -219,6 +220,7 @@ Deno.serve(async (req) => {
 
       const conversations = convosResponse.conversations ?? [];
       const totalPages = extractPageFromUrl(convosResponse.pages?.last);
+      totalPagesCount = totalPages;
       const hasNextPage = !!convosResponse.pages?.next;
 
       console.log(`[ingest] Page ${currentPage}/${totalPages} — ${conversations.length} convos, hasNext=${hasNextPage}, pages=${JSON.stringify(convosResponse.pages)}`);
@@ -360,6 +362,8 @@ Deno.serve(async (req) => {
       }
     }
 
+
+
     return new Response(
       JSON.stringify({
         conversations_fetched: conversationsFetched,
@@ -370,6 +374,7 @@ Deno.serve(async (req) => {
         errors,
         has_more: hasMore,
         next_page: nextPage,
+        total_pages: totalPagesCount,
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
