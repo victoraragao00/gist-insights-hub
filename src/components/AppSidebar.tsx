@@ -1,4 +1,4 @@
-import { LayoutDashboard, ShieldAlert, Settings, Users, MessageSquare } from "lucide-react";
+import { LayoutDashboard, ShieldAlert, Settings, Users } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import {
@@ -18,7 +18,6 @@ import {
 const modules = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
   { title: "Clientes", url: "/clients", icon: Users },
-  { title: "Interações", url: "/interactions", icon: MessageSquare },
   { title: "Auditorias", url: "/audits", icon: ShieldAlert },
 ];
 
