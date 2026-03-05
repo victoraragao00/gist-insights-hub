@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -14,7 +14,8 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Users, MessageCircle, Phone, Hash, Mail, Mic, Download, Loader2, Check, Upload, MoreHorizontal, RefreshCw, X } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Users, MessageCircle, Phone, Hash, Mail, Mic, Download, Loader2, Check, Upload, MoreHorizontal, RefreshCw, X, AlertTriangle, ShieldAlert } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger,
@@ -94,6 +95,10 @@ const SettingsPage = () => {
   const [cancelled, setCancelled] = useState(false);
   const cancelledRef = useRef(false);
   const [syncError, setSyncError] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<"active" | "inactive" | "all">("active");
+  const [inactiveDays, setInactiveDays] = useState(90);
+  const [applyingRule, setApplyingRule] = useState(false);
+  const queryClient = useQueryClient();
 
   // ── Queries ──
 
@@ -172,6 +177,26 @@ const SettingsPage = () => {
     }
   }, [syncClients]);
 
+  // Prevent tab close during sync
+  useEffect(() => {
+    if (!syncing) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [syncing]);
+
+  // Filtered clients for display
+  const filteredClients = useMemo(() => {
+    if (statusFilter === "active") return syncClients.filter((c) => c.active);
+    if (statusFilter === "inactive") return syncClients.filter((c) => !c.active);
+    return syncClients;
+  }, [syncClients, statusFilter]);
+
+  const activeCount = useMemo(() => syncClients.filter((c) => c.active).length, [syncClients]);
+  const inactiveCount = useMemo(() => syncClients.filter((c) => !c.active).length, [syncClients]);
+
   // ── Upload handler ──
 
   const handleUpload = () => {
@@ -189,9 +214,16 @@ const SettingsPage = () => {
     );
   };
 
-  const selectActive = () => setSelectedClientIds(syncClients.filter((c) => c.active).map((c) => c.id));
-  const selectAll = () => setSelectedClientIds(syncClients.map((c) => c.id));
-  const clearSelection = () => setSelectedClientIds([]);
+  const selectActive = () => setSelectedClientIds(filteredClients.filter((c) => c.active).map((c) => c.id));
+  const selectAll = () => setSelectedClientIds((prev) => {
+    const filteredIds = new Set(filteredClients.map((c) => c.id));
+    const otherSelected = prev.filter((id) => !filteredIds.has(id));
+    return [...otherSelected, ...filteredClients.map((c) => c.id)];
+  });
+  const clearSelection = () => {
+    const filteredIds = new Set(filteredClients.map((c) => c.id));
+    setSelectedClientIds((prev) => prev.filter((id) => !filteredIds.has(id)));
+  };
 
   const selectedClients = useMemo(
     () => syncClients.filter((c) => selectedClientIds.includes(c.id)),
@@ -316,6 +348,29 @@ const SettingsPage = () => {
     ? Math.round((currentClientIndex / selectedClients.length) * 100)
     : syncing ? 50 : 0;
 
+  // ── Inactivation rule handler ──
+
+  const handleApplyInactivationRule = useCallback(async () => {
+    if (inactiveDays < 1) {
+      toast.error("O número de dias deve ser pelo menos 1.");
+      return;
+    }
+    setApplyingRule(true);
+    try {
+      const { data, error } = await (supabase.rpc as any)("deactivate_stale_clients", { _days: inactiveDays });
+      if (error) throw error;
+      const count = typeof data === "number" ? data : 0;
+      toast.success(`${count} cliente(s) inativado(s).`);
+      queryClient.invalidateQueries({ queryKey: ["sync_clients"] });
+      queryClient.invalidateQueries({ queryKey: ["clients"] });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Erro desconhecido";
+      toast.error("Erro ao aplicar regra: " + msg);
+    } finally {
+      setApplyingRule(false);
+    }
+  }, [inactiveDays, queryClient]);
+
   // ── Integration cards config ──
 
   const integrations = [
@@ -424,6 +479,16 @@ const SettingsPage = () => {
 
         {/* ═══ Tab: Sincronização ═══ */}
         <TabsContent value="sync" className="mt-4 space-y-6">
+          {/* Warning banner during sync */}
+          {syncing && (
+            <Alert className="border-amber-500/50 bg-amber-50 dark:bg-amber-950/20">
+              <AlertTriangle className="h-4 w-4 text-amber-600" />
+              <AlertDescription className="text-amber-800 dark:text-amber-200 font-medium">
+                ⚠ Sincronização em andamento. Não navegue para outra página.
+              </AlertDescription>
+            </Alert>
+          )}
+
           {/* Title + last sync */}
           <div>
             <h2 className="text-lg font-semibold text-foreground">Sincronização de Dados</h2>
@@ -484,10 +549,85 @@ const SettingsPage = () => {
             )}
           </div>
 
+          {/* Inactivation Rule Card */}
+          <Card className="border shadow-sm">
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2">
+                <ShieldAlert className="h-4 w-4 text-muted-foreground" />
+                <CardTitle className="text-sm font-semibold">Regra de Inativação Automática</CardTitle>
+              </div>
+              <CardDescription className="text-xs">
+                Aplica apenas a clientes criados automaticamente (auto_created = true)
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex items-center gap-3 flex-wrap">
+              <span className="text-sm text-foreground whitespace-nowrap">Inativar clientes sem acesso há mais de</span>
+              <Input
+                type="number"
+                min={1}
+                value={inactiveDays}
+                onChange={(e) => setInactiveDays(Math.max(1, parseInt(e.target.value) || 90))}
+                className="w-20 h-8 text-center"
+              />
+              <span className="text-sm text-foreground">dias</span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleApplyInactivationRule}
+                disabled={applyingRule}
+                className="ml-auto"
+              >
+                {applyingRule ? (
+                  <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> Aplicando...</>
+                ) : (
+                  "Aplicar regra agora"
+                )}
+              </Button>
+            </CardContent>
+          </Card>
+
           {/* Step 2 — Select clients */}
           <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-medium text-foreground">Clientes</h3>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-3">
+                <h3 className="text-sm font-medium text-foreground">Clientes</h3>
+                {/* Status filter */}
+                <div className="flex items-center rounded-lg border border-border overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setStatusFilter("active")}
+                    className={`px-3 py-1 text-xs font-medium transition-colors ${
+                      statusFilter === "active"
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-background text-muted-foreground hover:bg-muted"
+                    }`}
+                  >
+                    Ativos ({activeCount})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStatusFilter("inactive")}
+                    className={`px-3 py-1 text-xs font-medium transition-colors border-x border-border ${
+                      statusFilter === "inactive"
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-background text-muted-foreground hover:bg-muted"
+                    }`}
+                  >
+                    Inativos ({inactiveCount})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStatusFilter("all")}
+                    className={`px-3 py-1 text-xs font-medium transition-colors ${
+                      statusFilter === "all"
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-background text-muted-foreground hover:bg-muted"
+                    }`}
+                  >
+                    Todos ({syncClients.length})
+                  </button>
+                </div>
+              </div>
               <div className="flex items-center gap-2">
                 <Button variant="outline" size="sm" className="h-7 text-xs" onClick={selectActive}>
                   Selecionar ativos
@@ -515,7 +655,7 @@ const SettingsPage = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {syncClients.map((client) => {
+                    {filteredClients.map((client) => {
                       const meta = (client.metadata ?? {}) as Record<string, unknown>;
                       const lastSeen = meta.last_seen_at as string | undefined;
                       const isSelected = selectedClientIds.includes(client.id);
@@ -551,7 +691,7 @@ const SettingsPage = () => {
                         </TableRow>
                       );
                     })}
-                    {syncClients.length === 0 && (
+                    {filteredClients.length === 0 && (
                       <TableRow>
                         <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                           Nenhum cliente encontrado.
