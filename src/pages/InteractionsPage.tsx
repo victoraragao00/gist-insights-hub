@@ -77,6 +77,15 @@ interface Interaction {
 // ---------- Helpers ----------
 const humanizeTheme = (slug: string) => slug.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 const truncate = (text: string, max: number) => text.length <= max ? text : text.slice(0, max) + "…";
+const stripHtml = (html: string) => html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+const sanitizeHtml = (html: string) =>
+  html
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<iframe[\s\S]*?<\/iframe>/gi, "");
+const isImageUrl = (url: string) => /\.(jpg|jpeg|png|gif|webp|svg|bmp)(\?|$)/i.test(url) || /image/i.test(url);
+const getFileName = (a: any) => a.name ?? a.title ?? (typeof a.url === "string" ? a.url.split("/").pop()?.split("?")[0] : "Anexo");
+const getAttachmentUrl = (a: any): string | null => a.url ?? (typeof a === "string" ? a : null);
 
 // ---------- Sub-components ----------
 const DateSeparator = ({ date }: { date: string }) => (
@@ -115,7 +124,12 @@ const InteractionRow = memo(({ item, onClick }: { item: Interaction; onClick: ()
           </span>
         </div>
         {item.content && (
-          <p className="text-sm text-muted-foreground leading-relaxed">{truncate(item.content, 200)}</p>
+          <p className="text-sm text-muted-foreground leading-relaxed">{truncate(stripHtml(item.content), 200)}</p>
+        )}
+        {Array.isArray(item.attachments) && item.attachments.length > 0 && (
+          <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-muted text-muted-foreground">
+            📎 {item.attachments.length} anexo{item.attachments.length > 1 ? "s" : ""}
+          </span>
         )}
         <div className="flex items-center gap-1.5 flex-wrap">
           {item.classified_at ? (
@@ -193,13 +207,36 @@ const DetailPanel = ({ item, onClose }: { item: Interaction; onClose: () => void
           {/* Full content */}
           <section>
             <h4 className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">Conteúdo</h4>
-            <p className="text-sm whitespace-pre-wrap leading-relaxed">{item.content ?? "—"}</p>
+            {item.content ? (
+              <div
+                className="text-sm leading-relaxed prose prose-sm prose-neutral dark:prose-invert max-w-none [&_a]:text-primary [&_a]:underline"
+                dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.content) }}
+              />
+            ) : (
+              <p className="text-sm text-muted-foreground">—</p>
+            )}
             {attachments.length > 0 && (
-              <div className="mt-3 space-y-1">
-                <span className="text-xs text-muted-foreground">Anexos ({attachments.length})</span>
-                {attachments.map((a: any, i: number) => (
-                  <div key={i} className="text-xs bg-muted rounded px-2 py-1">{a.name ?? a.url ?? JSON.stringify(a)}</div>
-                ))}
+              <div className="mt-3 space-y-2">
+                <span className="text-xs font-medium text-muted-foreground">Anexos ({attachments.length})</span>
+                <div className="grid grid-cols-2 gap-2">
+                  {attachments.map((a: any, i: number) => {
+                    const url = getAttachmentUrl(a);
+                    if (!url) return (
+                      <div key={i} className="text-xs bg-muted rounded px-2 py-1 truncate">{JSON.stringify(a)}</div>
+                    );
+                    if (isImageUrl(url)) return (
+                      <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="block rounded-md overflow-hidden border border-border hover:ring-2 hover:ring-primary/30 transition-shadow">
+                        <img src={url} alt={getFileName(a)} className="w-full h-24 object-cover" loading="lazy" />
+                        <span className="block text-[10px] text-muted-foreground px-1.5 py-1 truncate">{getFileName(a)}</span>
+                      </a>
+                    );
+                    return (
+                      <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-xs bg-muted rounded px-2 py-2 hover:bg-accent transition-colors truncate">
+                        📄 <span className="truncate underline">{getFileName(a)}</span>
+                      </a>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </section>
