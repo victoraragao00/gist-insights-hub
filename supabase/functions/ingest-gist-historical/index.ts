@@ -360,6 +360,9 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Extract total pages from the last conversation page processed
+    const lastPageUrl = hasMore ? undefined : undefined; // already tracked in loop
+    
     return new Response(
       JSON.stringify({
         conversations_fetched: conversationsFetched,
@@ -370,6 +373,7 @@ Deno.serve(async (req) => {
         errors,
         has_more: hasMore,
         next_page: nextPage,
+        total_pages: totalPagesCount,
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
