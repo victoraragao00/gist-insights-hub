@@ -1,42 +1,83 @@
 
 
-# Wizard de Contatos Gist: Separar em 2 etapas
+## Progresso granular + tempo decorrido
 
-## Problema
-Atualmente, o Step A ("Discovery") mostra tudo junto: a lista de domínios/empresas com as opções de vincular/criar/ignorar E os contatos individuais de cada grupo. Isso é confuso quando há muitos domínios com dezenas de contatos.
+### Mudanças em `src/context/ClientContext.tsx`
 
-## Nova estrutura do wizard
+**1. Renomear `estimatedRemaining` → `elapsedDisplay` no `SyncState`**
 
-### Step 1 — "Clientes" (novo)
-Lista apenas os **domínios/empresas** encontrados. Para cada grupo, o usuário escolhe:
-- **Vincular a cliente existente** (select de clientes)
-- **Criar novo cliente** (input de nome)
-- **Ignorar** (novo — não importa contatos desse domínio)
+Replace ETA with elapsed time. The `formatEta` helper becomes `formatElapsed`:
+```typescript
+function formatElapsed(ms: number): string {
+  const totalSec = Math.floor(ms / 1000);
+  const min = Math.floor(totalSec / 60);
+  const sec = totalSec % 60;
+  if (min === 0) return `${sec}s`;
+  return `${min}min ${sec}s`;
+}
+```
 
-Sem tabela de contatos. Apenas mostra o domínio, nome da empresa (se houver) e quantidade de contatos como informação contextual (ex: "nkstore.com.br — 42 contatos").
+**2. `updateProgress` accepts `subProgress` fraction + shows elapsed time**
 
-Botão "Próximo" avança ao Step 2 (filtrando apenas os grupos não-ignorados).
+```typescript
+const updateProgress = (currentName: string, stepIndex: number, subProgress = 0) => {
+  const basePct = (completedSteps / totalSteps) * 100;
+  const stepPct = (1 / totalSteps) * 100;
+  const pct = Math.round(basePct + stepPct * Math.min(subProgress, 0.95));
+  const elapsed = Date.now() - startedAt;
 
-### Step 2 — "Contatos" (novo)
-Para cada grupo **não ignorado**, mostra a tabela de contatos com checkbox individual para selecionar quais contatos importar. Também mostra a seção de Teammates.
+  setSyncState((prev) => ({
+    ...prev,
+    currentClientName: currentName,
+    currentClientIndex: completedSteps + 1,
+    progressPct: pct,
+    elapsedDisplay: `Em andamento há ${formatElapsed(elapsed)}`,
+    completedResults: [...results],
+  }));
+};
+```
 
-Botão "Confirmar Vínculos" avança ao Step 3 (atual "confirmation").
+**3. Contacts loop — denominator from `total_pages` or 31**
 
-### Step 3 — "Confirmação" (atual)
-Sem alterações significativas, apenas ajusta os contadores para refletir apenas os selecionados.
+Inside the `while (hasMore)` loop for contacts:
+```typescript
+let pageCount = 0;
+let denominator = 31; // default
+while (hasMore && !cancelledRef.current) {
+  const { data, error } = await supabase.functions.invoke(...);
+  if (data?.result?.total_pages) denominator = data.result.total_pages;
+  pageCount++;
+  updateProgress("Contatos (global)", 0, Math.min(pageCount / denominator, 0.95));
+  // ...
+}
+```
 
-### Step 4 — "Importação" (atual, só onboarding)
-Sem alterações.
+**4. History loop — denominator = 5 (max_pages per invocation)**
 
-## Alterações em `src/pages/ClientsPage.tsx`
+```typescript
+let pageCount = 0;
+while (hasMore && !cancelledRef.current) {
+  // ... invoke ...
+  pageCount++;
+  updateProgress(client.name, contactsStep + i, Math.min(pageCount / 5, 0.95));
+}
+```
 
-1. Alterar `WizardStep` para `"clients" | "contacts" | "confirmation" | "import"`
-2. Step inicial passa de `"discovery"` para `"clients"`
-3. Adicionar opção `"ignore"` ao `GroupMapping.type` (tipo `"existing" | "new" | "ignore"`)
-4. **Step "clients"**: renderiza cards compactos por domínio — só domínio, empresa, count, e select (vincular/criar/ignorar) + input/select conforme tipo
-5. **Step "contacts"**: para cada grupo não-ignorado, mostra tabela de contatos com checkboxes. Novo state `selectedContacts: Map<number, boolean>` para controle individual. Também mostra teammates aqui.
-6. Ajustar `handleConfirmMappings` para filtrar apenas contatos selecionados e grupos não-ignorados
-7. Ajustar `summaryContactCount` para contar apenas selecionados
+### Mudanças em `src/components/DashboardLayout.tsx`
 
-Nenhum outro arquivo será alterado.
+Replace the `estimatedRemaining` display with `elapsedDisplay`:
+```
+— Em andamento há 2min 34s
+```
+Line 30-34: change from `syncState.estimatedRemaining` to `syncState.elapsedDisplay`.
+
+### Mudanças na interface `SyncState`
+
+- `estimatedRemaining: string | null` → `elapsedDisplay: string | null`
+- Update `INITIAL_SYNC_STATE` accordingly
+- Update final state reset to set `elapsedDisplay: null`
+
+### Files modified
+- `src/context/ClientContext.tsx`
+- `src/components/DashboardLayout.tsx`
 
