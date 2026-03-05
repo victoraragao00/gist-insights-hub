@@ -1,8 +1,9 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -11,7 +12,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Plus, MoreHorizontal } from "lucide-react";
+import { Plus, MoreHorizontal, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
@@ -119,6 +120,7 @@ function computeStats(interactions: InteractionRow[], clientId: string): ClientS
 const ClientsPage = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [search, setSearch] = useState("");
 
   const thirtyDaysAgo = useMemo(
     () => new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
@@ -158,14 +160,16 @@ const ClientsPage = () => {
 
   // Compute stats per client and sort by last interaction DESC
   const clientsWithStats = useMemo(() => {
+    const q = search.toLowerCase().trim();
     return clients
       .map((c) => ({ ...c, stats: computeStats(interactions, c.id) }))
+      .filter((c) => !q || c.name.toLowerCase().includes(q) || c.slug.toLowerCase().includes(q))
       .sort((a, b) => {
         const aDate = a.stats.last_contact ?? "";
         const bDate = b.stats.last_contact ?? "";
         return bDate.localeCompare(aDate);
       });
-  }, [clients, interactions]);
+  }, [clients, interactions, search]);
 
   return (
     <div className="space-y-6">
@@ -175,9 +179,20 @@ const ClientsPage = () => {
           <h1 className="text-2xl font-bold tracking-tight text-foreground">Clientes</h1>
           <p className="text-sm text-muted-foreground">Gerencie clientes, participantes e canais</p>
         </div>
-        <Button onClick={() => toast.info("Em breve")}>
-          <Plus className="h-4 w-4 mr-1" /> Novo Cliente
-        </Button>
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar cliente..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9 w-64 h-9"
+            />
+          </div>
+          <Button onClick={() => toast.info("Em breve")}>
+            <Plus className="h-4 w-4 mr-1" /> Novo Cliente
+          </Button>
+        </div>
       </div>
 
       {/* Table */}
