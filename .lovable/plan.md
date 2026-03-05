@@ -1,54 +1,42 @@
 
 
-## CX Hub — Rebuild Clients UI
+# Wizard de Contatos Gist: Separar em 2 etapas
 
-This is a large UI rebuild: replacing `ClientsPage.tsx` entirely, creating a new `ClientDetailPage.tsx` with 6 tabs, adding a route, and conditionally hiding the sidebar client selector.
+## Problema
+Atualmente, o Step A ("Discovery") mostra tudo junto: a lista de domínios/empresas com as opções de vincular/criar/ignorar E os contatos individuais de cada grupo. Isso é confuso quando há muitos domínios com dezenas de contatos.
 
-### Files to modify/create
+## Nova estrutura do wizard
 
-**1. `src/pages/ClientsPage.tsx`** — Full rewrite
-- Remove all existing code (dialogs, participant management, scope editing, wizard)
-- New layout: header + "+ Novo Cliente" button (toast "Em breve") + full-width table
-- Query clients with channel_bindings joined, plus interactions (30d) for stats
-- Compute client-side: `total_30d`, `dominant_tone`, `health_pct`, `last_contact` per client
-- Table columns: Cliente (name+slug), Canais (emoji badges), Interações 30d, Tom predominante (colored badge), Saúde (thermometer bar 64px), Último contato (formatted), Actions (dropdown)
-- Row click → `navigate(/clients/${slug})`
-- Loading skeleton, empty state, sort by last interaction DESC
+### Step 1 — "Clientes" (novo)
+Lista apenas os **domínios/empresas** encontrados. Para cada grupo, o usuário escolhe:
+- **Vincular a cliente existente** (select de clientes)
+- **Criar novo cliente** (input de nome)
+- **Ignorar** (novo — não importa contatos desse domínio)
 
-**2. `src/pages/ClientDetailPage.tsx`** — New file (~800 lines)
-- Fetch client by slug from URL params, redirect if not found
-- Breadcrumb → Header (name, badges, subtitle) → Tab bar with 6 tabs + 1 disabled
-- **Tab 1 — Visão Geral**: 4 KPI cards, 14-day volume bar chart (inline divs), tone distribution segmented bar, recent non-ok interactions table (last 5)
-- **Tab 2 — Participantes**: Two sections (client side / uMode side), tables with name/email/role/channels, disabled action buttons
-- **Tab 3 — Canais**: Connected bindings list with icons + badges, disconnected channels grayed out, "Conectar canal" button (toast)
-- **Tab 4 — Documentos**: Grid from `metadata.documents`, upload zone placeholder (toast "Em breve"), empty state
-- **Tab 5 — Regras de Negócio**: Escopo (editable textarea saving to metadata.scope), monitored themes as pills, governance rules list with toggles
-- **Tab 6 — Configurações**: SLA card (editable fields from metadata.sla), audit_rules toggles for this client, danger zone with deactivate button + confirmation dialog
-- **Tasks tab**: Grayed out, cursor-not-allowed, toast on click
+Sem tabela de contatos. Apenas mostra o domínio, nome da empresa (se houver) e quantidade de contatos como informação contextual (ex: "nkstore.com.br — 42 contatos").
 
-**3. `src/App.tsx`** — Add route
-- Import `ClientDetailPage`
-- Add `<Route path="/clients/:slug" element={<ErrorBoundary><ClientDetailPage /></ErrorBoundary>} />` inside the protected/layout group
+Botão "Próximo" avança ao Step 2 (filtrando apenas os grupos não-ignorados).
 
-**4. `src/components/AppSidebar.tsx`** — Hide client selector on detail page
-- Check `location.pathname` starts with `/clients/` and has a slug segment
-- Conditionally hide the `<Select>` client selector on that route
+### Step 2 — "Contatos" (novo)
+Para cada grupo **não ignorado**, mostra a tabela de contatos com checkbox individual para selecionar quais contatos importar. Também mostra a seção de Teammates.
 
-### Data queries approach
+Botão "Confirmar Vínculos" avança ao Step 3 (atual "confirmation").
 
-- **ClientsPage**: Two queries — clients with channel_bindings (joined), and interactions (30d) for all clients. Stats computed client-side by grouping.
-- **ClientDetailPage**: Client by slug, participants, channel_bindings, interactions (30d) for that client, audit_rules for that client. Each as separate `useQuery`.
+### Step 3 — "Confirmação" (atual)
+Sem alterações significativas, apenas ajusta os contadores para refletir apenas os selecionados.
 
-### Styling
-- Purple primary `#7c3aed`, white cards with `border border-zinc-200 rounded-xl`
-- Tone badges: green/yellow/orange/red with `bg-{color}-100 text-{color}-700`
-- Thermometer: thin bar (h-2, w-16) with color based on health percentage
-- Tab content padding via Tailwind utilities
+### Step 4 — "Importação" (atual, só onboarding)
+Sem alterações.
 
-### Key types
-- `ClientMetadata` interface as specified in the prompt
-- Reuse existing `Client` type pattern from `ClientContext`
+## Alterações em `src/pages/ClientsPage.tsx`
 
-### Not touching
-- Edge functions, ClientContext, AuthContext, other pages
+1. Alterar `WizardStep` para `"clients" | "contacts" | "confirmation" | "import"`
+2. Step inicial passa de `"discovery"` para `"clients"`
+3. Adicionar opção `"ignore"` ao `GroupMapping.type` (tipo `"existing" | "new" | "ignore"`)
+4. **Step "clients"**: renderiza cards compactos por domínio — só domínio, empresa, count, e select (vincular/criar/ignorar) + input/select conforme tipo
+5. **Step "contacts"**: para cada grupo não-ignorado, mostra tabela de contatos com checkboxes. Novo state `selectedContacts: Map<number, boolean>` para controle individual. Também mostra teammates aqui.
+6. Ajustar `handleConfirmMappings` para filtrar apenas contatos selecionados e grupos não-ignorados
+7. Ajustar `summaryContactCount` para contar apenas selecionados
+
+Nenhum outro arquivo será alterado.
 
