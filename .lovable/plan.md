@@ -1,50 +1,42 @@
 
 
-## Fix: Backfill `auto_created` for existing clients
+# Wizard de Contatos Gist: Separar em 2 etapas
 
-### Root cause
-The `sync-gist-contacts` edge function already sets `auto_created: true` when creating new clients (line 173). But all existing clients were created **before** this code existed, so they're missing the flag. The `deactivate_stale_clients` function correctly filters on `auto_created = 'true'` — that safety net must stay.
+## Problema
+Atualmente, o Step A ("Discovery") mostra tudo junto: a lista de domínios/empresas com as opções de vincular/criar/ignorar E os contatos individuais de cada grupo. Isso é confuso quando há muitos domínios com dezenas de contatos.
 
-### What needs to happen
+## Nova estrutura do wizard
 
-**1. Database migration — backfill `auto_created` on domain-based clients**
+### Step 1 — "Clientes" (novo)
+Lista apenas os **domínios/empresas** encontrados. Para cada grupo, o usuário escolhe:
+- **Vincular a cliente existente** (select de clientes)
+- **Criar novo cliente** (input de nome)
+- **Ignorar** (novo — não importa contatos desse domínio)
 
-All domain-based slugs end with patterns like `-com-br`, `-com`, `-ind-br`, `-net`, `-edu`, etc. The two "real" clients have simple slugs: `bynv` and `osklen`.
+Sem tabela de contatos. Apenas mostra o domínio, nome da empresa (se houver) e quantidade de contatos como informação contextual (ex: "nkstore.com.br — 42 contatos").
 
-```sql
-UPDATE clients
-SET metadata = metadata || '{"auto_created": true, "source": "gist_sync"}'::jsonb
-WHERE (
-  slug LIKE '%-com-br'
-  OR slug LIKE '%-com'
-  OR slug LIKE '%-ind-br'
-  OR slug LIKE '%-net'
-  OR slug LIKE '%-edu'
-  OR slug LIKE '%-senai-br'
-)
-AND slug NOT IN ('bynv', 'osklen');
-```
+Botão "Próximo" avança ao Step 2 (filtrando apenas os grupos não-ignorados).
 
-This tags ~240+ domain-based clients as `auto_created` without touching By NV or Osklen.
+### Step 2 — "Contatos" (novo)
+Para cada grupo **não ignorado**, mostra a tabela de contatos com checkbox individual para selecionar quais contatos importar. Também mostra a seção de Teammates.
 
-**2. No edge function changes needed**
+Botão "Confirmar Vínculos" avança ao Step 3 (atual "confirmation").
 
-The `sync-gist-contacts/index.ts` already:
-- Sets `metadata: { auto_created: true, source: 'gist_sync' }` on insert (line 173)
-- Preserves existing metadata with spread on update (line 351-354)
+### Step 3 — "Confirmação" (atual)
+Sem alterações significativas, apenas ajusta os contadores para refletir apenas os selecionados.
 
-**3. No changes to `deactivate_stale_clients`**
+### Step 4 — "Importação" (atual, só onboarding)
+Sem alterações.
 
-The function stays as-is with the `auto_created` filter.
+## Alterações em `src/pages/ClientsPage.tsx`
 
-**4. `src/pages/SettingsPage.tsx` — update description text**
+1. Alterar `WizardStep` para `"clients" | "contacts" | "confirmation" | "import"`
+2. Step inicial passa de `"discovery"` para `"clients"`
+3. Adicionar opção `"ignore"` ao `GroupMapping.type` (tipo `"existing" | "new" | "ignore"`)
+4. **Step "clients"**: renderiza cards compactos por domínio — só domínio, empresa, count, e select (vincular/criar/ignorar) + input/select conforme tipo
+5. **Step "contacts"**: para cada grupo não-ignorado, mostra tabela de contatos com checkboxes. Novo state `selectedContacts: Map<number, boolean>` para controle individual. Também mostra teammates aqui.
+6. Ajustar `handleConfirmMappings` para filtrar apenas contatos selecionados e grupos não-ignorados
+7. Ajustar `summaryContactCount` para contar apenas selecionados
 
-Change the inactivation card description from current text to:
-> "Inativa clientes criados automaticamente (via sincronização) sem acesso no período configurado."
-
-This accurately reflects what the function does.
-
-### Files modified
-- New database migration (backfill SQL)
-- `src/pages/SettingsPage.tsx` — minor text update
+Nenhum outro arquivo será alterado.
 
