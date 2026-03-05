@@ -177,6 +177,26 @@ const SettingsPage = () => {
     }
   }, [syncClients]);
 
+  // Prevent tab close during sync
+  useEffect(() => {
+    if (!syncing) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [syncing]);
+
+  // Filtered clients for display
+  const filteredClients = useMemo(() => {
+    if (statusFilter === "active") return syncClients.filter((c) => c.active);
+    if (statusFilter === "inactive") return syncClients.filter((c) => !c.active);
+    return syncClients;
+  }, [syncClients, statusFilter]);
+
+  const activeCount = useMemo(() => syncClients.filter((c) => c.active).length, [syncClients]);
+  const inactiveCount = useMemo(() => syncClients.filter((c) => !c.active).length, [syncClients]);
+
   // ── Upload handler ──
 
   const handleUpload = () => {
@@ -194,9 +214,16 @@ const SettingsPage = () => {
     );
   };
 
-  const selectActive = () => setSelectedClientIds(syncClients.filter((c) => c.active).map((c) => c.id));
-  const selectAll = () => setSelectedClientIds(syncClients.map((c) => c.id));
-  const clearSelection = () => setSelectedClientIds([]);
+  const selectActive = () => setSelectedClientIds(filteredClients.filter((c) => c.active).map((c) => c.id));
+  const selectAll = () => setSelectedClientIds((prev) => {
+    const filteredIds = new Set(filteredClients.map((c) => c.id));
+    const otherSelected = prev.filter((id) => !filteredIds.has(id));
+    return [...otherSelected, ...filteredClients.map((c) => c.id)];
+  });
+  const clearSelection = () => {
+    const filteredIds = new Set(filteredClients.map((c) => c.id));
+    setSelectedClientIds((prev) => prev.filter((id) => !filteredIds.has(id)));
+  };
 
   const selectedClients = useMemo(
     () => syncClients.filter((c) => selectedClientIds.includes(c.id)),
