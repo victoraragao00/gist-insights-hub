@@ -362,9 +362,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Extract total pages from the last conversation page processed
-    const lastPageUrl = hasMore ? undefined : undefined; // already tracked in loop
-    
+
+
     return new Response(
       JSON.stringify({
         conversations_fetched: conversationsFetched,
