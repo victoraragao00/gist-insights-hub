@@ -347,9 +347,9 @@ const InteractionsPage = () => {
         .from("interactions")
         .select("id", { count: "exact", head: true })
         .eq("client_id", selectedClient!.id);
-      if (filters.channel) q = q.eq("channel", filters.channel);
+      if (filters.channel) q = q.eq("channel", filters.channel as any);
       if (filters.side) q = q.eq("sender_side", filters.side);
-      if (filters.tone) q = q.eq("tone", filters.tone);
+      if (filters.tone) q = q.eq("tone", filters.tone as any);
       if (filters.theme) q = q.eq("theme", filters.theme);
       if (filters.search) q = q.ilike("content", `%${filters.search}%`);
       if (effectiveDateFrom) q = q.gte("occurred_at", effectiveDateFrom);
@@ -382,9 +382,9 @@ const InteractionsPage = () => {
         .order("occurred_at", { ascending: false })
         .range(pageParam * PAGE_SIZE, (pageParam + 1) * PAGE_SIZE - 1);
 
-      if (filters.channel) q = q.eq("channel", filters.channel);
+      if (filters.channel) q = q.eq("channel", filters.channel as any);
       if (filters.side) q = q.eq("sender_side", filters.side);
-      if (filters.tone) q = q.eq("tone", filters.tone);
+      if (filters.tone) q = q.eq("tone", filters.tone as any);
       if (filters.theme) q = q.eq("theme", filters.theme);
       if (filters.search) q = q.ilike("content", `%${filters.search}%`);
       if (effectiveDateFrom) q = q.gte("occurred_at", effectiveDateFrom);
