@@ -1,49 +1,42 @@
 
 
-## Mover InteractionsFeed para ClientDetailPage
+# Wizard de Contatos Gist: Separar em 2 etapas
 
-### Arquivos
+## Problema
+Atualmente, o Step A ("Discovery") mostra tudo junto: a lista de domínios/empresas com as opções de vincular/criar/ignorar E os contatos individuais de cada grupo. Isso é confuso quando há muitos domínios com dezenas de contatos.
 
-**Criar:** `src/components/InteractionsFeed.tsx`
-- Extrair toda a lógica de `InteractionsPage.tsx` (linhas 1-617): constants, types, helpers (`stripHtml`, `sanitizeHtml`, `isImageUrl`, etc.), sub-components (`DateSeparator`, `InteractionRow`, `LoadingSkeleton`, `DetailPanel`), filter bar, infinite scroll, detail panel
-- Prop: `clientId: string`
-- Remover dependência de `useClient()` — recebe `clientId` diretamente
-- Default de período: `"30"` (últimos 30 dias) em vez de vazio
-- Remover opção "90 dias" e "Todo período" — máximo permitido = 30 dias
-- `PERIOD_OPTIONS`: `[7d, 14d, 30d, custom]` — custom limitado a 30 dias
-- Remover header (título "Interações" e subtitle) — fica por conta do contexto pai (tab)
-- Filtros continuam via `useSearchParams` para persistência em URL
+## Nova estrutura do wizard
 
-**Modificar:** `src/pages/ClientDetailPage.tsx`
-- Importar `InteractionsFeed` 
-- Adicionar tab "Interações" como 2a posição (entre "Visão Geral" e "Participantes")
-- Conteúdo da tab: `<InteractionsFeed clientId={client.id} />`
-- ~5 linhas de mudança
+### Step 1 — "Clientes" (novo)
+Lista apenas os **domínios/empresas** encontrados. Para cada grupo, o usuário escolhe:
+- **Vincular a cliente existente** (select de clientes)
+- **Criar novo cliente** (input de nome)
+- **Ignorar** (novo — não importa contatos desse domínio)
 
-**Modificar:** `src/pages/InteractionsPage.tsx`
-- Substituir conteúdo por redirect: `<Navigate to="/clients" replace />`
+Sem tabela de contatos. Apenas mostra o domínio, nome da empresa (se houver) e quantidade de contatos como informação contextual (ex: "nkstore.com.br — 42 contatos").
 
-**Modificar:** `src/App.tsx`
-- Remover rota `/interactions`
-- Remover import de `InteractionsPage`
+Botão "Próximo" avança ao Step 2 (filtrando apenas os grupos não-ignorados).
 
-**Modificar:** `src/components/AppSidebar.tsx`
-- Remover item "Interações" do array `modules`
+### Step 2 — "Contatos" (novo)
+Para cada grupo **não ignorado**, mostra a tabela de contatos com checkbox individual para selecionar quais contatos importar. Também mostra a seção de Teammates.
 
-### Estrutura do InteractionsFeed
+Botão "Confirmar Vínculos" avança ao Step 3 (atual "confirmation").
 
-```text
-InteractionsFeed ({ clientId })
-├── FilterBar (canal, lado, tom, tema, período [default 30d, max 30d], busca)
-├── ResultCount
-├── Timeline (infinite scroll via useInfiniteQuery + IntersectionObserver)
-│   ├── DateSeparator
-│   └── InteractionRow (memo)
-└── DetailPanel (desktop: fixed right 420px, mobile: Sheet)
-```
+### Step 3 — "Confirmação" (atual)
+Sem alterações significativas, apenas ajusta os contadores para refletir apenas os selecionados.
 
-### Mudança de período
-- Default: `periodo=30` (últimos 30 dias)
-- Opções: 7d, 14d, 30d, Personalizado
-- Custom: calendário limitado a `fromDate = subDays(new Date(), 30)`
+### Step 4 — "Importação" (atual, só onboarding)
+Sem alterações.
+
+## Alterações em `src/pages/ClientsPage.tsx`
+
+1. Alterar `WizardStep` para `"clients" | "contacts" | "confirmation" | "import"`
+2. Step inicial passa de `"discovery"` para `"clients"`
+3. Adicionar opção `"ignore"` ao `GroupMapping.type` (tipo `"existing" | "new" | "ignore"`)
+4. **Step "clients"**: renderiza cards compactos por domínio — só domínio, empresa, count, e select (vincular/criar/ignorar) + input/select conforme tipo
+5. **Step "contacts"**: para cada grupo não-ignorado, mostra tabela de contatos com checkboxes. Novo state `selectedContacts: Map<number, boolean>` para controle individual. Também mostra teammates aqui.
+6. Ajustar `handleConfirmMappings` para filtrar apenas contatos selecionados e grupos não-ignorados
+7. Ajustar `summaryContactCount` para contar apenas selecionados
+
+Nenhum outro arquivo será alterado.
 
