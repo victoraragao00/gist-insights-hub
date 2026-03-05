@@ -1,600 +1,561 @@
-import { useState, useEffect, useCallback, useRef, memo } from "react";
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
-import { useSearchParams } from "react-router-dom";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { format, subDays, isSameDay, parseISO } from "date-fns";
+import { format, subDays, parseISO, formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import {
-  MessageSquare, Smartphone, Mail, Hash, Mic, PenLine,
-  X, Search, FilterX, CalendarIcon, ChevronDown, Loader2,
-} from "lucide-react";
+import { X, Search, MessageSquare, Circle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
-import { Progress } from "@/components/ui/progress";
-import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { toast } from "sonner";
-
-// ---------- Constants ----------
-const PAGE_SIZE = 50;
-
-const CHANNEL_ICONS: Record<string, typeof MessageSquare> = {
-  gist: MessageSquare, whatsapp: Smartphone, email: Mail, discord: Hash,
-  transcription_gemini: Mic, transcription_tactiq: Mic, manual: PenLine,
-};
-const CHANNEL_LABELS: Record<string, string> = {
-  gist: "Gist", whatsapp: "WhatsApp", email: "Email", discord: "Discord",
-  transcription_gemini: "Transcrição", transcription_tactiq: "Transcrição", manual: "Manual",
-};
-const TONE_COLORS: Record<string, string> = {
-  ok: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
-  atencao: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300",
-  alerta: "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300",
-  critico: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300",
-};
-const SIDE_COLORS: Record<string, string> = {
-  customer: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
-  agent: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
-};
-const SIDE_LABELS: Record<string, string> = { customer: "Cliente", agent: "uMode" };
-const PERIOD_OPTIONS = [
-  { value: "7", label: "Últimos 7 dias" },
-  { value: "14", label: "Últimos 14 dias" },
-  { value: "30", label: "Últimos 30 dias" },
-  { value: "custom", label: "Personalizado" },
-];
 
 // ---------- Types ----------
 interface Interaction {
   id: string;
   content: string | null;
   occurred_at: string;
-  channel: string;
-  sender_side: string | null;
   sender_raw: string | null;
+  sender_side: string | null;
   tone: string | null;
-  tone_detail: string | null;
   theme: string | null;
-  theme_detail: string | null;
-  sentiment: number | null;
-  is_out_of_scope: boolean | null;
   classified_at: string | null;
-  classification_model: string | null;
-  attachments: any;
   raw_payload: any;
-  participants: { id: string; name: string; side: string; role: string | null } | null;
+  attachments: any;
 }
 
+interface Conversation {
+  conversationId: string;
+  messages: Interaction[];
+  lastMessage: Interaction;
+  worstTone: "ok" | "atencao" | "alerta" | "critico";
+  primaryTheme: string | null;
+  hasUnclassified: boolean;
+  contactName: string;
+  messageCount: number;
+}
+
+// ---------- Constants ----------
+const TONE_RANK: Record<string, number> = { ok: 0, atencao: 1, alerta: 2, critico: 3 };
+const TONE_LABELS: Record<string, string> = { ok: "Ok", atencao: "Atenção", alerta: "Alerta", critico: "Crítico" };
+const TONE_COLORS: Record<string, string> = {
+  ok: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
+  atencao: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300",
+  alerta: "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300",
+  critico: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300",
+};
+const PERIOD_OPTIONS = [
+  { value: "7", label: "7 dias" },
+  { value: "14", label: "14 dias" },
+  { value: "30", label: "30 dias" },
+];
+const AVATAR_COLORS = [
+  "bg-primary text-primary-foreground",
+  "bg-emerald-600 text-white",
+  "bg-amber-600 text-white",
+  "bg-rose-600 text-white",
+  "bg-sky-600 text-white",
+  "bg-indigo-600 text-white",
+  "bg-teal-600 text-white",
+  "bg-fuchsia-600 text-white",
+];
+
 // ---------- Helpers ----------
-const humanizeTheme = (slug: string) => slug.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-const truncate = (text: string, max: number) => text.length <= max ? text : text.slice(0, max) + "…";
 const stripHtml = (html: string) => html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+const truncate = (text: string, max: number) => (text.length <= max ? text : text.slice(0, max) + "…");
+const humanizeTheme = (slug: string) => slug.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 const sanitizeHtml = (html: string) =>
-  html
-    .replace(/<script[\s\S]*?<\/script>/gi, "")
-    .replace(/<style[\s\S]*?<\/style>/gi, "")
-    .replace(/<iframe[\s\S]*?<\/iframe>/gi, "");
-const isImageUrl = (url: string) => /\.(jpg|jpeg|png|gif|webp|svg|bmp)(\?|$)/i.test(url) || /image/i.test(url);
-const getFileName = (a: any) => a.name ?? a.title ?? (typeof a.url === "string" ? a.url.split("/").pop()?.split("?")[0] : "Anexo");
-const getAttachmentUrl = (a: any): string | null => a.url ?? (typeof a === "string" ? a : null);
+  html.replace(/<script[\s\S]*?<\/script>/gi, "").replace(/<style[\s\S]*?<\/style>/gi, "").replace(/<iframe[\s\S]*?<\/iframe>/gi, "");
+
+function extractContactName(senderRaw: string | null): string {
+  if (!senderRaw) return "Desconhecido";
+  if (!senderRaw.includes("@")) return senderRaw;
+  return senderRaw
+    .split("@")[0]
+    .split(".")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(" ");
+}
+
+function getInitials(name: string): string {
+  return name
+    .split(" ")
+    .slice(0, 2)
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase();
+}
+
+function hashCode(str: string): number {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash + str.charCodeAt(i)) | 0;
+  }
+  return Math.abs(hash);
+}
+
+function formatRelativeDate(dateStr: string): string {
+  const date = parseISO(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffHours = diffMs / (1000 * 60 * 60);
+
+  if (diffHours < 24) {
+    return formatDistanceToNow(date, { locale: ptBR, addSuffix: true });
+  }
+  if (diffHours < 48) return "ontem";
+  return format(date, "dd MMM", { locale: ptBR });
+}
+
+function isInbound(interaction: Interaction): boolean {
+  return interaction.raw_payload?.is_inbound === true;
+}
+
+function isBotSender(interaction: Interaction): boolean {
+  const sender = interaction.sender_raw ?? "";
+  return /bot/i.test(sender);
+}
+
+// ---------- Build Conversations ----------
+function buildConversations(interactions: Interaction[]): Conversation[] {
+  const groups = new Map<string, Interaction[]>();
+
+  for (const item of interactions) {
+    const convId = item.raw_payload?.conversation_id?.toString();
+    if (!convId) continue;
+    if (!groups.has(convId)) groups.set(convId, []);
+    groups.get(convId)!.push(item);
+  }
+
+  const conversations: Conversation[] = [];
+
+  for (const [conversationId, messages] of groups) {
+    // messages are already ordered ASC by occurred_at from the query
+    const lastMessage = messages[messages.length - 1];
+
+    const worstTone = messages.reduce<"ok" | "atencao" | "alerta" | "critico">((worst, msg) => {
+      const t = (msg.tone ?? "ok") as string;
+      return (TONE_RANK[t] ?? 0) > (TONE_RANK[worst] ?? 0) ? (t as any) : worst;
+    }, "ok");
+
+    const themeMsg = [...messages].reverse().find((m) => m.theme != null);
+    const primaryTheme = themeMsg?.theme ?? null;
+
+    const hasUnclassified = messages.some((m) => m.classified_at == null);
+
+    const clientMsg = messages.find(
+      (m) => m.sender_side === "client" || m.raw_payload?.is_inbound === true
+    );
+    const contactName = extractContactName(clientMsg?.sender_raw ?? null);
+
+    conversations.push({
+      conversationId,
+      messages,
+      lastMessage,
+      worstTone,
+      primaryTheme,
+      hasUnclassified,
+      contactName,
+      messageCount: messages.length,
+    });
+  }
+
+  // Sort by last message DESC
+  conversations.sort(
+    (a, b) =>
+      new Date(b.lastMessage.occurred_at).getTime() - new Date(a.lastMessage.occurred_at).getTime()
+  );
+
+  return conversations;
+}
 
 // ---------- Sub-components ----------
-const DateSeparator = ({ date }: { date: string }) => (
-  <div className="flex items-center gap-3 py-3 px-1">
-    <Separator className="flex-1" />
-    <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">
-      {format(parseISO(date), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
-    </span>
-    <Separator className="flex-1" />
-  </div>
-);
 
-const InteractionRow = memo(({ item, onClick }: { item: Interaction; onClick: () => void }) => {
-  const ChannelIcon = CHANNEL_ICONS[item.channel] ?? MessageSquare;
-  const sideKey = item.sender_side === "customer" ? "customer" : item.sender_side === "agent" ? "agent" : null;
-  const senderName = item.participants?.name ?? item.sender_raw ?? "Desconhecido";
+function Avatar({ name, size = 36 }: { name: string; size?: number }) {
+  const initials = getInitials(name);
+  const colorIdx = hashCode(name) % AVATAR_COLORS.length;
+  return (
+    <div
+      className={cn("rounded-full flex items-center justify-center font-semibold shrink-0", AVATAR_COLORS[colorIdx])}
+      style={{ width: size, height: size, fontSize: size * 0.36 }}
+    >
+      {initials}
+    </div>
+  );
+}
+
+function ConversationRow({
+  conversation,
+  isSelected,
+  onClick,
+}: {
+  conversation: Conversation;
+  isSelected: boolean;
+  onClick: () => void;
+}) {
+  const preview = conversation.lastMessage.content
+    ? truncate(stripHtml(conversation.lastMessage.content), 80)
+    : "—";
 
   return (
     <button
       onClick={onClick}
-      className="w-full text-left px-4 py-3 rounded-lg hover:bg-accent/40 transition-colors cursor-pointer flex items-start gap-3 group"
+      className={cn(
+        "w-full text-left px-4 py-3 transition-colors cursor-pointer flex items-start gap-3 border-b border-border",
+        isSelected ? "bg-accent/60" : "hover:bg-accent/30"
+      )}
     >
-      <div className="mt-0.5 text-muted-foreground">
-        <ChannelIcon className="h-4 w-4" />
-      </div>
+      <Avatar name={conversation.contactName} size={40} />
       <div className="flex-1 min-w-0 space-y-1">
-        <div className="flex items-center gap-2 flex-wrap">
-          {sideKey && (
-            <span className={cn("text-[10px] px-1.5 py-0.5 rounded font-medium", SIDE_COLORS[sideKey])}>
-              {SIDE_LABELS[sideKey]}
-            </span>
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-semibold truncate">{conversation.contactName}</span>
+          {conversation.hasUnclassified && (
+            <Circle className="h-2.5 w-2.5 fill-primary text-primary shrink-0" />
           )}
-          <span className="text-sm font-medium truncate">{senderName}</span>
-          <span className="text-xs text-muted-foreground ml-auto whitespace-nowrap">
-            {format(parseISO(item.occurred_at), "HH:mm")}
+          <span className="text-[11px] text-muted-foreground ml-auto whitespace-nowrap">
+            {formatRelativeDate(conversation.lastMessage.occurred_at)}
           </span>
         </div>
-        {item.content && (
-          <p className="text-sm text-muted-foreground leading-relaxed">{truncate(stripHtml(item.content), 200)}</p>
-        )}
-        {Array.isArray(item.attachments) && item.attachments.length > 0 && (
-          <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-muted text-muted-foreground">
-            📎 {item.attachments.length} anexo{item.attachments.length > 1 ? "s" : ""}
-          </span>
-        )}
+        <p className="text-sm text-muted-foreground leading-snug truncate">{preview}</p>
         <div className="flex items-center gap-1.5 flex-wrap">
-          {item.classified_at ? (
-            <>
-              {item.tone && (
-                <span className={cn("text-[10px] px-1.5 py-0.5 rounded font-medium", TONE_COLORS[item.tone] ?? "bg-muted text-muted-foreground")}>
-                  {item.tone}
-                </span>
-              )}
-              {item.theme && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-muted text-muted-foreground">
-                  {humanizeTheme(item.theme)}
-                </span>
-              )}
-            </>
-          ) : (
-            <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-muted text-muted-foreground">
-              Não classificado
+          {conversation.worstTone !== "ok" && (
+            <span className={cn("text-[10px] px-1.5 py-0.5 rounded font-medium", TONE_COLORS[conversation.worstTone])}>
+              {TONE_LABELS[conversation.worstTone]}
             </span>
           )}
+          {conversation.primaryTheme && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-muted text-muted-foreground">
+              {humanizeTheme(conversation.primaryTheme)}
+            </span>
+          )}
+          <span className="text-[10px] text-muted-foreground ml-auto">
+            {conversation.messageCount} msg{conversation.messageCount !== 1 ? "s" : ""}
+          </span>
         </div>
       </div>
     </button>
   );
-});
-InteractionRow.displayName = "InteractionRow";
+}
 
-const LoadingSkeleton = () => (
-  <div className="space-y-2 px-4">
-    {Array.from({ length: 10 }).map((_, i) => (
-      <div key={i} className="flex items-start gap-3 py-3">
-        <Skeleton className="h-4 w-4 mt-1 rounded" />
-        <div className="flex-1 space-y-2">
-          <Skeleton className="h-4 w-1/3" />
-          <Skeleton className="h-3 w-full" />
-          <Skeleton className="h-3 w-1/4" />
+function MessageBubble({ interaction }: { interaction: Interaction }) {
+  const inbound = isInbound(interaction);
+  const bot = !inbound && isBotSender(interaction);
+  const senderName = inbound
+    ? extractContactName(interaction.sender_raw)
+    : bot
+    ? "Bot"
+    : "uMode";
+
+  // Bubble styles
+  let bubbleBg: string;
+  let bubbleText: string;
+  let borderRadius: string;
+
+  if (inbound) {
+    // Client — left
+    bubbleBg = "bg-card";
+    bubbleText = "text-card-foreground";
+    borderRadius = "rounded-xl rounded-bl-sm";
+  } else if (bot) {
+    // Bot — right
+    bubbleBg = "bg-accent";
+    bubbleText = "text-accent-foreground";
+    borderRadius = "rounded-xl rounded-br-sm";
+  } else {
+    // uMode/agent — right
+    bubbleBg = "bg-[hsl(263,70%,58%)]";
+    bubbleText = "text-white";
+    borderRadius = "rounded-xl rounded-br-sm";
+  }
+
+  const align = inbound ? "items-start" : "items-end";
+
+  return (
+    <div className={cn("flex flex-col gap-1", align)}>
+      <div className={cn("flex items-end gap-2", inbound ? "flex-row" : "flex-row-reverse")}>
+        <Avatar name={senderName} size={26} />
+        <div className={cn("max-w-[75%] px-3 py-2 border border-border", bubbleBg, bubbleText, borderRadius)}>
+          {interaction.content ? (
+            <div
+              className="text-sm leading-relaxed prose prose-sm max-w-none [&_a]:underline break-words"
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(interaction.content) }}
+            />
+          ) : (
+            <p className="text-sm text-muted-foreground">—</p>
+          )}
+          {interaction.tone && interaction.tone !== "ok" && (
+            <span className={cn("inline-block mt-1 text-[10px] px-1.5 py-0.5 rounded font-medium", TONE_COLORS[interaction.tone])}>
+              {TONE_LABELS[interaction.tone]}
+            </span>
+          )}
         </div>
       </div>
-    ))}
-  </div>
-);
+      <span className={cn("text-[10px] text-muted-foreground", inbound ? "pl-9" : "pr-9")}>
+        {format(parseISO(interaction.occurred_at), "HH:mm")}
+      </span>
+    </div>
+  );
+}
 
-// ---------- Detail Panel ----------
-const DetailPanel = ({ item, onClose }: { item: Interaction; onClose: () => void }) => {
-  const ChannelIcon = CHANNEL_ICONS[item.channel] ?? MessageSquare;
-  const sideKey = item.sender_side === "customer" ? "customer" : item.sender_side === "agent" ? "agent" : null;
-  const senderName = item.participants?.name ?? item.sender_raw ?? "Desconhecido";
-  const attachments = Array.isArray(item.attachments) ? item.attachments : [];
-  const sentimentPercent = item.sentiment != null ? ((item.sentiment + 1) / 2) * 100 : null;
+function ThreadPanel({
+  conversation,
+  onClose,
+}: {
+  conversation: Conversation;
+  onClose: () => void;
+}) {
+  const firstDate = conversation.messages[0]?.occurred_at;
+  const lastDate = conversation.lastMessage.occurred_at;
 
   return (
     <div className="h-full flex flex-col">
-      <div className="p-4 border-b border-border space-y-1">
+      {/* Header */}
+      <div className="p-4 border-b border-border space-y-1 shrink-0">
         <div className="flex items-center justify-between">
-          <span className="font-semibold">{senderName}</span>
-          <Button variant="ghost" size="icon" onClick={onClose} className="h-7 w-7">
+          <div className="flex items-center gap-2 min-w-0">
+            <Avatar name={conversation.contactName} size={32} />
+            <span className="font-semibold text-sm truncate">{conversation.contactName}</span>
+          </div>
+          <Button variant="ghost" size="icon" onClick={onClose} className="h-7 w-7 shrink-0">
             <X className="h-4 w-4" />
           </Button>
         </div>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <ChannelIcon className="h-3.5 w-3.5" />
-          <span>{CHANNEL_LABELS[item.channel] ?? item.channel}</span>
-          {sideKey && (
-            <span className={cn("px-1.5 py-0.5 rounded font-medium", SIDE_COLORS[sideKey])}>
-              {SIDE_LABELS[sideKey]}
-            </span>
+        <div className="flex items-center gap-2 text-[11px] text-muted-foreground flex-wrap">
+          <span>{conversation.messageCount} mensagens</span>
+          <span>·</span>
+          <span>
+            {firstDate && format(parseISO(firstDate), "dd MMM", { locale: ptBR })}
+            {" — "}
+            {format(parseISO(lastDate), "dd MMM", { locale: ptBR })}
+          </span>
+          {conversation.primaryTheme && (
+            <>
+              <span>·</span>
+              <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                {humanizeTheme(conversation.primaryTheme)}
+              </Badge>
+            </>
           )}
-          <span className="ml-auto">{format(parseISO(item.occurred_at), "dd/MM/yyyy HH:mm:ss")}</span>
         </div>
       </div>
 
+      {/* Messages */}
       <ScrollArea className="flex-1">
-        <div className="p-4 space-y-6">
-          <section>
-            <h4 className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">Conteúdo</h4>
-            {item.content ? (
-              <div
-                className="text-sm leading-relaxed prose prose-sm prose-neutral dark:prose-invert max-w-none [&_a]:text-primary [&_a]:underline"
-                dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.content) }}
-              />
-            ) : (
-              <p className="text-sm text-muted-foreground">—</p>
-            )}
-            {attachments.length > 0 && (
-              <div className="mt-3 space-y-2">
-                <span className="text-xs font-medium text-muted-foreground">Anexos ({attachments.length})</span>
-                <div className="grid grid-cols-2 gap-2">
-                  {attachments.map((a: any, i: number) => {
-                    const url = getAttachmentUrl(a);
-                    if (!url) return (
-                      <div key={i} className="text-xs bg-muted rounded px-2 py-1 truncate">{JSON.stringify(a)}</div>
-                    );
-                    if (isImageUrl(url)) return (
-                      <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="block rounded-md overflow-hidden border border-border hover:ring-2 hover:ring-primary/30 transition-shadow">
-                        <img src={url} alt={getFileName(a)} className="w-full h-24 object-cover" loading="lazy" />
-                        <span className="block text-[10px] text-muted-foreground px-1.5 py-1 truncate">{getFileName(a)}</span>
-                      </a>
-                    );
-                    return (
-                      <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-xs bg-muted rounded px-2 py-2 hover:bg-accent transition-colors truncate">
-                        📄 <span className="truncate underline">{getFileName(a)}</span>
-                      </a>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </section>
-
-          <Separator />
-
-          <section>
-            <h4 className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wider">Classificação IA</h4>
-            {item.classified_at ? (
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground w-20">Tom</span>
-                  {item.tone && (
-                    <span className={cn("text-xs px-2 py-0.5 rounded font-medium", TONE_COLORS[item.tone])}>
-                      {item.tone}
-                    </span>
-                  )}
-                </div>
-                {item.tone_detail && <p className="text-xs text-muted-foreground pl-[88px] -mt-1">{item.tone_detail}</p>}
-
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground w-20">Tema</span>
-                  {item.theme ? (
-                    <span className="text-xs px-2 py-0.5 rounded font-medium bg-muted text-muted-foreground">{humanizeTheme(item.theme)}</span>
-                  ) : <span className="text-xs text-muted-foreground">—</span>}
-                </div>
-                {item.theme_detail && <p className="text-xs text-muted-foreground pl-[88px] -mt-1">{item.theme_detail}</p>}
-
-                {sentimentPercent != null && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground w-20">Sentimento</span>
-                    <div className="flex-1 flex items-center gap-2">
-                      <span className="text-xs">-1</span>
-                      <Progress value={sentimentPercent} className="h-2 flex-1" />
-                      <span className="text-xs">+1</span>
-                      <span className="text-xs font-mono">{item.sentiment!.toFixed(2)}</span>
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground w-20">Fora de escopo</span>
-                  <Badge variant={item.is_out_of_scope ? "destructive" : "secondary"} className="text-[10px]">
-                    {item.is_out_of_scope ? "Sim" : "Não"}
-                  </Badge>
-                </div>
-
-                <div className="text-xs text-muted-foreground space-y-0.5 pt-1">
-                  {item.classification_model && <p>Modelo: {item.classification_model}</p>}
-                  <p>Classificado em: {format(parseISO(item.classified_at), "dd/MM/yyyy HH:mm")}</p>
-                </div>
-
-                <Button variant="outline" size="sm" className="mt-2" onClick={() => toast.info("Em breve")}>
-                  Reclassificar
-                </Button>
-              </div>
-            ) : (
-              <div className="text-sm text-muted-foreground space-y-2">
-                <p>Ainda não classificado</p>
-                <Button variant="outline" size="sm" onClick={() => toast.info("Em breve")}>
-                  Classificar agora
-                </Button>
-              </div>
-            )}
-          </section>
-
-          {item.raw_payload && (
-            <>
-              <Separator />
-              <details className="group">
-                <summary className="text-xs font-semibold text-muted-foreground uppercase tracking-wider cursor-pointer flex items-center gap-1">
-                  Payload original
-                  <ChevronDown className="h-3 w-3 transition-transform group-open:rotate-180" />
-                </summary>
-                <pre className="mt-2 text-[10px] bg-muted p-3 rounded-md overflow-auto max-h-60 whitespace-pre-wrap">
-                  {JSON.stringify(item.raw_payload, null, 2)}
-                </pre>
-              </details>
-            </>
-          )}
+        <div className="p-4 space-y-4">
+          {conversation.messages.map((msg) => (
+            <MessageBubble key={msg.id} interaction={msg} />
+          ))}
         </div>
       </ScrollArea>
     </div>
   );
-};
+}
+
+function ConversationListSkeleton() {
+  return (
+    <div className="space-y-0">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <div key={i} className="flex items-start gap-3 px-4 py-3 border-b border-border">
+          <Skeleton className="h-10 w-10 rounded-full shrink-0" />
+          <div className="flex-1 space-y-2">
+            <Skeleton className="h-4 w-1/3" />
+            <Skeleton className="h-3 w-full" />
+            <Skeleton className="h-3 w-1/4" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 // ---------- Main Component ----------
 export const InteractionsFeed = ({ clientId }: { clientId: string }) => {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const [selectedItem, setSelectedItem] = useState<Interaction | null>(null);
-  const [searchInput, setSearchInput] = useState(searchParams.get("busca") ?? "");
-  const sentinelRef = useRef<HTMLDivElement>(null);
-
-  // Filters from URL — default period to 30 days
-  const filters = {
-    channel: searchParams.get("canal") ?? "",
-    side: searchParams.get("lado") ?? "",
-    tone: searchParams.get("tom") ?? "",
-    theme: searchParams.get("tema") ?? "",
-    period: searchParams.get("periodo") ?? "30",
-    dateFrom: searchParams.get("de") ?? "",
-    dateTo: searchParams.get("ate") ?? "",
-    search: searchParams.get("busca") ?? "",
-  };
-
-  const hasActiveFilters = filters.channel || filters.side || filters.tone || filters.theme || filters.search || filters.period !== "30" || filters.dateFrom || filters.dateTo;
-
-  const setFilter = useCallback((key: string, value: string) => {
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
-      if (value) next.set(key, value);
-      else next.delete(key);
-      return next;
-    }, { replace: true });
-  }, [setSearchParams]);
-
-  const clearFilters = useCallback(() => {
-    setSearchParams({}, { replace: true });
-    setSearchInput("");
-  }, [setSearchParams]);
+  const [selectedConvId, setSelectedConvId] = useState<string | null>(null);
+  const [searchInput, setSearchInput] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [toneFilter, setToneFilter] = useState<string>("all");
+  const [period, setPeriod] = useState("30");
 
   // Debounce search
   useEffect(() => {
-    const t = setTimeout(() => setFilter("busca", searchInput), 300);
+    const t = setTimeout(() => setDebouncedSearch(searchInput), 300);
     return () => clearTimeout(t);
-  }, [searchInput, setFilter]);
+  }, [searchInput]);
 
-  // Period → date range (max 30 days)
-  const effectiveDateFrom = filters.period && filters.period !== "custom"
-    ? subDays(new Date(), Math.min(parseInt(filters.period), 30)).toISOString()
-    : filters.dateFrom || undefined;
-  const effectiveDateTo = filters.dateTo || undefined;
+  const dateFrom = subDays(new Date(), Math.min(parseInt(period), 30)).toISOString();
 
-  // Limit custom range to 30 days
-  const maxCustomFrom = subDays(new Date(), 30);
-
-  // Total count query
-  const { data: totalCount } = useQuery({
-    queryKey: ["interactions_count", clientId, filters],
+  // Single query — all interactions for period
+  const { data: rawInteractions, isLoading } = useQuery({
+    queryKey: ["conversations", clientId, period],
     enabled: !!clientId,
     staleTime: 30_000,
     queryFn: async () => {
-      let q = supabase
+      const { data, error } = await supabase
         .from("interactions")
-        .select("id", { count: "exact", head: true })
-        .eq("client_id", clientId);
-      if (filters.channel) q = q.eq("channel", filters.channel as any);
-      if (filters.side) q = q.eq("sender_side", filters.side);
-      if (filters.tone) q = q.eq("tone", filters.tone as any);
-      if (filters.theme) q = q.eq("theme", filters.theme);
-      if (filters.search) q = q.ilike("content", `%${filters.search}%`);
-      if (effectiveDateFrom) q = q.gte("occurred_at", effectiveDateFrom);
-      if (effectiveDateTo) q = q.lte("occurred_at", effectiveDateTo);
-      const { count, error } = await q;
-      if (error) throw error;
-      return count ?? 0;
-    },
-  });
-
-  // Infinite query
-  const {
-    data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading,
-  } = useInfiniteQuery({
-    queryKey: ["interactions_feed", clientId, filters],
-    enabled: !!clientId,
-    staleTime: 30_000,
-    initialPageParam: 0,
-    queryFn: async ({ pageParam = 0 }) => {
-      let q = supabase
-        .from("interactions")
-        .select(`
-          id, content, occurred_at, channel, sender_side, sender_raw,
-          tone, tone_detail, theme, theme_detail, sentiment,
-          is_out_of_scope, classified_at, classification_model,
-          attachments, raw_payload,
-          participants(id, name, side, role)
-        `)
+        .select("id, content, occurred_at, sender_raw, sender_side, tone, theme, classified_at, raw_payload, attachments")
         .eq("client_id", clientId)
-        .order("occurred_at", { ascending: false })
-        .range(pageParam * PAGE_SIZE, (pageParam + 1) * PAGE_SIZE - 1);
-
-      if (filters.channel) q = q.eq("channel", filters.channel as any);
-      if (filters.side) q = q.eq("sender_side", filters.side);
-      if (filters.tone) q = q.eq("tone", filters.tone as any);
-      if (filters.theme) q = q.eq("theme", filters.theme);
-      if (filters.search) q = q.ilike("content", `%${filters.search}%`);
-      if (effectiveDateFrom) q = q.gte("occurred_at", effectiveDateFrom);
-      if (effectiveDateTo) q = q.lte("occurred_at", effectiveDateTo);
-
-      const { data: rows, error } = await q;
+        .gte("occurred_at", dateFrom)
+        .order("occurred_at", { ascending: true });
       if (error) throw error;
-      return (rows ?? []) as Interaction[];
+      return (data ?? []) as Interaction[];
     },
-    getNextPageParam: (lastPage, allPages) =>
-      lastPage.length === PAGE_SIZE ? allPages.length : undefined,
   });
 
-  // Intersection observer for infinite scroll
+  // Build & filter conversations
+  const allConversations = useMemo(
+    () => buildConversations(rawInteractions ?? []),
+    [rawInteractions]
+  );
+
+  const filteredConversations = useMemo(() => {
+    let convs = allConversations;
+
+    if (toneFilter && toneFilter !== "all") {
+      convs = convs.filter((c) => c.worstTone === toneFilter);
+    }
+
+    if (debouncedSearch) {
+      const lower = debouncedSearch.toLowerCase();
+      convs = convs.filter((c) =>
+        c.messages.some((m) => m.content?.toLowerCase().includes(lower)) ||
+        c.contactName.toLowerCase().includes(lower)
+      );
+    }
+
+    return convs;
+  }, [allConversations, toneFilter, debouncedSearch]);
+
+  const totalMessages = filteredConversations.reduce((sum, c) => sum + c.messageCount, 0);
+
+  const selectedConversation = useMemo(
+    () => filteredConversations.find((c) => c.conversationId === selectedConvId) ?? null,
+    [filteredConversations, selectedConvId]
+  );
+
+  // Use hook to detect mobile
+  const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
-    const el = sentinelRef.current;
-    if (!el) return;
-    const obs = new IntersectionObserver(
-      (entries) => { if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) fetchNextPage(); },
-      { threshold: 0.1 }
-    );
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
-
-  const allItems = data?.pages.flat() ?? [];
-  const displayedCount = allItems.length;
-
-  // Active filters text
-  const activeFilterLabels: string[] = [];
-  if (filters.channel) activeFilterLabels.push(`canal: ${filters.channel}`);
-  if (filters.side) activeFilterLabels.push(`lado: ${filters.side}`);
-  if (filters.tone) activeFilterLabels.push(`tom: ${filters.tone}`);
-  if (filters.theme) activeFilterLabels.push(`tema: ${filters.theme}`);
-  if (filters.search) activeFilterLabels.push(`busca: "${filters.search}"`);
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
 
   return (
-    <div className="flex h-full">
-      <div className={cn("flex-1 flex flex-col min-w-0 transition-all", selectedItem && "xl:mr-[420px]")}>
-        {/* Filter Bar */}
-        <div className="pb-3 flex flex-wrap items-center gap-2">
-          <Select value={filters.channel} onValueChange={(v) => setFilter("canal", v === "all" ? "" : v)}>
-            <SelectTrigger className="w-[130px] h-8 text-xs"><SelectValue placeholder="Canal" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos os canais</SelectItem>
-              {Object.entries(CHANNEL_LABELS).map(([k, v]) => (
-                <SelectItem key={k} value={k}>{v}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+    <div className="flex flex-col h-full">
+      {/* Filter Bar */}
+      <div className="flex items-center gap-2 flex-wrap px-1 pb-3">
+        <Select value={toneFilter} onValueChange={setToneFilter}>
+          <SelectTrigger className="w-[130px] h-9 text-xs">
+            <SelectValue placeholder="Tom" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os tons</SelectItem>
+            <SelectItem value="ok">Ok</SelectItem>
+            <SelectItem value="atencao">Atenção</SelectItem>
+            <SelectItem value="alerta">Alerta</SelectItem>
+            <SelectItem value="critico">Crítico</SelectItem>
+          </SelectContent>
+        </Select>
 
-          <Select value={filters.side} onValueChange={(v) => setFilter("lado", v === "all" ? "" : v)}>
-            <SelectTrigger className="w-[110px] h-8 text-xs"><SelectValue placeholder="Lado" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="customer">Cliente</SelectItem>
-              <SelectItem value="agent">uMode</SelectItem>
-            </SelectContent>
-          </Select>
+        <Select value={period} onValueChange={setPeriod}>
+          <SelectTrigger className="w-[110px] h-9 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {PERIOD_OPTIONS.map((o) => (
+              <SelectItem key={o.value} value={o.value}>
+                {o.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
-          <Select value={filters.tone} onValueChange={(v) => setFilter("tom", v === "all" ? "" : v)}>
-            <SelectTrigger className="w-[110px] h-8 text-xs"><SelectValue placeholder="Tom" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="ok">Ok</SelectItem>
-              <SelectItem value="atencao">Atenção</SelectItem>
-              <SelectItem value="alerta">Alerta</SelectItem>
-              <SelectItem value="critico">Crítico</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Select value={filters.period} onValueChange={(v) => setFilter("periodo", v === "all" ? "30" : v)}>
-            <SelectTrigger className="w-[150px] h-8 text-xs"><SelectValue placeholder="Período" /></SelectTrigger>
-            <SelectContent>
-              {PERIOD_OPTIONS.map((p) => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
-            </SelectContent>
-          </Select>
-
-          {filters.period === "custom" && (
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" className="h-8 text-xs gap-1">
-                  <CalendarIcon className="h-3 w-3" />
-                  {filters.dateFrom ? format(parseISO(filters.dateFrom), "dd/MM") : "De"} — {filters.dateTo ? format(parseISO(filters.dateTo), "dd/MM") : "Até"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="range"
-                  selected={{
-                    from: filters.dateFrom ? parseISO(filters.dateFrom) : undefined,
-                    to: filters.dateTo ? parseISO(filters.dateTo) : undefined,
-                  } as any}
-                  onSelect={(range: any) => {
-                    setFilter("de", range?.from ? range.from.toISOString() : "");
-                    setFilter("ate", range?.to ? range.to.toISOString() : "");
-                  }}
-                  fromDate={maxCustomFrom}
-                  toDate={new Date()}
-                  className="p-3 pointer-events-auto"
-                />
-              </PopoverContent>
-            </Popover>
-          )}
-
-          <div className="relative">
-            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-            <Input
-              placeholder="Buscar nas mensagens..."
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              className="h-8 text-xs pl-7 w-[200px]"
-            />
-          </div>
-
-          {hasActiveFilters && (
-            <Button variant="ghost" size="sm" className="h-8 text-xs gap-1 text-muted-foreground" onClick={clearFilters}>
-              <FilterX className="h-3.5 w-3.5" /> Limpar filtros
-            </Button>
-          )}
-        </div>
-
-        {/* Result count */}
-        {totalCount != null && totalCount > 0 && (
-          <div className="pb-2 text-xs text-muted-foreground flex items-center gap-1 flex-wrap">
-            <span>Exibindo {displayedCount} de {totalCount.toLocaleString("pt-BR")} interações</span>
-            {activeFilterLabels.length > 0 && (
-              <span className="ml-1">[{activeFilterLabels.join(" · ")}]</span>
-            )}
-          </div>
-        )}
-
-        {/* Timeline */}
-        <div className="flex-1 overflow-y-auto">
-          {isLoading ? (
-            <LoadingSkeleton />
-          ) : allItems.length === 0 ? (
-            <div className="text-center py-20 text-muted-foreground space-y-3">
-              <MessageSquare className="h-10 w-10 mx-auto opacity-40" />
-              <p className="text-sm">Nenhuma interação encontrada{hasActiveFilters ? " para os filtros selecionados." : "."}</p>
-              {hasActiveFilters && (
-                <Button variant="outline" size="sm" onClick={clearFilters}>Limpar filtros</Button>
-              )}
-            </div>
-          ) : (
-            <div>
-              {allItems.map((item, idx) => {
-                const prev = idx > 0 ? allItems[idx - 1] : null;
-                const showDate = !prev || !isSameDay(parseISO(item.occurred_at), parseISO(prev.occurred_at));
-                return (
-                  <div key={item.id}>
-                    {showDate && <DateSeparator date={item.occurred_at} />}
-                    <InteractionRow item={item} onClick={() => setSelectedItem(item)} />
-                  </div>
-                );
-              })}
-              <div ref={sentinelRef} className="h-8 flex items-center justify-center">
-                {isFetchingNextPage && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
-              </div>
-            </div>
-          )}
+        <div className="relative flex-1 min-w-[160px]">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <Input
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="Buscar conversas..."
+            className="pl-8 h-9 text-xs"
+          />
         </div>
       </div>
 
-      {/* Detail panel — desktop: fixed right, mobile: sheet overlay */}
-      {selectedItem && (
-        <>
-          <div className="hidden xl:block fixed top-0 right-0 h-screen w-[420px] border-l border-border bg-background z-30">
-            <DetailPanel item={selectedItem} onClose={() => setSelectedItem(null)} />
+      {/* Counter */}
+      <div className="px-1 pb-2 text-xs text-muted-foreground">
+        {isLoading ? (
+          <Skeleton className="h-3 w-48" />
+        ) : (
+          <>
+            {filteredConversations.length} conversa{filteredConversations.length !== 1 ? "s" : ""}
+            {" · "}
+            {totalMessages.toLocaleString("pt-BR")} msg{totalMessages !== 1 ? "s" : ""}
+            {" · "}
+            últimos {period} dias
+          </>
+        )}
+      </div>
+
+      {/* Content area */}
+      <div className="flex flex-1 min-h-0 border border-border rounded-lg overflow-hidden bg-card">
+        {/* Conversation list */}
+        <div
+          className={cn(
+            "flex-1 min-w-0 overflow-hidden",
+            selectedConversation && !isMobile ? "border-r border-border" : ""
+          )}
+        >
+          <ScrollArea className="h-full">
+            {isLoading ? (
+              <ConversationListSkeleton />
+            ) : filteredConversations.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+                <MessageSquare className="h-10 w-10 text-muted-foreground/40 mb-3" />
+                <p className="text-sm text-muted-foreground">
+                  Nenhuma conversa encontrada para o período selecionado
+                </p>
+              </div>
+            ) : (
+              filteredConversations.map((conv) => (
+                <ConversationRow
+                  key={conv.conversationId}
+                  conversation={conv}
+                  isSelected={conv.conversationId === selectedConvId}
+                  onClick={() => setSelectedConvId(conv.conversationId)}
+                />
+              ))
+            )}
+          </ScrollArea>
+        </div>
+
+        {/* Thread panel — desktop */}
+        {selectedConversation && !isMobile && (
+          <div className="w-[420px] shrink-0">
+            <ThreadPanel
+              conversation={selectedConversation}
+              onClose={() => setSelectedConvId(null)}
+            />
           </div>
-          <Sheet open={!!selectedItem} onOpenChange={(open) => !open && setSelectedItem(null)}>
-            <SheetContent side="right" className="w-[420px] max-w-full p-0 xl:hidden">
-              <SheetHeader className="sr-only"><SheetTitle>Detalhe</SheetTitle></SheetHeader>
-              <DetailPanel item={selectedItem} onClose={() => setSelectedItem(null)} />
+        )}
+
+        {/* Thread panel — mobile sheet */}
+        {isMobile && (
+          <Sheet open={!!selectedConversation} onOpenChange={(open) => !open && setSelectedConvId(null)}>
+            <SheetContent side="right" className="p-0 w-full sm:max-w-full">
+              {selectedConversation && (
+                <ThreadPanel
+                  conversation={selectedConversation}
+                  onClose={() => setSelectedConvId(null)}
+                />
+              )}
             </SheetContent>
           </Sheet>
-        </>
-      )}
+        )}
+      </div>
     </div>
   );
 };
