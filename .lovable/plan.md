@@ -1,55 +1,42 @@
 
 
-## Root Cause
+# Wizard de Contatos Gist: Separar em 2 etapas
 
-The Gist conversations API returns pagination as URL strings:
-```json
-{
-  "next": "https://api.getgist.com/conversations?page=2&per_page=20&state=all",
-  "last": "https://api.getgist.com/conversations?page=294&per_page=20&state=all"
-}
-```
+## Problema
+Atualmente, o Step A ("Discovery") mostra tudo junto: a lista de domínios/empresas com as opções de vincular/criar/ignorar E os contatos individuais de cada grupo. Isso é confuso quando há muitos domínios com dezenas de contatos.
 
-But the code assumes numeric fields:
-```typescript
-const totalConvos = convosResponse.pages?.total_count ?? 0;  // undefined → 0
-const totalPages = Math.ceil(totalConvos / 20);               // 0
-```
+## Nova estrutura do wizard
 
-Result: `totalPages = 0`, so the loop thinks there are no more pages.
+### Step 1 — "Clientes" (novo)
+Lista apenas os **domínios/empresas** encontrados. Para cada grupo, o usuário escolhe:
+- **Vincular a cliente existente** (select de clientes)
+- **Criar novo cliente** (input de nome)
+- **Ignorar** (novo — não importa contatos desse domínio)
 
-## Fix: `supabase/functions/ingest-gist-historical/index.ts`
+Sem tabela de contatos. Apenas mostra o domínio, nome da empresa (se houver) e quantidade de contatos como informação contextual (ex: "nkstore.com.br — 42 contatos").
 
-1. **Update the `GistConversationsResponse` interface** to reflect the actual API shape:
-```typescript
-interface GistConversationsResponse {
-  conversations: GistConversation[];
-  pages: { next?: string; first?: string; last?: string };
-}
-```
+Botão "Próximo" avança ao Step 2 (filtrando apenas os grupos não-ignorados).
 
-2. **Parse `totalPages` from the `last` URL** by extracting the `page` query parameter:
-```typescript
-function extractPageFromUrl(url?: string): number {
-  if (!url) return 1;
-  const match = url.match(/[?&]page=(\d+)/);
-  return match ? parseInt(match[1], 10) : 1;
-}
-```
+### Step 2 — "Contatos" (novo)
+Para cada grupo **não ignorado**, mostra a tabela de contatos com checkbox individual para selecionar quais contatos importar. Também mostra a seção de Teammates.
 
-3. **Determine `hasMore` from the `next` URL** existence:
-```typescript
-const totalPages = extractPageFromUrl(convosResponse.pages?.last);
-const hasNextPage = !!convosResponse.pages?.next;
-```
+Botão "Confirmar Vínculos" avança ao Step 3 (atual "confirmation").
 
-4. **Update the loop exit condition** to use `hasNextPage` and `totalPages` correctly.
+### Step 3 — "Confirmação" (atual)
+Sem alterações significativas, apenas ajusta os contadores para refletir apenas os selecionados.
 
-5. **Apply the same fix to the messages endpoint** — verify if it uses the same URL-based pagination format (check the `GistMessagesResponse` pages handling too).
+### Step 4 — "Importação" (atual, só onboarding)
+Sem alterações.
 
-6. **Keep existing debug logs**, update them with correct values.
+## Alterações em `src/pages/ClientsPage.tsx`
 
-No frontend changes needed. Redeploy the function after changes.
+1. Alterar `WizardStep` para `"clients" | "contacts" | "confirmation" | "import"`
+2. Step inicial passa de `"discovery"` para `"clients"`
+3. Adicionar opção `"ignore"` ao `GroupMapping.type` (tipo `"existing" | "new" | "ignore"`)
+4. **Step "clients"**: renderiza cards compactos por domínio — só domínio, empresa, count, e select (vincular/criar/ignorar) + input/select conforme tipo
+5. **Step "contacts"**: para cada grupo não-ignorado, mostra tabela de contatos com checkboxes. Novo state `selectedContacts: Map<number, boolean>` para controle individual. Também mostra teammates aqui.
+6. Ajustar `handleConfirmMappings` para filtrar apenas contatos selecionados e grupos não-ignorados
+7. Ajustar `summaryContactCount` para contar apenas selecionados
 
-**Expected result**: 294 pages × 20 = ~5,880 conversations, processed in batches of 5 pages per invocation (~59 frontend loop iterations).
+Nenhum outro arquivo será alterado.
 

@@ -22,14 +22,20 @@ interface GistConversation {
   state: string;
 }
 
+interface GistPaginationPages {
+  next?: string;
+  first?: string;
+  last?: string;
+}
+
 interface GistConversationsResponse {
   conversations: GistConversation[];
-  pages: { total_count: number; per_page: number; page: number };
+  pages: GistPaginationPages;
 }
 
 interface GistMessagesResponse {
   messages: GistMessage[];
-  pages?: { total_count: number; per_page: number; page: number };
+  pages?: GistPaginationPages;
 }
 
 interface ChannelBinding {
@@ -55,6 +61,12 @@ interface RequestBody {
   page?: number;
   max_pages?: number;
   delete_client_id?: string;
+}
+
+function extractPageFromUrl(url?: string): number {
+  if (!url) return 0;
+  const match = url.match(/[?&]page=(\d+)/);
+  return match ? parseInt(match[1], 10) : 0;
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -206,10 +218,10 @@ Deno.serve(async (req) => {
       }
 
       const conversations = convosResponse.conversations ?? [];
-      const totalConvos = convosResponse.pages?.total_count ?? 0;
-      const totalPages = Math.ceil(totalConvos / 20);
+      const totalPages = extractPageFromUrl(convosResponse.pages?.last);
+      const hasNextPage = !!convosResponse.pages?.next;
 
-      console.log(`[ingest] Page ${currentPage}/${totalPages} — ${conversations.length} convos on page, total_count=${totalConvos}, raw pages=`, JSON.stringify(convosResponse.pages));
+      console.log(`[ingest] Page ${currentPage}/${totalPages} — ${conversations.length} convos, hasNext=${hasNextPage}, pages=${JSON.stringify(convosResponse.pages)}`);
 
       conversationsFetched += conversations.length;
       pagesProcessed++;
@@ -244,8 +256,8 @@ Deno.serve(async (req) => {
             const msgs = msgRes.messages ?? [];
             allMessages.push(...msgs);
 
-            const msgTotalPages = msgRes.pages ? Math.ceil(msgRes.pages.total_count / 50) : 1;
-            msgHasMore = msgPage < msgTotalPages;
+            // Use URL-based pagination for messages too
+            msgHasMore = !!msgRes.pages?.next;
             msgPage++;
           }
 
@@ -333,18 +345,16 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Check if there are more pages beyond current
-      console.log(`[ingest] Decision: currentPage=${currentPage}, totalPages=${totalPages}, pagesProcessed=${pagesProcessed}/${maxPages}`);
-      if (currentPage < totalPages) {
+      // Check if there are more pages
+      console.log(`[ingest] Decision: currentPage=${currentPage}, totalPages=${totalPages}, hasNextPage=${hasNextPage}, pagesProcessed=${pagesProcessed}/${maxPages}`);
+      if (hasNextPage) {
         currentPage++;
-        // If we've hit maxPages, signal has_more for the frontend to continue
         if (pagesProcessed >= maxPages) {
           hasMore = true;
           nextPage = currentPage;
           console.log(`[ingest] Yielding: has_more=true, next_page=${nextPage}`);
         }
       } else {
-        // No more conversation pages
         console.log(`[ingest] All pages processed, no more.`);
         break;
       }
