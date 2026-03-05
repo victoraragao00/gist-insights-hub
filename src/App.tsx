@@ -10,7 +10,7 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import Index from "./pages/Index";
 import ClientsPage from "./pages/ClientsPage";
 import ClientDetailPage from "./pages/ClientDetailPage";
-import InteractionsPage from "./pages/InteractionsPage";
+
 import Audits from "./pages/Audits";
 import SettingsPage from "./pages/SettingsPage";
 import LoginPage from "./pages/LoginPage";
@@ -31,7 +31,7 @@ const App = () => (
             <Route element={<ProtectedRoute />}>
               <Route element={<ClientProvider><DashboardLayout /></ClientProvider>}>
                 <Route path="/" element={<ErrorBoundary><Index /></ErrorBoundary>} />
-                <Route path="/interactions" element={<ErrorBoundary><InteractionsPage /></ErrorBoundary>} />
+                
                 <Route path="/clients" element={<ErrorBoundary><ClientsPage /></ErrorBoundary>} />
                 <Route path="/clients/:slug" element={<ErrorBoundary><ClientDetailPage /></ErrorBoundary>} />
                 <Route path="/audits" element={<ErrorBoundary><Audits /></ErrorBoundary>} />
