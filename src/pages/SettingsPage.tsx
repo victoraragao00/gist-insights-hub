@@ -603,8 +603,8 @@ const SettingsPage = () => {
                         ({syncState.currentClientIndex}/{syncState.totalClients})
                       </span>
                     )}
-                    {syncState.estimatedRemaining && (
-                      <span className="text-muted-foreground">— {syncState.estimatedRemaining}</span>
+                    {syncState.elapsedDisplay && (
+                      <span className="text-muted-foreground">— {syncState.elapsedDisplay}</span>
                     )}
                   </div>
                   <Button variant="ghost" size="sm" onClick={cancelSync} className="text-xs text-muted-foreground hover:text-destructive">
