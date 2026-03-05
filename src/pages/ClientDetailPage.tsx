@@ -22,6 +22,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ChevronRight, Pencil, MoreHorizontal, Loader2, Upload } from "lucide-react";
+import { InteractionsFeed } from "@/components/InteractionsFeed";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
@@ -466,6 +467,7 @@ const ClientDetailPage = () => {
       <Tabs defaultValue="overview" className="space-y-6">
         <TabsList className="bg-muted/50">
           <TabsTrigger value="overview">Visão Geral</TabsTrigger>
+          <TabsTrigger value="interactions">Interações</TabsTrigger>
           <TabsTrigger value="participants">Participantes ({participants.length})</TabsTrigger>
           <TabsTrigger value="channels">Canais ({bindings.length})</TabsTrigger>
           <TabsTrigger value="documents">Documentos ({documents.length})</TabsTrigger>
@@ -588,6 +590,11 @@ const ClientDetailPage = () => {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* ── TAB: Interações ── */}
+        <TabsContent value="interactions" className="min-h-[500px]">
+          <InteractionsFeed clientId={client.id} />
         </TabsContent>
 
         {/* ── TAB 2: Participantes ── */}
