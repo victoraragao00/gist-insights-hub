@@ -348,6 +348,29 @@ const SettingsPage = () => {
     ? Math.round((currentClientIndex / selectedClients.length) * 100)
     : syncing ? 50 : 0;
 
+  // ── Inactivation rule handler ──
+
+  const handleApplyInactivationRule = useCallback(async () => {
+    if (inactiveDays < 1) {
+      toast.error("O número de dias deve ser pelo menos 1.");
+      return;
+    }
+    setApplyingRule(true);
+    try {
+      const { data, error } = await supabase.rpc("deactivate_stale_clients", { _days: inactiveDays });
+      if (error) throw error;
+      const count = typeof data === "number" ? data : 0;
+      toast.success(`${count} cliente(s) inativado(s).`);
+      queryClient.invalidateQueries({ queryKey: ["sync_clients"] });
+      queryClient.invalidateQueries({ queryKey: ["clients"] });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Erro desconhecido";
+      toast.error("Erro ao aplicar regra: " + msg);
+    } finally {
+      setApplyingRule(false);
+    }
+  }, [inactiveDays, queryClient]);
+
   // ── Integration cards config ──
 
   const integrations = [
