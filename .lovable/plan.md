@@ -1,42 +1,49 @@
 
 
-# Wizard de Contatos Gist: Separar em 2 etapas
+## Diagnóstico e plano de otimização
 
-## Problema
-Atualmente, o Step A ("Discovery") mostra tudo junto: a lista de domínios/empresas com as opções de vincular/criar/ignorar E os contatos individuais de cada grupo. Isso é confuso quando há muitos domínios com dezenas de contatos.
+### Problemas encontrados
 
-## Nova estrutura do wizard
+**1. Bug de progresso: denominador incompatível (contatos)**
 
-### Step 1 — "Clientes" (novo)
-Lista apenas os **domínios/empresas** encontrados. Para cada grupo, o usuário escolhe:
-- **Vincular a cliente existente** (select de clientes)
-- **Criar novo cliente** (input de nome)
-- **Ignorar** (novo — não importa contatos desse domínio)
+No loop de contatos, `pageCount` conta **invocações** (cada uma processa 5 páginas), mas `denominator` é `total_pages` (páginas individuais, ~31). Resultado: após 6 invocações (cobrindo ~30 páginas), o progresso mostra `6/31 ≈ 19%` quando na verdade ~97% das páginas foram processadas. Com `totalSteps=3`, isso vira ~6% da barra total. Explica o que você vê.
 
-Sem tabela de contatos. Apenas mostra o domínio, nome da empresa (se houver) e quantidade de contatos como informação contextual (ex: "nkstore.com.br — 42 contatos").
+**Correção:** usar `page` (página acumulada) ao invés de `pageCount` (invocações) no cálculo de subProgress:
+```
+subProgress = Math.min(page / denominator, 0.95)
+```
 
-Botão "Próximo" avança ao Step 2 (filtrando apenas os grupos não-ignorados).
+**2. Bug grave: `ingest-gist-historical` ignora `client_id`**
 
-### Step 2 — "Contatos" (novo)
-Para cada grupo **não ignorado**, mostra a tabela de contatos com checkbox individual para selecionar quais contatos importar. Também mostra a seção de Teammates.
+A edge function **não aceita** o parâmetro `client_id`. Ela sempre busca TODAS as conversas do Gist globalmente. O frontend passa `client_id` no body, mas o backend ignora. Com 2 clientes selecionados, o histórico completo é processado **2 vezes**.
 
-Botão "Confirmar Vínculos" avança ao Step 3 (atual "confirmation").
+**Correção:** Chamar `ingest-gist-historical` apenas **uma vez** (não por cliente). Remover o loop `for (const client of selectedClients)` e fazer uma única passagem global. A resolução de client_id já acontece no backend via mapeamento de participantes.
 
-### Step 3 — "Confirmação" (atual)
-Sem alterações significativas, apenas ajusta os contadores para refletir apenas os selecionados.
+**3. Denominador do histórico fixo em 5 é incorreto**
 
-### Step 4 — "Importação" (atual, só onboarding)
-Sem alterações.
+O denominador 5 assume que serão exatamente 5 invocações. Na realidade, pode haver centenas de páginas de conversas. A função retorna `totalPagesCount` no resultado — devemos usar isso como denominador, similar ao contacts.
 
-## Alterações em `src/pages/ClientsPage.tsx`
+### Plano de implementação
 
-1. Alterar `WizardStep` para `"clients" | "contacts" | "confirmation" | "import"`
-2. Step inicial passa de `"discovery"` para `"clients"`
-3. Adicionar opção `"ignore"` ao `GroupMapping.type` (tipo `"existing" | "new" | "ignore"`)
-4. **Step "clients"**: renderiza cards compactos por domínio — só domínio, empresa, count, e select (vincular/criar/ignorar) + input/select conforme tipo
-5. **Step "contacts"**: para cada grupo não-ignorado, mostra tabela de contatos com checkboxes. Novo state `selectedContacts: Map<number, boolean>` para controle individual. Também mostra teammates aqui.
-6. Ajustar `handleConfirmMappings` para filtrar apenas contatos selecionados e grupos não-ignorados
-7. Ajustar `summaryContactCount` para contar apenas selecionados
+#### `src/context/ClientContext.tsx`
 
-Nenhum outro arquivo será alterado.
+1. **Contacts loop** — trocar `pageCount / denominator` por `page / denominator` (onde `page` é a página acumulada real)
+
+2. **History loop** — remover o `for` por cliente. Fazer uma única chamada em loop:
+   - Step 1 (se contacts): sync contatos global
+   - Step 2 (se history): sync histórico global (1 passagem)
+   - `totalSteps` = contactsStep + (syncHistory ? 1 : 0)
+   - Usar `totalPagesCount` retornado pela função como denominador dinâmico (default 50)
+
+3. **Resultados** — ao final do history, reportar um único resultado global com total de mensagens inseridas
+
+#### Sem alterações nas edge functions
+
+As funções já funcionam corretamente — o problema está na orquestração do frontend.
+
+### Impacto
+
+- Tempo de sync com 2 clientes: de ~2x o tempo total para ~1x
+- Barra de progresso: reflete progresso real ao invés de ficar parada em <5%
+- Nenhuma alteração nas edge functions = sem risco para a sync em andamento
 
