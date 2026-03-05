@@ -1,42 +1,44 @@
 
 
-# Wizard de Contatos Gist: Separar em 2 etapas
+## Two Changes
 
-## Problema
-Atualmente, o Step A ("Discovery") mostra tudo junto: a lista de domínios/empresas com as opções de vincular/criar/ignorar E os contatos individuais de cada grupo. Isso é confuso quando há muitos domínios com dezenas de contatos.
+### 1. Automate sync-gist-contacts via pg_cron
 
-## Nova estrutura do wizard
+Run SQL using the Supabase insert tool (not migration, since it contains project-specific URLs/keys):
 
-### Step 1 — "Clientes" (novo)
-Lista apenas os **domínios/empresas** encontrados. Para cada grupo, o usuário escolhe:
-- **Vincular a cliente existente** (select de clientes)
-- **Criar novo cliente** (input de nome)
-- **Ignorar** (novo — não importa contatos desse domínio)
+```sql
+SELECT cron.schedule(
+  'sync-gist-contacts-auto',
+  '0 */6 * * *',
+  $$
+  SELECT net.http_post(
+    url := 'https://qyfwbmukylyfsgzgocfo.supabase.co/functions/v1/sync-gist-contacts',
+    headers := '{"Content-Type": "application/json", "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF5ZndibXVreWx5ZnNnemdjZm8iLCJyb2xlIjoiYW5vbiIsImlhdCI6MTc0MDY5ODQ5MSwiZXhwIjoyMDU2Mjc0NDkxfQ.oaldMHMhpMBbhkFCtO4j8bAiJrjxuKnDNa9S9DqQhAo"}'::jsonb,
+    body := '{}'::jsonb
+  ) as request_id;
+  $$
+);
+```
 
-Sem tabela de contatos. Apenas mostra o domínio, nome da empresa (se houver) e quantidade de contatos como informação contextual (ex: "nkstore.com.br — 42 contatos").
+**Pre-requisite**: Enable `pg_cron` and `pg_net` extensions first if not already enabled.
 
-Botão "Próximo" avança ao Step 2 (filtrando apenas os grupos não-ignorados).
+### 2. Update ClientDetailPage.tsx — two small edits
 
-### Step 2 — "Contatos" (novo)
-Para cada grupo **não ignorado**, mostra a tabela de contatos com checkbox individual para selecionar quais contatos importar. Também mostra a seção de Teammates.
+**a) KPI card (line 471-475)**: Change label to "Último Acesso Gist", add relative time formatting to sub text:
+```tsx
+<KPICard
+  label="Último Acesso Gist"
+  value={meta.last_seen_at ? formatDate(meta.last_seen_at) : "Não disponível"}
+  sub={meta.last_seen_at ? `atualizado ${formatRelativeTime(meta.last_seen_at)}` : "sem dados"}
+/>
+```
 
-Botão "Confirmar Vínculos" avança ao Step 3 (atual "confirmation").
+Add a `formatRelativeTime` helper near `formatDate` that returns "há 2 horas" / "hoje às 14:32" / "há 3 dias" style strings.
 
-### Step 3 — "Confirmação" (atual)
-Sem alterações significativas, apenas ajusta os contadores para refletir apenas os selecionados.
+**b) Header subtitle (line 424)**: Append sync indicator:
+```tsx
+slug: {client.slug} · {bindings.length} canais · Atualizado {formatDate(...)} · 🔘 Gist sync: automático (6h)
+```
 
-### Step 4 — "Importação" (atual, só onboarding)
-Sem alterações.
-
-## Alterações em `src/pages/ClientsPage.tsx`
-
-1. Alterar `WizardStep` para `"clients" | "contacts" | "confirmation" | "import"`
-2. Step inicial passa de `"discovery"` para `"clients"`
-3. Adicionar opção `"ignore"` ao `GroupMapping.type` (tipo `"existing" | "new" | "ignore"`)
-4. **Step "clients"**: renderiza cards compactos por domínio — só domínio, empresa, count, e select (vincular/criar/ignorar) + input/select conforme tipo
-5. **Step "contacts"**: para cada grupo não-ignorado, mostra tabela de contatos com checkboxes. Novo state `selectedContacts: Map<number, boolean>` para controle individual. Também mostra teammates aqui.
-6. Ajustar `handleConfirmMappings` para filtrar apenas contatos selecionados e grupos não-ignorados
-7. Ajustar `summaryContactCount` para contar apenas selecionados
-
-Nenhum outro arquivo será alterado.
+No other files changed.
 
