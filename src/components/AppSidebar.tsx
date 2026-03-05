@@ -43,15 +43,15 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader className="p-4">
+      <SidebarHeader className={collapsed ? "p-2" : "p-4"}>
         <div className="flex items-center gap-3">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground font-bold text-sm">
             H
           </div>
           {!collapsed && (
-            <div>
-              <h2 className="text-sm font-bold tracking-tight text-foreground">Hub Central</h2>
-              <p className="text-xs text-muted-foreground">Integrações & Analytics</p>
+            <div className="overflow-hidden">
+              <h2 className="text-sm font-bold tracking-tight text-foreground truncate">Hub Central</h2>
+              <p className="text-xs text-muted-foreground truncate">Integrações & Analytics</p>
             </div>
           )}
         </div>
@@ -88,17 +88,18 @@ export function AppSidebar() {
             <SidebarMenu>
               {modules.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
+                  <SidebarMenuButton
+                    asChild
+                    tooltip={collapsed ? item.title : undefined}
+                  >
                     <NavLink
                       to={item.url}
                       end={item.url === "/"}
                       className="hover:bg-accent/50"
                       activeClassName="bg-primary text-primary-foreground hover:bg-primary/90"
                     >
-                      <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${isActive(item.url) ? "bg-primary-foreground/20" : "bg-accent"}`}>
-                        <item.icon className="h-4 w-4" />
-                      </div>
-                      {!collapsed && <span className="ml-1">{item.title}</span>}
+                      <item.icon className="h-4 w-4 shrink-0" />
+                      {!collapsed && <span>{item.title}</span>}
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
