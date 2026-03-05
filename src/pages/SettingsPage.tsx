@@ -479,6 +479,16 @@ const SettingsPage = () => {
 
         {/* ═══ Tab: Sincronização ═══ */}
         <TabsContent value="sync" className="mt-4 space-y-6">
+          {/* Warning banner during sync */}
+          {syncing && (
+            <Alert className="border-amber-500/50 bg-amber-50 dark:bg-amber-950/20">
+              <AlertTriangle className="h-4 w-4 text-amber-600" />
+              <AlertDescription className="text-amber-800 dark:text-amber-200 font-medium">
+                ⚠ Sincronização em andamento. Não navegue para outra página.
+              </AlertDescription>
+            </Alert>
+          )}
+
           {/* Title + last sync */}
           <div>
             <h2 className="text-lg font-semibold text-foreground">Sincronização de Dados</h2>
@@ -539,10 +549,85 @@ const SettingsPage = () => {
             )}
           </div>
 
+          {/* Inactivation Rule Card */}
+          <Card className="border shadow-sm">
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2">
+                <ShieldAlert className="h-4 w-4 text-muted-foreground" />
+                <CardTitle className="text-sm font-semibold">Regra de Inativação Automática</CardTitle>
+              </div>
+              <CardDescription className="text-xs">
+                Aplica apenas a clientes criados automaticamente (auto_created = true)
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex items-center gap-3 flex-wrap">
+              <span className="text-sm text-foreground whitespace-nowrap">Inativar clientes sem acesso há mais de</span>
+              <Input
+                type="number"
+                min={1}
+                value={inactiveDays}
+                onChange={(e) => setInactiveDays(Math.max(1, parseInt(e.target.value) || 90))}
+                className="w-20 h-8 text-center"
+              />
+              <span className="text-sm text-foreground">dias</span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleApplyInactivationRule}
+                disabled={applyingRule}
+                className="ml-auto"
+              >
+                {applyingRule ? (
+                  <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> Aplicando...</>
+                ) : (
+                  "Aplicar regra agora"
+                )}
+              </Button>
+            </CardContent>
+          </Card>
+
           {/* Step 2 — Select clients */}
           <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-medium text-foreground">Clientes</h3>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-3">
+                <h3 className="text-sm font-medium text-foreground">Clientes</h3>
+                {/* Status filter */}
+                <div className="flex items-center rounded-lg border border-border overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setStatusFilter("active")}
+                    className={`px-3 py-1 text-xs font-medium transition-colors ${
+                      statusFilter === "active"
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-background text-muted-foreground hover:bg-muted"
+                    }`}
+                  >
+                    Ativos ({activeCount})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStatusFilter("inactive")}
+                    className={`px-3 py-1 text-xs font-medium transition-colors border-x border-border ${
+                      statusFilter === "inactive"
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-background text-muted-foreground hover:bg-muted"
+                    }`}
+                  >
+                    Inativos ({inactiveCount})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStatusFilter("all")}
+                    className={`px-3 py-1 text-xs font-medium transition-colors ${
+                      statusFilter === "all"
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-background text-muted-foreground hover:bg-muted"
+                    }`}
+                  >
+                    Todos ({syncClients.length})
+                  </button>
+                </div>
+              </div>
               <div className="flex items-center gap-2">
                 <Button variant="outline" size="sm" className="h-7 text-xs" onClick={selectActive}>
                   Selecionar ativos
@@ -570,7 +655,7 @@ const SettingsPage = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {syncClients.map((client) => {
+                    {filteredClients.map((client) => {
                       const meta = (client.metadata ?? {}) as Record<string, unknown>;
                       const lastSeen = meta.last_seen_at as string | undefined;
                       const isSelected = selectedClientIds.includes(client.id);
@@ -606,7 +691,7 @@ const SettingsPage = () => {
                         </TableRow>
                       );
                     })}
-                    {syncClients.length === 0 && (
+                    {filteredClients.length === 0 && (
                       <TableRow>
                         <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                           Nenhum cliente encontrado.
