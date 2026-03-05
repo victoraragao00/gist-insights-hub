@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Users, MessageCircle, Phone, Hash, Mail, Mic, Download, Loader2, Check, Upload, MoreHorizontal, RefreshCw, X, AlertTriangle, ShieldAlert } from "lucide-react";
+import { Users, MessageCircle, Phone, Hash, Mail, Mic, Download, Loader2, Check, Upload, MoreHorizontal, RefreshCw, X, ShieldAlert } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger,
@@ -49,13 +49,6 @@ interface SyncClient {
   metadata: Record<string, unknown> | null;
 }
 
-interface ClientSyncResult {
-  clientId: string;
-  contacts: number;
-  messages: number;
-  error?: string;
-}
-
 // ── Helpers ──
 
 function formatSyncDate(dateStr: string | null): string {
@@ -73,7 +66,7 @@ function formatSyncDate(dateStr: string | null): string {
 
 const SettingsPage = () => {
   const { user } = useAuth();
-  const { importing, importProgress, handleImportHistory } = useClient();
+  const { importing, importProgress, handleImportHistory, syncState, runSync, cancelSync } = useClient();
 
   // Wizard state
   const [wizardOpen, setWizardOpen] = useState(false);
@@ -88,12 +81,6 @@ const SettingsPage = () => {
   const [syncContacts, setSyncContacts] = useState(true);
   const [syncHistory, setSyncHistory] = useState(true);
   const [selectedClientIds, setSelectedClientIds] = useState<string[]>([]);
-  const [syncing, setSyncing] = useState(false);
-  const [currentClientName, setCurrentClientName] = useState<string | null>(null);
-  const [currentClientIndex, setCurrentClientIndex] = useState(0);
-  const [completedResults, setCompletedResults] = useState<ClientSyncResult[]>([]);
-  const [cancelled, setCancelled] = useState(false);
-  const cancelledRef = useRef(false);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<"active" | "inactive" | "all">("active");
   const [inactiveDays, setInactiveDays] = useState(90);
@@ -177,16 +164,6 @@ const SettingsPage = () => {
     }
   }, [syncClients]);
 
-  // Prevent tab close during sync
-  useEffect(() => {
-    if (!syncing) return;
-    const handler = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-    };
-    window.addEventListener("beforeunload", handler);
-    return () => window.removeEventListener("beforeunload", handler);
-  }, [syncing]);
-
   // Filtered clients for display
   const filteredClients = useMemo(() => {
     if (statusFilter === "active") return syncClients.filter((c) => c.active);
@@ -257,96 +234,13 @@ const SettingsPage = () => {
     setSyncHistory(checked);
   };
 
-  const runSync = useCallback(async () => {
-    if (selectedClients.length === 0) return;
-    setSyncing(true);
-    setCancelled(false);
-    cancelledRef.current = false;
-    setCompletedResults([]);
-    setCurrentClientIndex(0);
-
-    const results: ClientSyncResult[] = [];
-
-    // sync-gist-contacts is global (not per-client), run once if checked
-    if (syncContacts && !cancelledRef.current) {
-      setCurrentClientName("Contatos (global)");
-      try {
-        let page = 1;
-        let hasMore = true;
-        let totalContacts = 0;
-        while (hasMore && !cancelledRef.current) {
-          const { data, error } = await supabase.functions.invoke("sync-gist-contacts", {
-            body: { page, max_pages: 5 },
-          });
-          if (error) throw error;
-          totalContacts += data?.result?.contacts_processed ?? 0;
-          hasMore = data?.result?.has_more ?? false;
-          page = data?.result?.next_page ?? page + 1;
-          await new Promise((r) => setTimeout(r, 1000));
-        }
-        results.push({ clientId: "__contacts__", contacts: totalContacts, messages: 0 });
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : "Erro desconhecido";
-        results.push({ clientId: "__contacts__", contacts: 0, messages: 0, error: msg });
-      }
-    }
-
-    // ingest-gist-historical per selected client
-    if (syncHistory) {
-      for (let i = 0; i < selectedClients.length; i++) {
-        if (cancelledRef.current) break;
-        const client = selectedClients[i];
-        setCurrentClientName(client.name);
-        setCurrentClientIndex(i + 1);
-
-        let totalMessages = 0;
-        try {
-          let page = 1;
-          let hasMore = true;
-          while (hasMore && !cancelledRef.current) {
-            const { data, error } = await supabase.functions.invoke("ingest-gist-historical", {
-              body: { page, max_pages: 5, client_id: client.id },
-            });
-            if (error) throw error;
-            totalMessages += data?.result?.messages_inserted ?? 0;
-            hasMore = data?.result?.has_more ?? false;
-            page = data?.result?.next_page ?? page + 1;
-            await new Promise((r) => setTimeout(r, 1000));
-          }
-          results.push({ clientId: client.id, contacts: 0, messages: totalMessages });
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : "Erro desconhecido";
-          results.push({ clientId: client.id, contacts: 0, messages: totalMessages, error: msg });
-        }
-        setCompletedResults([...results]);
-      }
-    }
-
-    localStorage.setItem("cx_hub_last_sync", new Date().toISOString());
-    setSyncing(false);
-    setCurrentClientName(null);
-
-    const totalContacts = results.reduce((s, r) => s + r.contacts, 0);
-    const totalMessages = results.reduce((s, r) => s + r.messages, 0);
-    const errorCount = results.filter((r) => r.error).length;
-
-    if (cancelledRef.current) {
-      toast.info("Sincronização cancelada pelo usuário.");
-    } else if (errorCount > 0) {
-      toast.warning(`Sincronização concluída com ${errorCount} erro(s) — ${totalContacts} contatos, ${totalMessages} mensagens`);
-    } else {
-      toast.success(`Sincronização completa — ${totalContacts} contatos, ${totalMessages} mensagens novas`);
-    }
-  }, [selectedClients, syncContacts, syncHistory]);
-
-  const handleCancel = () => {
-    cancelledRef.current = true;
-    setCancelled(true);
+  const handleRunSync = () => {
+    runSync({
+      syncContacts,
+      syncHistory,
+      selectedClients: selectedClients.map((c) => ({ id: c.id, name: c.name })),
+    });
   };
-
-  const progressPct = syncing && syncHistory && selectedClients.length > 0
-    ? Math.round((currentClientIndex / selectedClients.length) * 100)
-    : syncing ? 50 : 0;
 
   // ── Inactivation rule handler ──
 
@@ -380,6 +274,8 @@ const SettingsPage = () => {
     { id: "email", name: "Email", icon: Mail, connected: false, enabled: false },
     { id: "transcription", name: "Transcrição", icon: Mic, connected: false, enabled: false },
   ];
+
+  const { syncing } = syncState;
 
   return (
     <div className="space-y-6 max-w-5xl">
@@ -479,16 +375,6 @@ const SettingsPage = () => {
 
         {/* ═══ Tab: Sincronização ═══ */}
         <TabsContent value="sync" className="mt-4 space-y-6">
-          {/* Warning banner during sync */}
-          {syncing && (
-            <Alert className="border-amber-500/50 bg-amber-50 dark:bg-amber-950/20">
-              <AlertTriangle className="h-4 w-4 text-amber-600" />
-              <AlertDescription className="text-amber-800 dark:text-amber-200 font-medium">
-                ⚠ Sincronização em andamento. Não navegue para outra página.
-              </AlertDescription>
-            </Alert>
-          )}
-
           {/* Title + last sync */}
           <div>
             <h2 className="text-lg font-semibold text-foreground">Sincronização de Dados</h2>
@@ -704,16 +590,24 @@ const SettingsPage = () => {
             </div>
           </div>
 
-          {/* Progress panel (shown while syncing) */}
+          {/* Progress panel (shown while syncing — detailed view on this page) */}
           {syncing && (
             <Card className="border border-primary/20 bg-primary/5 shadow-sm">
               <CardContent className="p-5 space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-sm font-medium text-foreground">
                     <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                    Sincronizando{syncHistory ? ` cliente ${currentClientIndex} de ${selectedClients.length}` : ""}: {currentClientName}...
+                    Sincronizando: {syncState.currentClientName ?? "Preparando..."}
+                    {syncState.totalClients > 0 && (
+                      <span className="text-muted-foreground">
+                        ({syncState.currentClientIndex}/{syncState.totalClients})
+                      </span>
+                    )}
+                    {syncState.estimatedRemaining && (
+                      <span className="text-muted-foreground">— {syncState.estimatedRemaining}</span>
+                    )}
                   </div>
-                  <Button variant="ghost" size="sm" onClick={handleCancel} className="text-xs text-muted-foreground hover:text-destructive">
+                  <Button variant="ghost" size="sm" onClick={cancelSync} className="text-xs text-muted-foreground hover:text-destructive">
                     <X className="h-3.5 w-3.5 mr-1" /> Cancelar
                   </Button>
                 </div>
@@ -722,46 +616,32 @@ const SettingsPage = () => {
                 <div className="h-3 w-full rounded-full bg-muted overflow-hidden">
                   <div
                     className="h-full rounded-full bg-primary transition-all duration-500"
-                    style={{ width: `${progressPct}%` }}
+                    style={{ width: `${syncState.progressPct}%` }}
                   />
                 </div>
 
                 {/* Per-client status list */}
-                {syncHistory && (
+                {syncState.completedResults.length > 0 && (
                   <div className="space-y-1 max-h-48 overflow-y-auto text-sm">
-                    {selectedClients.map((client, idx) => {
-                      const result = completedResults.find((r) => r.clientId === client.id);
-                      const isCurrent = idx + 1 === currentClientIndex;
-                      const isPending = !result && !isCurrent;
-
-                      return (
-                        <div key={client.id} className="flex items-center gap-2 py-0.5">
-                          {result ? (
-                            result.error ? (
-                              <span className="text-destructive text-xs">✗</span>
-                            ) : (
-                              <Check className="h-3.5 w-3.5 text-green-600 shrink-0" />
-                            )
-                          ) : isCurrent ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin text-primary shrink-0" />
-                          ) : (
-                            <span className="h-3.5 w-3.5 flex items-center justify-center text-muted-foreground text-xs">○</span>
-                          )}
-                          <span className={`${isCurrent ? "font-medium text-foreground" : result ? "text-muted-foreground" : "text-muted-foreground/60"}`}>
-                            {client.name}
-                          </span>
-                          {result && !result.error && (
-                            <span className="text-xs text-muted-foreground ml-auto tabular-nums">{result.messages.toLocaleString("pt-BR")} msgs</span>
-                          )}
-                          {result?.error && (
-                            <span className="text-xs text-destructive ml-auto">erro</span>
-                          )}
-                          {isCurrent && (
-                            <span className="text-xs text-muted-foreground ml-auto">em andamento...</span>
-                          )}
-                        </div>
-                      );
-                    })}
+                    {syncState.completedResults.map((result) => (
+                      <div key={result.clientId} className="flex items-center gap-2 py-0.5">
+                        {result.error ? (
+                          <span className="text-destructive text-xs">✗</span>
+                        ) : (
+                          <Check className="h-3.5 w-3.5 text-green-600 shrink-0" />
+                        )}
+                        <span className="text-muted-foreground">{result.clientName}</span>
+                        {!result.error && result.messages > 0 && (
+                          <span className="text-xs text-muted-foreground ml-auto tabular-nums">{result.messages.toLocaleString("pt-BR")} msgs</span>
+                        )}
+                        {!result.error && result.contacts > 0 && (
+                          <span className="text-xs text-muted-foreground ml-auto tabular-nums">{result.contacts.toLocaleString("pt-BR")} contatos</span>
+                        )}
+                        {result.error && (
+                          <span className="text-xs text-destructive ml-auto">erro</span>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 )}
               </CardContent>
@@ -774,7 +654,7 @@ const SettingsPage = () => {
               {selectedClientIds.length} clientes selecionados · {syncLabel}
             </p>
             <Button
-              onClick={runSync}
+              onClick={handleRunSync}
               disabled={syncing || selectedClientIds.length === 0 || (!syncContacts && !syncHistory)}
               className="gap-2"
             >

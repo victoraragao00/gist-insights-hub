@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useRef, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
@@ -31,6 +31,46 @@ interface IngestionResult {
   next_page?: number;
 }
 
+// ── Sync types ──
+
+export interface ClientSyncResult {
+  clientId: string;
+  clientName: string;
+  contacts: number;
+  messages: number;
+  error?: string;
+}
+
+export interface SyncState {
+  syncing: boolean;
+  cancelled: boolean;
+  currentClientName: string | null;
+  currentClientIndex: number;
+  totalClients: number;
+  completedResults: ClientSyncResult[];
+  startedAt: number | null;
+  progressPct: number;
+  estimatedRemaining: string | null;
+}
+
+export interface SyncParams {
+  syncContacts: boolean;
+  syncHistory: boolean;
+  selectedClients: { id: string; name: string }[];
+}
+
+const INITIAL_SYNC_STATE: SyncState = {
+  syncing: false,
+  cancelled: false,
+  currentClientName: null,
+  currentClientIndex: 0,
+  totalClients: 0,
+  completedResults: [],
+  startedAt: null,
+  progressPct: 0,
+  estimatedRemaining: null,
+};
+
 interface ClientContextValue {
   clients: Client[];
   selectedClient: Client | null;
@@ -39,9 +79,18 @@ interface ClientContextValue {
   importing: boolean;
   importProgress: ImportProgress | null;
   handleImportHistory: () => Promise<void>;
+  // Sync
+  syncState: SyncState;
+  runSync: (params: SyncParams) => Promise<void>;
+  cancelSync: () => void;
 }
 
 const ClientContext = createContext<ClientContextValue | undefined>(undefined);
+
+function formatEta(ms: number): string {
+  if (ms < 60_000) return `~${Math.max(1, Math.round(ms / 1000))}s`;
+  return `~${Math.round(ms / 60_000)}min`;
+}
 
 export function ClientProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
@@ -49,6 +98,10 @@ export function ClientProvider({ children }: { children: ReactNode }) {
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [importing, setImporting] = useState(false);
   const [importProgress, setImportProgress] = useState<ImportProgress | null>(null);
+
+  // ── Sync state ──
+  const [syncState, setSyncState] = useState<SyncState>(INITIAL_SYNC_STATE);
+  const cancelledRef = useRef(false);
 
   const { data: clients = [], isLoading } = useQuery<Client[]>({
     queryKey: ["clients", user?.id],
@@ -69,6 +122,8 @@ export function ClientProvider({ children }: { children: ReactNode }) {
   if (clients.length > 0 && !selectedClient) {
     setSelectedClient(clients[0]);
   }
+
+  // ── Import history (existing) ──
 
   const handleImportHistory = useCallback(async () => {
     setImporting(true);
@@ -121,6 +176,141 @@ export function ClientProvider({ children }: { children: ReactNode }) {
     }
   }, [queryClient]);
 
+  // ── Sync logic (moved from SettingsPage) ──
+
+  const cancelSync = useCallback(() => {
+    cancelledRef.current = true;
+    setSyncState((prev) => ({ ...prev, cancelled: true }));
+  }, []);
+
+  const runSync = useCallback(async (params: SyncParams) => {
+    const { syncContacts, syncHistory, selectedClients } = params;
+    if (selectedClients.length === 0 && !syncContacts) return;
+
+    cancelledRef.current = false;
+    const startedAt = Date.now();
+
+    // Total steps: 1 for contacts (if checked) + selectedClients.length for history
+    const contactsStep = syncContacts ? 1 : 0;
+    const historySteps = syncHistory ? selectedClients.length : 0;
+    const totalSteps = contactsStep + historySteps;
+
+    setSyncState({
+      syncing: true,
+      cancelled: false,
+      currentClientName: null,
+      currentClientIndex: 0,
+      totalClients: totalSteps,
+      completedResults: [],
+      startedAt,
+      progressPct: 0,
+      estimatedRemaining: null,
+    });
+
+    const results: ClientSyncResult[] = [];
+    let completedSteps = 0;
+
+    const updateProgress = (currentName: string, stepIndex: number) => {
+      const elapsed = Date.now() - startedAt;
+      const avgPerStep = completedSteps > 0 ? elapsed / completedSteps : 0;
+      const remaining = avgPerStep * (totalSteps - completedSteps);
+      const pct = Math.round((completedSteps / totalSteps) * 100);
+
+      setSyncState((prev) => ({
+        ...prev,
+        currentClientName: currentName,
+        currentClientIndex: stepIndex,
+        completedResults: [...results],
+        progressPct: pct,
+        estimatedRemaining: completedSteps > 0 ? formatEta(remaining) : null,
+      }));
+    };
+
+    // 1. Sync contacts (global)
+    if (syncContacts && !cancelledRef.current) {
+      updateProgress("Contatos (global)", 0);
+      try {
+        let page = 1;
+        let hasMore = true;
+        let totalContacts = 0;
+        while (hasMore && !cancelledRef.current) {
+          const { data, error } = await supabase.functions.invoke("sync-gist-contacts", {
+            body: { page, max_pages: 5 },
+          });
+          if (error) throw error;
+          totalContacts += data?.result?.contacts_processed ?? 0;
+          hasMore = data?.result?.has_more ?? false;
+          page = data?.result?.next_page ?? page + 1;
+          await new Promise((r) => setTimeout(r, 1000));
+        }
+        results.push({ clientId: "__contacts__", clientName: "Contatos (global)", contacts: totalContacts, messages: 0 });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Erro desconhecido";
+        results.push({ clientId: "__contacts__", clientName: "Contatos (global)", contacts: 0, messages: 0, error: msg });
+      }
+      completedSteps++;
+      updateProgress("Contatos (global)", completedSteps);
+    }
+
+    // 2. Sync history per client
+    if (syncHistory) {
+      for (let i = 0; i < selectedClients.length; i++) {
+        if (cancelledRef.current) break;
+        const client = selectedClients[i];
+        updateProgress(client.name, contactsStep + i);
+
+        let totalMessages = 0;
+        try {
+          let page = 1;
+          let hasMore = true;
+          while (hasMore && !cancelledRef.current) {
+            const { data, error } = await supabase.functions.invoke("ingest-gist-historical", {
+              body: { page, max_pages: 5, client_id: client.id },
+            });
+            if (error) throw error;
+            totalMessages += data?.result?.messages_inserted ?? 0;
+            hasMore = data?.result?.has_more ?? false;
+            page = data?.result?.next_page ?? page + 1;
+            await new Promise((r) => setTimeout(r, 1000));
+          }
+          results.push({ clientId: client.id, clientName: client.name, contacts: 0, messages: totalMessages });
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : "Erro desconhecido";
+          results.push({ clientId: client.id, clientName: client.name, contacts: 0, messages: totalMessages, error: msg });
+        }
+        completedSteps++;
+        updateProgress(client.name, contactsStep + i + 1);
+      }
+    }
+
+    localStorage.setItem("cx_hub_last_sync", new Date().toISOString());
+
+    // Final state
+    setSyncState((prev) => ({
+      ...prev,
+      syncing: false,
+      currentClientName: null,
+      completedResults: [...results],
+      progressPct: 100,
+      estimatedRemaining: null,
+    }));
+
+    const totalContacts = results.reduce((s, r) => s + r.contacts, 0);
+    const totalMessages = results.reduce((s, r) => s + r.messages, 0);
+    const errorCount = results.filter((r) => r.error).length;
+
+    if (cancelledRef.current) {
+      toast.info("Sincronização cancelada pelo usuário.");
+    } else if (errorCount > 0) {
+      toast.warning(`Sincronização concluída com ${errorCount} erro(s) — ${totalContacts} contatos, ${totalMessages} mensagens`);
+    } else {
+      toast.success(`Sincronização completa — ${totalContacts} contatos, ${totalMessages} mensagens novas`);
+    }
+
+    queryClient.invalidateQueries({ queryKey: ["sync_clients"] });
+    queryClient.invalidateQueries({ queryKey: ["clients"] });
+  }, [queryClient]);
+
   return (
     <ClientContext.Provider
       value={{
@@ -131,6 +321,9 @@ export function ClientProvider({ children }: { children: ReactNode }) {
         importing,
         importProgress,
         handleImportHistory,
+        syncState,
+        runSync,
+        cancelSync,
       }}
     >
       {children}
