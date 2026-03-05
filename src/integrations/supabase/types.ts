@@ -376,6 +376,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      deactivate_stale_clients: { Args: { _days: number }; Returns: number }
       user_accessible_client_ids: {
         Args: { _user_id: string }
         Returns: string[]
