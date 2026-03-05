@@ -37,14 +37,10 @@ export function AppSidebar() {
     <Sidebar collapsible="icon">
       <SidebarHeader className={collapsed ? "p-2" : "p-4"}>
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground font-bold text-sm">
-            H
-          </div>
-          {!collapsed && (
-            <div className="overflow-hidden">
-              <h2 className="text-sm font-bold tracking-tight text-foreground truncate">Hub Central</h2>
-              <p className="text-xs text-muted-foreground truncate">Integrações & Analytics</p>
-            </div>
+          {collapsed ? (
+            <img src={umodeIcon} alt="uMode" className="h-9 w-9 shrink-0 rounded-xl object-contain" />
+          ) : (
+            <img src={umodeLogo} alt="uMode CX Hub" className="h-8 object-contain" />
           )}
         </div>
       </SidebarHeader>
