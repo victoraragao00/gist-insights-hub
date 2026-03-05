@@ -194,6 +194,7 @@ Deno.serve(async (req) => {
     let hasMore = false;
     let nextPage: number | undefined;
     let pagesProcessed = 0;
+    let totalPagesCount = 0;
 
     while (pagesProcessed < maxPages) {
       let convosResponse: GistConversationsResponse;
