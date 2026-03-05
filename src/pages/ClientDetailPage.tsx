@@ -135,6 +135,23 @@ function formatDate(dateStr: string): string {
   return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }) + `, ${time}`;
 }
 
+function formatRelativeTime(dateStr: string): string {
+  const d = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const diffMinutes = Math.floor(diffMs / (1000 * 60));
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const time = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+
+  if (diffMinutes < 1) return "agora mesmo";
+  if (diffMinutes < 60) return `há ${diffMinutes} minuto${diffMinutes > 1 ? "s" : ""}`;
+  if (diffHours < 24) return `há ${diffHours} hora${diffHours > 1 ? "s" : ""}`;
+  if (diffDays === 0) return `hoje às ${time}`;
+  if (diffDays === 1) return `ontem às ${time}`;
+  return `há ${diffDays} dia${diffDays > 1 ? "s" : ""}`;
+}
+
 // ── Component ──
 
 const ClientDetailPage = () => {
@@ -421,7 +438,11 @@ const ClientDetailPage = () => {
             </Badge>
           </div>
           <p className="text-sm text-muted-foreground">
-            slug: {client.slug} · {bindings.length} canais · Atualizado {stats.last_contact ? formatDate(stats.last_contact) : "—"}
+            slug: {client.slug} · {bindings.length} canais · Atualizado {stats.last_contact ? formatDate(stats.last_contact) : "—"}{" "}
+            <span className="inline-flex items-center gap-1 ml-2 text-muted-foreground/70">
+              <span className="inline-block h-2 w-2 rounded-full bg-muted-foreground/40" />
+              Gist sync: automático (6h)
+            </span>
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -469,9 +490,9 @@ const ClientDetailPage = () => {
             <KPICard label="Tom predominante" value={dominantTone.label} sub="maior frequência" />
             <KPICard label="Fora de escopo %" value={`${stats.out_of_scope_pct}%`} sub="do total de interações" />
             <KPICard
-              label="Último Acesso (Plataforma)"
+              label="Último Acesso Gist"
               value={meta.last_seen_at ? formatDate(meta.last_seen_at) : "Não disponível"}
-              sub="via Gist tracking"
+              sub={meta.last_seen_at ? `atualizado ${formatRelativeTime(meta.last_seen_at)}` : "sem dados"}
             />
             <KPICard label="Tempo médio resposta" value="Em breve" sub="funcionalidade futura" />
           </div>
