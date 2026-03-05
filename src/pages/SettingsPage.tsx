@@ -557,7 +557,7 @@ const SettingsPage = () => {
                 <CardTitle className="text-sm font-semibold">Regra de Inativação Automática</CardTitle>
               </div>
               <CardDescription className="text-xs">
-                Aplica apenas a clientes criados automaticamente (auto_created = true)
+                Inativa clientes criados automaticamente (via sincronização) sem acesso no período configurado.
               </CardDescription>
             </CardHeader>
             <CardContent className="flex items-center gap-3 flex-wrap">
