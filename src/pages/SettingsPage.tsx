@@ -357,7 +357,7 @@ const SettingsPage = () => {
     }
     setApplyingRule(true);
     try {
-      const { data, error } = await supabase.rpc("deactivate_stale_clients", { _days: inactiveDays });
+      const { data, error } = await (supabase.rpc as any)("deactivate_stale_clients", { _days: inactiveDays });
       if (error) throw error;
       const count = typeof data === "number" ? data : 0;
       toast.success(`${count} cliente(s) inativado(s).`);
