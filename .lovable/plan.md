@@ -1,62 +1,42 @@
 
 
-## Changes to `src/pages/SettingsPage.tsx`
+# Wizard de Contatos Gist: Separar em 2 etapas
 
-### 1. Warning banner instead of useBlocker
+## Problema
+Atualmente, o Step A ("Discovery") mostra tudo junto: a lista de domínios/empresas com as opções de vincular/criar/ignorar E os contatos individuais de cada grupo. Isso é confuso quando há muitos domínios com dezenas de contatos.
 
-- Add a yellow/amber alert banner at the top of the Sincronização tab when `syncing === true`:
-  "⚠ Sincronização em andamento. Não navegue para outra página."
-- Add `window.onbeforeunload` via `useEffect` when `syncing` is true (prevents tab close)
-- No `useBlocker`, no route blocking
+## Nova estrutura do wizard
 
-### 2. Status filter for client table
+### Step 1 — "Clientes" (novo)
+Lista apenas os **domínios/empresas** encontrados. Para cada grupo, o usuário escolhe:
+- **Vincular a cliente existente** (select de clientes)
+- **Criar novo cliente** (input de nome)
+- **Ignorar** (novo — não importa contatos desse domínio)
 
-- New state: `statusFilter: "active" | "inactive" | "all"` (default `"active"`)
-- Three filter buttons above the table showing counts: `Ativos (N) | Inativos (N) | Todos (N)`
-- Filter the displayed `syncClients` list based on `statusFilter`
-- Update `selectActive` / `selectAll` / `clearSelection` to work with the filtered list
+Sem tabela de contatos. Apenas mostra o domínio, nome da empresa (se houver) e quantidade de contatos como informação contextual (ex: "nkstore.com.br — 42 contatos").
 
-### 3. Inactivation rule card (above client table)
+Botão "Próximo" avança ao Step 2 (filtrando apenas os grupos não-ignorados).
 
-New `Card` titled "Regra de Inativação Automática":
-- Input field: "Inativar clientes sem acesso há mais de [90] dias" (editable number, default 90)
-- Button: "Aplicar regra agora"
-- On click: calls `supabase.functions.invoke` or `supabase.rpc` — but since we need an UPDATE and RLS doesn't allow client updates, we'll use an edge function approach. However, the user said not to touch edge functions.
-- Alternative: Use a direct SQL approach via `supabase.rpc`. We need a database function for this since RLS blocks UPDATE on clients table.
+### Step 2 — "Contatos" (novo)
+Para cada grupo **não ignorado**, mostra a tabela de contatos com checkbox individual para selecionar quais contatos importar. Também mostra a seção de Teammates.
 
-**Database migration needed**: Create a `deactivate_stale_clients` SQL function (SECURITY DEFINER) that:
-```sql
-CREATE OR REPLACE FUNCTION public.deactivate_stale_clients(_days integer)
-RETURNS integer
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  affected integer;
-BEGIN
-  UPDATE clients
-  SET active = false
-  WHERE active = true
-    AND metadata->>'auto_created' = 'true'
-    AND (metadata->>'last_seen_at')::timestamptz < NOW() - make_interval(days => _days);
-  GET DIAGNOSTICS affected = ROW_COUNT;
-  RETURN affected;
-END;
-$$;
-```
+Botão "Confirmar Vínculos" avança ao Step 3 (atual "confirmation").
 
-Then in the UI:
-```typescript
-const { data, error } = await supabase.rpc('deactivate_stale_clients', { _days: inactiveDays });
-toast.success(`${data} clientes inativados.`);
-```
+### Step 3 — "Confirmação" (atual)
+Sem alterações significativas, apenas ajusta os contadores para refletir apenas os selecionados.
 
-- State: `inactiveDays: number` (default 90), `applyingRule: boolean`
-- Small info text: "Aplica apenas a clientes criados automaticamente (auto_created = true)"
+### Step 4 — "Importação" (atual, só onboarding)
+Sem alterações.
 
-### 4. Files modified
+## Alterações em `src/pages/ClientsPage.tsx`
 
-- `src/pages/SettingsPage.tsx` — all UI changes
-- Database migration — `deactivate_stale_clients` function
+1. Alterar `WizardStep` para `"clients" | "contacts" | "confirmation" | "import"`
+2. Step inicial passa de `"discovery"` para `"clients"`
+3. Adicionar opção `"ignore"` ao `GroupMapping.type` (tipo `"existing" | "new" | "ignore"`)
+4. **Step "clients"**: renderiza cards compactos por domínio — só domínio, empresa, count, e select (vincular/criar/ignorar) + input/select conforme tipo
+5. **Step "contacts"**: para cada grupo não-ignorado, mostra tabela de contatos com checkboxes. Novo state `selectedContacts: Map<number, boolean>` para controle individual. Também mostra teammates aqui.
+6. Ajustar `handleConfirmMappings` para filtrar apenas contatos selecionados e grupos não-ignorados
+7. Ajustar `summaryContactCount` para contar apenas selecionados
+
+Nenhum outro arquivo será alterado.
 
