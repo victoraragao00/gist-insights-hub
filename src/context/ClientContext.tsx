@@ -193,9 +193,9 @@ export function ClientProvider({ children }: { children: ReactNode }) {
     cancelledRef.current = false;
     const startedAt = Date.now();
 
-    // Total steps: 1 for contacts (if checked) + selectedClients.length for history
+    // Total steps: 1 for contacts (if checked) + 1 for history (global, not per client)
     const contactsStep = syncContacts ? 1 : 0;
-    const historySteps = syncHistory ? selectedClients.length : 0;
+    const historySteps = syncHistory ? 1 : 0;
     const totalSteps = contactsStep + historySteps;
 
     setSyncState({
@@ -236,7 +236,6 @@ export function ClientProvider({ children }: { children: ReactNode }) {
         let page = 1;
         let hasMore = true;
         let totalContacts = 0;
-        let pageCount = 0;
         let denominator = 31;
         while (hasMore && !cancelledRef.current) {
           const { data, error } = await supabase.functions.invoke("sync-gist-contacts", {
@@ -247,8 +246,7 @@ export function ClientProvider({ children }: { children: ReactNode }) {
           totalContacts += data?.result?.contacts_processed ?? 0;
           hasMore = data?.result?.has_more ?? false;
           page = data?.result?.next_page ?? page + 1;
-          pageCount++;
-          updateProgress("Contatos (global)", 0, Math.min(pageCount / denominator, 0.95));
+          updateProgress("Contatos (global)", 0, Math.min(page / denominator, 0.95));
           await new Promise((r) => setTimeout(r, 1000));
         }
         results.push({ clientId: "__contacts__", clientName: "Contatos (global)", contacts: totalContacts, messages: 0 });
@@ -259,37 +257,32 @@ export function ClientProvider({ children }: { children: ReactNode }) {
       completedSteps++;
     }
 
-    // 2. Sync history per client
-    if (syncHistory) {
-      for (let i = 0; i < selectedClients.length; i++) {
-        if (cancelledRef.current) break;
-        const client = selectedClients[i];
-        updateProgress(client.name, contactsStep + i);
-
-        let totalMessages = 0;
-        try {
-          let page = 1;
-          let hasMore = true;
-          let pageCount = 0;
-          while (hasMore && !cancelledRef.current) {
-            const { data, error } = await supabase.functions.invoke("ingest-gist-historical", {
-              body: { page, max_pages: 5, client_id: client.id },
-            });
-            if (error) throw error;
-            totalMessages += data?.result?.messages_inserted ?? 0;
-            hasMore = data?.result?.has_more ?? false;
-            page = data?.result?.next_page ?? page + 1;
-            pageCount++;
-            updateProgress(client.name, contactsStep + i, Math.min(pageCount / 5, 0.95));
-            await new Promise((r) => setTimeout(r, 1000));
-          }
-          results.push({ clientId: client.id, clientName: client.name, contacts: 0, messages: totalMessages });
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : "Erro desconhecido";
-          results.push({ clientId: client.id, clientName: client.name, contacts: 0, messages: totalMessages, error: msg });
+    // 2. Sync history (single global pass — backend resolves client_id per conversation)
+    if (syncHistory && !cancelledRef.current) {
+      updateProgress("Histórico (global)", contactsStep);
+      let totalMessages = 0;
+      try {
+        let page = 1;
+        let hasMore = true;
+        let denominator = 50; // default, updated dynamically
+        while (hasMore && !cancelledRef.current) {
+          const { data, error } = await supabase.functions.invoke("ingest-gist-historical", {
+            body: { page, max_pages: 5 },
+          });
+          if (error) throw error;
+          if (data?.result?.total_pages) denominator = data.result.total_pages;
+          totalMessages += data?.result?.messages_inserted ?? 0;
+          hasMore = data?.result?.has_more ?? false;
+          page = data?.result?.next_page ?? page + 1;
+          updateProgress("Histórico (global)", contactsStep, Math.min(page / denominator, 0.95));
+          await new Promise((r) => setTimeout(r, 1000));
         }
-        completedSteps++;
+        results.push({ clientId: "__history__", clientName: "Histórico (global)", contacts: 0, messages: totalMessages });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Erro desconhecido";
+        results.push({ clientId: "__history__", clientName: "Histórico (global)", contacts: 0, messages: totalMessages, error: msg });
       }
+      completedSteps++;
     }
 
     localStorage.setItem("cx_hub_last_sync", new Date().toISOString());
