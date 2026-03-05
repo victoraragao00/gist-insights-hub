@@ -95,6 +95,10 @@ const SettingsPage = () => {
   const [cancelled, setCancelled] = useState(false);
   const cancelledRef = useRef(false);
   const [syncError, setSyncError] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<"active" | "inactive" | "all">("active");
+  const [inactiveDays, setInactiveDays] = useState(90);
+  const [applyingRule, setApplyingRule] = useState(false);
+  const queryClient = useQueryClient();
 
   // ── Queries ──
 
