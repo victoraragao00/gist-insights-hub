@@ -56,8 +56,8 @@ export function AppSidebar() {
           )}
         </div>
 
-        {/* Client selector */}
-        {!collapsed && clients.length > 0 && (
+        {/* Client selector — hidden on /clients/:slug detail pages */}
+        {!collapsed && clients.length > 0 && !/^\/clients\/[^/]+/.test(location.pathname) && (
           <div className="mt-3">
             <Select
               value={selectedClient?.id ?? ""}

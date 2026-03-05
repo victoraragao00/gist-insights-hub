@@ -1,465 +1,299 @@
-import { useState, useRef } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
-} from "@/components/ui/dialog";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
-import { Plus, Users, MessageCircle, Loader2, Building2, ChevronRight } from "lucide-react";
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Plus, MoreHorizontal } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { GistContactWizard } from "@/components/GistContactWizard";
 import { useAuth } from "@/context/AuthContext";
 
-// ── Types ──────────────────────────────────────────────
+// ── Types ──
 
-interface Client {
+interface ClientRow {
   id: string;
   name: string;
   slug: string;
   active: boolean;
-  metadata: Record<string, unknown> | null;
+  channel_bindings: Array<{
+    channel: string;
+    label: string | null;
+    active: boolean | null;
+  }>;
 }
 
-interface ChannelBinding {
-  id: string;
+interface InteractionRow {
   client_id: string;
-  channel: string;
-  label: string | null;
-  active: boolean | null;
+  tone: string | null;
+  occurred_at: string;
 }
 
-interface Participant {
-  id: string;
-  client_id: string | null;
-  name: string;
-  role: string | null;
-  side: string;
-  identifiers: Array<{ channel: string; value: string }> | null;
-  active: boolean | null;
+interface ClientStats {
+  total_30d: number;
+  dominant_tone: string;
+  health_pct: number;
+  last_contact: string | null;
 }
 
-// ── Component ──────────────────────────────────────────
+// ── Helpers ──
+
+const CHANNEL_ICONS: Record<string, string> = {
+  gist: "💬",
+  whatsapp: "📱",
+  email: "📧",
+  discord: "🟣",
+};
+
+const TONE_CONFIG: Record<string, { label: string; className: string }> = {
+  ok: { label: "✓ Ok", className: "bg-green-100 text-green-700" },
+  atencao: { label: "⚠ Atenção", className: "bg-yellow-100 text-yellow-700" },
+  alerta: { label: "🔶 Alerta", className: "bg-orange-100 text-orange-700" },
+  critico: { label: "🔴 Crítico", className: "bg-red-100 text-red-700" },
+};
+
+function formatLastContact(dateStr: string | null): string {
+  if (!dateStr) return "—";
+  const d = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const time = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+
+  if (diffDays === 0) return `Hoje, ${time}`;
+  if (diffDays === 1) return `Ontem, ${time}`;
+  const day = d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
+  return `${day}, ${time}`;
+}
+
+function getHealthColor(pct: number): string {
+  if (pct < 20) return "bg-green-500";
+  if (pct < 40) return "bg-yellow-500";
+  if (pct < 70) return "bg-orange-500";
+  return "bg-red-500";
+}
+
+function computeStats(interactions: InteractionRow[], clientId: string): ClientStats {
+  const clientInteractions = interactions.filter((i) => i.client_id === clientId);
+  const total = clientInteractions.length;
+
+  if (total === 0) {
+    return { total_30d: 0, dominant_tone: "ok", health_pct: 0, last_contact: null };
+  }
+
+  // Dominant tone (most frequent non-ok, fallback to ok)
+  const toneCounts: Record<string, number> = {};
+  let nonOkCount = 0;
+  clientInteractions.forEach((i) => {
+    const t = i.tone ?? "ok";
+    toneCounts[t] = (toneCounts[t] || 0) + 1;
+    if (t !== "ok") nonOkCount++;
+  });
+
+  let dominant = "ok";
+  let maxCount = 0;
+  for (const [tone, count] of Object.entries(toneCounts)) {
+    if (tone !== "ok" && count > maxCount) {
+      dominant = tone;
+      maxCount = count;
+    }
+  }
+  if (maxCount === 0) dominant = "ok";
+
+  const healthPct = Math.round((nonOkCount / total) * 100);
+  const lastContact = clientInteractions.reduce((max, i) =>
+    i.occurred_at > max ? i.occurred_at : max, clientInteractions[0].occurred_at);
+
+  return { total_30d: total, dominant_tone: dominant, health_pct: healthPct, last_contact: lastContact };
+}
+
+// ── Component ──
 
 const ClientsPage = () => {
   const { user } = useAuth();
-  const queryClient = useQueryClient();
-  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
-  const [newClientOpen, setNewClientOpen] = useState(false);
-  const [newClientName, setNewClientName] = useState("");
-  const [newClientSlug, setNewClientSlug] = useState("");
-  const [creatingClient, setCreatingClient] = useState(false);
+  const navigate = useNavigate();
 
-  const [newParticipantOpen, setNewParticipantOpen] = useState(false);
-  const [npName, setNpName] = useState("");
-  const [npRole, setNpRole] = useState("");
-  const [npSide, setNpSide] = useState<string>("client");
-  const [creatingParticipant, setCreatingParticipant] = useState(false);
+  const thirtyDaysAgo = useMemo(
+    () => new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+    []
+  );
 
-  const [wizardOpen, setWizardOpen] = useState(false);
-
-  const [scopeText, setScopeText] = useState("");
-  const [savingScope, setSavingScope] = useState(false);
-
-  // ── Queries ──
-
-  const { data: clients = [], isLoading: loadingClients } = useQuery<Client[]>({
-    queryKey: ["clients", user?.id],
+  const { data: clients = [], isLoading: loadingClients } = useQuery<ClientRow[]>({
+    queryKey: ["clients_list", user?.id],
     enabled: !!user?.id,
     staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("clients")
-        .select("id, name, slug, active, metadata")
+        .select("id, name, slug, active, channel_bindings(channel, label, active)")
+        .eq("active", true)
         .order("name")
         .limit(100);
       if (error) throw error;
-      return (data ?? []) as Client[];
+      return (data ?? []) as ClientRow[];
     },
   });
 
-  const selectedClient = clients.find((c) => c.id === selectedClientId) ?? null;
-
-  const { data: bindings = [] } = useQuery<ChannelBinding[]>({
-    queryKey: ["channel_bindings", selectedClientId, user?.id],
-    enabled: !!selectedClientId && !!user?.id,
+  const { data: interactions = [] } = useQuery<InteractionRow[]>({
+    queryKey: ["interactions_30d_all", user?.id, thirtyDaysAgo],
+    enabled: !!user?.id,
     staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("channel_bindings")
-        .select("id, client_id, channel, label, active")
-        .eq("client_id", selectedClientId!)
-        .limit(100);
-      if (error) throw error;
-      return (data ?? []) as ChannelBinding[];
-    },
-  });
-
-  const hasGistBinding = bindings.some((b) => b.channel === "gist");
-
-  const { data: participants = [] } = useQuery<Participant[]>({
-    queryKey: ["participants", selectedClientId, user?.id],
-    enabled: !!selectedClientId && !!user?.id,
-    staleTime: 5 * 60 * 1000,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("participants")
-        .select("id, client_id, name, role, side, identifiers, active")
-        .eq("client_id", selectedClientId!)
-        .order("name")
+        .from("interactions")
+        .select("client_id, tone, occurred_at")
+        .gte("occurred_at", thirtyDaysAgo)
         .limit(200);
       if (error) throw error;
-      return (data ?? []) as Participant[];
+      return (data ?? []) as InteractionRow[];
     },
   });
 
-  // ── Load scope when client changes ──
-
-  const prevScopeClientRef = useRef<string | null>(null);
-  if (selectedClient && selectedClient.id !== prevScopeClientRef.current) {
-    prevScopeClientRef.current = selectedClient.id;
-    const meta = selectedClient.metadata as Record<string, unknown> | null;
-    setScopeText(typeof meta?.scope === "string" ? meta.scope : "");
-  }
-
-  // ── Create client ──
-
-  const handleCreateClient = async () => {
-    if (!newClientName.trim() || !newClientSlug.trim()) {
-      toast.error("Preencha nome e slug");
-      return;
-    }
-    setCreatingClient(true);
-    try {
-      const { error } = await supabase.from("clients").insert({
-        name: newClientName.trim(),
-        slug: newClientSlug.trim().toLowerCase(),
+  // Compute stats per client and sort by last interaction DESC
+  const clientsWithStats = useMemo(() => {
+    return clients
+      .map((c) => ({ ...c, stats: computeStats(interactions, c.id) }))
+      .sort((a, b) => {
+        const aDate = a.stats.last_contact ?? "";
+        const bDate = b.stats.last_contact ?? "";
+        return bDate.localeCompare(aDate);
       });
-      if (error) throw error;
-      toast.success("Cliente criado!");
-      setNewClientOpen(false);
-      setNewClientName("");
-      setNewClientSlug("");
-      queryClient.invalidateQueries({ queryKey: ["clients"] });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Erro desconhecido";
-      toast.error("Erro ao criar cliente: " + msg);
-    } finally {
-      setCreatingClient(false);
-    }
-  };
-
-  // ── Create participant ──
-
-  const handleCreateParticipant = async () => {
-    if (!npName.trim()) {
-      toast.error("Preencha o nome");
-      return;
-    }
-    setCreatingParticipant(true);
-    try {
-      const { error } = await supabase.from("participants").insert({
-        name: npName.trim(),
-        role: npRole.trim() || null,
-        side: npSide,
-        client_id: selectedClientId,
-      });
-      if (error) throw error;
-      toast.success("Participante adicionado!");
-      setNewParticipantOpen(false);
-      setNpName("");
-      setNpRole("");
-      setNpSide("client");
-      queryClient.invalidateQueries({ queryKey: ["participants", selectedClientId] });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Erro desconhecido";
-      toast.error("Erro ao adicionar participante: " + msg);
-    } finally {
-      setCreatingParticipant(false);
-    }
-  };
-
-  // ── Save scope ──
-
-  const handleSaveScope = async () => {
-    if (!selectedClient) return;
-    setSavingScope(true);
-    try {
-      const existingMeta = (selectedClient.metadata as Record<string, unknown>) ?? {};
-      const { error } = await supabase
-        .from("clients")
-        .update({ metadata: { ...existingMeta, scope: scopeText } })
-        .eq("id", selectedClient.id);
-      if (error) throw error;
-      toast.success("Escopo salvo!");
-      queryClient.invalidateQueries({ queryKey: ["clients"] });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Erro desconhecido";
-      toast.error("Erro ao salvar escopo: " + msg);
-    } finally {
-      setSavingScope(false);
-    }
-  };
-
-  // ── Channel icon helper ──
-
-  const channelIcon = (ch: string) => {
-    switch (ch) {
-      case "gist":
-        return <MessageCircle className="h-4 w-4" />;
-      default:
-        return <MessageCircle className="h-4 w-4" />;
-    }
-  };
+  }, [clients, interactions]);
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Clientes</h1>
-          <p className="text-muted-foreground">Gerencie clientes, participantes e canais</p>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Clientes</h1>
+          <p className="text-sm text-muted-foreground">Gerencie clientes, participantes e canais</p>
         </div>
-        <Button onClick={() => setNewClientOpen(true)}>
+        <Button onClick={() => toast.info("Em breve")}>
           <Plus className="h-4 w-4 mr-1" /> Novo Cliente
         </Button>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
-        {/* ── Client List ── */}
-        <div className="space-y-2">
-          {loadingClients && (
-            <div className="flex items-center justify-center py-8 text-muted-foreground">
-              <Loader2 className="h-5 w-5 animate-spin mr-2" /> Carregando...
-            </div>
-          )}
-          {clients.map((client) => (
-            <Card
-              key={client.id}
-              className={`cursor-pointer border transition-colors ${
-                selectedClientId === client.id
-                  ? "border-primary bg-accent/30"
-                  : "border-border hover:border-primary/40"
-              }`}
-              onClick={() => setSelectedClientId(client.id)}
-            >
-              <CardContent className="p-4 flex items-center justify-between">
-                <div className="min-w-0">
-                  <p className="font-medium text-sm truncate">{client.name}</p>
-                  <p className="text-xs text-muted-foreground">{client.slug}</p>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <Badge variant={client.active ? "default" : "secondary"} className="text-xs">
-                    {client.active ? "Ativo" : "Inativo"}
-                  </Badge>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-          {!loadingClients && clients.length === 0 && (
-            <p className="text-sm text-muted-foreground py-8 text-center">
-              Nenhum cliente cadastrado
-            </p>
-          )}
-        </div>
-
-        {/* ── Client Details ── */}
-        {selectedClient ? (
-          <div className="space-y-6">
-            <h2 className="text-lg font-semibold">{selectedClient.name}</h2>
-
-            {/* Canais Vinculados */}
-            <Card className="border-0 shadow-sm">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">Canais Vinculados</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {bindings.length === 0 && (
-                  <p className="text-sm text-muted-foreground">Nenhum canal vinculado.</p>
-                )}
-                {bindings.map((b) => (
-                  <div key={b.id} className="flex items-center justify-between rounded-lg border p-3">
-                    <div className="flex items-center gap-2">
-                      {channelIcon(b.channel)}
-                      <span className="text-sm font-medium capitalize">{b.channel}</span>
-                      {b.label && <span className="text-xs text-muted-foreground">({b.label})</span>}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant={b.active ? "default" : "secondary"} className="text-xs">
-                        {b.active ? "Ativo" : "Inativo"}
-                      </Badge>
-                      {b.channel === "gist" && (
-                        <Button size="sm" variant="outline" onClick={() => setWizardOpen(true)}>
-                          <Users className="h-3.5 w-3.5 mr-1" /> Importar Contatos
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-                {!hasGistBinding && (
-                  <Button size="sm" variant="outline" onClick={() => setWizardOpen(true)}>
-                    <MessageCircle className="h-3.5 w-3.5 mr-1" /> Conectar Gist
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Participantes */}
-            <Card className="border-0 shadow-sm">
-              <CardHeader className="pb-3 flex flex-row items-center justify-between">
-                <CardTitle className="text-base">Participantes</CardTitle>
-                <Button size="sm" variant="outline" onClick={() => setNewParticipantOpen(true)}>
-                  <Plus className="h-3.5 w-3.5 mr-1" /> Adicionar
-                </Button>
-              </CardHeader>
-              <CardContent>
-                {participants.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">Nenhum participante vinculado.</p>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Nome</TableHead>
-                        <TableHead>Papel</TableHead>
-                        <TableHead>Lado</TableHead>
-                        <TableHead>IDs</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {participants.map((p) => (
-                        <TableRow key={p.id}>
-                          <TableCell className="text-sm font-medium">{p.name}</TableCell>
-                          <TableCell className="text-sm text-muted-foreground">{p.role ?? "—"}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className="text-xs">{p.side}</Badge>
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
-                            {Array.isArray(p.identifiers) ? p.identifiers.length : 0}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Escopo e SLA */}
-            <Card className="border-0 shadow-sm">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">Escopo e SLA</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Escopo do atendimento</Label>
-                  <Textarea
-                    rows={4}
-                    placeholder="Descreva o escopo de atendimento deste cliente..."
-                    value={scopeText}
-                    onChange={(e) => setScopeText(e.target.value)}
-                  />
-                </div>
-                <Button size="sm" onClick={handleSaveScope} disabled={savingScope}>
-                  {savingScope && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
-                  Salvar Escopo
-                </Button>
-              </CardContent>
-            </Card>
+      {/* Table */}
+      <div className="rounded-xl border border-border bg-card">
+        {loadingClients ? (
+          <div className="p-6 space-y-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="flex items-center gap-4">
+                <Skeleton className="h-5 w-40" />
+                <Skeleton className="h-5 w-20" />
+                <Skeleton className="h-5 w-16" />
+                <Skeleton className="h-5 w-20" />
+                <Skeleton className="h-2 w-16" />
+                <Skeleton className="h-5 w-28" />
+              </div>
+            ))}
+          </div>
+        ) : clientsWithStats.length === 0 ? (
+          <div className="py-20 text-center text-muted-foreground text-sm">
+            Nenhum cliente ativo. Adicione um cliente para começar.
           </div>
         ) : (
-          <div className="flex items-center justify-center py-20 text-muted-foreground">
-            <Building2 className="h-5 w-5 mr-2" />
-            Selecione um cliente para ver os detalhes
-          </div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Cliente</TableHead>
+                <TableHead>Canais</TableHead>
+                <TableHead className="text-right">Interações (30d)</TableHead>
+                <TableHead>Tom predominante</TableHead>
+                <TableHead>Saúde</TableHead>
+                <TableHead>Último contato</TableHead>
+                <TableHead className="w-10" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {clientsWithStats.map((client) => {
+                const tone = TONE_CONFIG[client.stats.dominant_tone] ?? TONE_CONFIG.ok;
+                return (
+                  <TableRow
+                    key={client.id}
+                    className="cursor-pointer hover:bg-muted/30"
+                    onClick={() => navigate(`/clients/${client.slug}`)}
+                  >
+                    <TableCell>
+                      <div>
+                        <span className="font-medium text-sm text-foreground">{client.name}</span>
+                        <p className="text-xs text-muted-foreground">{client.slug}</p>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        {client.channel_bindings
+                          .filter((b) => b.active)
+                          .map((b, idx) => (
+                            <span key={idx} title={`${b.channel}${b.label ? ` — ${b.label}` : ""}`} className="text-base">
+                              {CHANNEL_ICONS[b.channel] ?? "📡"}
+                            </span>
+                          ))}
+                        {client.channel_bindings.filter((b) => b.active).length === 0 && (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right font-medium text-sm">
+                      {client.stats.total_30d}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className={`text-xs border-0 ${tone.className}`}>
+                        {tone.label}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <div className="h-2 w-16 rounded-full bg-muted overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all ${getHealthColor(client.stats.health_pct)}`}
+                            style={{ width: `${Math.min(client.stats.health_pct, 100)}%` }}
+                          />
+                        </div>
+                        <span className="text-xs text-muted-foreground">{client.stats.health_pct}%</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {formatLastContact(client.stats.last_contact)}
+                    </TableCell>
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); navigate(`/clients/${client.slug}`); }}>
+                            Ver detalhes
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); toast.info("Em breve"); }}>
+                            Importar Contatos
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-destructive"
+                            onClick={(e) => { e.stopPropagation(); toast.info("Em breve"); }}
+                          >
+                            Desativar
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
         )}
       </div>
-
-      {/* ── New Client Dialog ── */}
-      <Dialog open={newClientOpen} onOpenChange={setNewClientOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Novo Cliente</DialogTitle>
-            <DialogDescription>Preencha os dados do novo cliente.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label>Nome</Label>
-              <Input placeholder="Nome do cliente" value={newClientName} onChange={(e) => setNewClientName(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label>Slug</Label>
-              <Input placeholder="slug-do-cliente" value={newClientSlug} onChange={(e) => setNewClientSlug(e.target.value)} />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setNewClientOpen(false)}>Cancelar</Button>
-            <Button onClick={handleCreateClient} disabled={creatingClient}>
-              {creatingClient && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
-              Criar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* ── New Participant Dialog ── */}
-      <Dialog open={newParticipantOpen} onOpenChange={setNewParticipantOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Novo Participante</DialogTitle>
-            <DialogDescription>Adicionar participante ao cliente {selectedClient?.name}.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label>Nome</Label>
-              <Input placeholder="Nome completo" value={npName} onChange={(e) => setNpName(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label>Papel</Label>
-              <Input placeholder="Ex: Gerente, Suporte" value={npRole} onChange={(e) => setNpRole(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label>Lado</Label>
-              <Select value={npSide} onValueChange={setNpSide}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="client">Cliente</SelectItem>
-                  <SelectItem value="umode">uMode (equipe)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setNewParticipantOpen(false)}>Cancelar</Button>
-            <Button onClick={handleCreateParticipant} disabled={creatingParticipant}>
-              {creatingParticipant && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
-              Adicionar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* ── Gist Contact Wizard ── */}
-      <GistContactWizard
-        open={wizardOpen}
-        onClose={() => {
-          setWizardOpen(false);
-          queryClient.invalidateQueries({ queryKey: ["participants", selectedClientId] });
-          queryClient.invalidateQueries({ queryKey: ["channel_bindings", selectedClientId] });
-        }}
-        mode={hasGistBinding ? "update-contacts" : "onboarding"}
-        clientId={selectedClientId ?? undefined}
-      />
     </div>
   );
 };
