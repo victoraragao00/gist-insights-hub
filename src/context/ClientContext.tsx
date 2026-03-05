@@ -50,7 +50,7 @@ export interface SyncState {
   completedResults: ClientSyncResult[];
   startedAt: number | null;
   progressPct: number;
-  estimatedRemaining: string | null;
+  elapsedDisplay: string | null;
 }
 
 export interface SyncParams {
@@ -68,7 +68,7 @@ const INITIAL_SYNC_STATE: SyncState = {
   completedResults: [],
   startedAt: null,
   progressPct: 0,
-  estimatedRemaining: null,
+  elapsedDisplay: null,
 };
 
 interface ClientContextValue {
@@ -87,9 +87,12 @@ interface ClientContextValue {
 
 const ClientContext = createContext<ClientContextValue | undefined>(undefined);
 
-function formatEta(ms: number): string {
-  if (ms < 60_000) return `~${Math.max(1, Math.round(ms / 1000))}s`;
-  return `~${Math.round(ms / 60_000)}min`;
+function formatElapsed(ms: number): string {
+  const totalSec = Math.floor(ms / 1000);
+  const min = Math.floor(totalSec / 60);
+  const sec = totalSec % 60;
+  if (min === 0) return `${sec}s`;
+  return `${min}min ${sec}s`;
 }
 
 export function ClientProvider({ children }: { children: ReactNode }) {
@@ -204,25 +207,25 @@ export function ClientProvider({ children }: { children: ReactNode }) {
       completedResults: [],
       startedAt,
       progressPct: 0,
-      estimatedRemaining: null,
+      elapsedDisplay: null,
     });
 
     const results: ClientSyncResult[] = [];
     let completedSteps = 0;
 
-    const updateProgress = (currentName: string, stepIndex: number) => {
+    const updateProgress = (currentName: string, stepIndex: number, subProgress = 0) => {
+      const basePct = (completedSteps / totalSteps) * 100;
+      const stepPct = (1 / totalSteps) * 100;
+      const pct = Math.round(basePct + stepPct * Math.min(subProgress, 0.95));
       const elapsed = Date.now() - startedAt;
-      const avgPerStep = completedSteps > 0 ? elapsed / completedSteps : 0;
-      const remaining = avgPerStep * (totalSteps - completedSteps);
-      const pct = Math.round((completedSteps / totalSteps) * 100);
 
       setSyncState((prev) => ({
         ...prev,
         currentClientName: currentName,
-        currentClientIndex: stepIndex,
+        currentClientIndex: completedSteps + 1,
         completedResults: [...results],
         progressPct: pct,
-        estimatedRemaining: completedSteps > 0 ? formatEta(remaining) : null,
+        elapsedDisplay: `Em andamento há ${formatElapsed(elapsed)}`,
       }));
     };
 
@@ -233,14 +236,19 @@ export function ClientProvider({ children }: { children: ReactNode }) {
         let page = 1;
         let hasMore = true;
         let totalContacts = 0;
+        let pageCount = 0;
+        let denominator = 31;
         while (hasMore && !cancelledRef.current) {
           const { data, error } = await supabase.functions.invoke("sync-gist-contacts", {
             body: { page, max_pages: 5 },
           });
           if (error) throw error;
+          if (data?.result?.total_pages) denominator = data.result.total_pages;
           totalContacts += data?.result?.contacts_processed ?? 0;
           hasMore = data?.result?.has_more ?? false;
           page = data?.result?.next_page ?? page + 1;
+          pageCount++;
+          updateProgress("Contatos (global)", 0, Math.min(pageCount / denominator, 0.95));
           await new Promise((r) => setTimeout(r, 1000));
         }
         results.push({ clientId: "__contacts__", clientName: "Contatos (global)", contacts: totalContacts, messages: 0 });
@@ -249,7 +257,6 @@ export function ClientProvider({ children }: { children: ReactNode }) {
         results.push({ clientId: "__contacts__", clientName: "Contatos (global)", contacts: 0, messages: 0, error: msg });
       }
       completedSteps++;
-      updateProgress("Contatos (global)", completedSteps);
     }
 
     // 2. Sync history per client
@@ -263,6 +270,7 @@ export function ClientProvider({ children }: { children: ReactNode }) {
         try {
           let page = 1;
           let hasMore = true;
+          let pageCount = 0;
           while (hasMore && !cancelledRef.current) {
             const { data, error } = await supabase.functions.invoke("ingest-gist-historical", {
               body: { page, max_pages: 5, client_id: client.id },
@@ -271,6 +279,8 @@ export function ClientProvider({ children }: { children: ReactNode }) {
             totalMessages += data?.result?.messages_inserted ?? 0;
             hasMore = data?.result?.has_more ?? false;
             page = data?.result?.next_page ?? page + 1;
+            pageCount++;
+            updateProgress(client.name, contactsStep + i, Math.min(pageCount / 5, 0.95));
             await new Promise((r) => setTimeout(r, 1000));
           }
           results.push({ clientId: client.id, clientName: client.name, contacts: 0, messages: totalMessages });
@@ -279,7 +289,6 @@ export function ClientProvider({ children }: { children: ReactNode }) {
           results.push({ clientId: client.id, clientName: client.name, contacts: 0, messages: totalMessages, error: msg });
         }
         completedSteps++;
-        updateProgress(client.name, contactsStep + i + 1);
       }
     }
 
@@ -292,7 +301,7 @@ export function ClientProvider({ children }: { children: ReactNode }) {
       currentClientName: null,
       completedResults: [...results],
       progressPct: 100,
-      estimatedRemaining: null,
+      elapsedDisplay: null,
     }));
 
     const totalContacts = results.reduce((s, r) => s + r.contacts, 0);

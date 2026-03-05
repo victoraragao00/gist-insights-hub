@@ -27,9 +27,9 @@ function SyncProgressBar() {
           <span className="text-muted-foreground shrink-0">
             — {syncState.progressPct}%
           </span>
-          {syncState.estimatedRemaining && (
+          {syncState.elapsedDisplay && (
             <span className="text-muted-foreground shrink-0">
-              — {syncState.estimatedRemaining}
+              — {syncState.elapsedDisplay}
             </span>
           )}
         </div>
