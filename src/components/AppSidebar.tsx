@@ -1,7 +1,6 @@
 import { LayoutDashboard, ShieldAlert, Settings, Users, MessageSquare } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
-import { useClient } from "@/context/ClientContext";
 import {
   Sidebar,
   SidebarContent,
@@ -15,13 +14,6 @@ import {
   SidebarFooter,
   useSidebar,
 } from "@/components/ui/sidebar";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 const modules = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
@@ -39,7 +31,6 @@ export function AppSidebar() {
   const collapsed = state === "collapsed";
   const location = useLocation();
   const isActive = (path: string) => location.pathname === path;
-  const { clients, selectedClient, setSelectedClient } = useClient();
 
   return (
     <Sidebar collapsible="icon">
@@ -55,30 +46,6 @@ export function AppSidebar() {
             </div>
           )}
         </div>
-
-        {/* Client selector — hidden on /clients/:slug detail pages */}
-        {!collapsed && clients.length > 0 && !/^\/clients\/[^/]+/.test(location.pathname) && (
-          <div className="mt-3">
-            <Select
-              value={selectedClient?.id ?? ""}
-              onValueChange={(val) => {
-                const client = clients.find((c) => c.id === val);
-                if (client) setSelectedClient(client);
-              }}
-            >
-              <SelectTrigger className="w-full h-8 text-xs">
-                <SelectValue placeholder="Selecionar cliente" />
-              </SelectTrigger>
-              <SelectContent>
-                {clients.map((c) => (
-                  <SelectItem key={c.id} value={c.id} className="text-xs">
-                    {c.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
       </SidebarHeader>
 
       <SidebarContent>
