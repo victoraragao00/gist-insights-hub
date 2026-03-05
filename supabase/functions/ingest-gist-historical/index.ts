@@ -220,6 +220,7 @@ Deno.serve(async (req) => {
 
       const conversations = convosResponse.conversations ?? [];
       const totalPages = extractPageFromUrl(convosResponse.pages?.last);
+      totalPagesCount = totalPages;
       const hasNextPage = !!convosResponse.pages?.next;
 
       console.log(`[ingest] Page ${currentPage}/${totalPages} — ${conversations.length} convos, hasNext=${hasNextPage}, pages=${JSON.stringify(convosResponse.pages)}`);
