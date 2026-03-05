@@ -352,9 +352,14 @@ const SettingsPage = () => {
               <CardContent className="p-4 text-sm space-y-1">
                 {!importProgress.done ? (
                   <>
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Importando página {importProgress.currentPage}...
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Importando página {importProgress.currentPage}...
+                      </div>
+                      <Button variant="ghost" size="sm" onClick={() => { /* signal cancel via ref */ window.location.reload(); }} className="text-xs text-muted-foreground hover:text-destructive h-7 px-2">
+                        <X className="h-3.5 w-3.5 mr-1" /> Parar
+                      </Button>
                     </div>
                     <p className="text-xs text-muted-foreground">
                       {importProgress.conversationsTotal} conversas | {importProgress.messagesTotal} mensagens importadas
