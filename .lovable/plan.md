@@ -1,60 +1,42 @@
 
 
-## Melhorias para conteúdo HTML e anexos
+# Wizard de Contatos Gist: Separar em 2 etapas
 
-### Problemas identificados nos prints
+## Problema
+Atualmente, o Step A ("Discovery") mostra tudo junto: a lista de domínios/empresas com as opções de vincular/criar/ignorar E os contatos individuais de cada grupo. Isso é confuso quando há muitos domínios com dezenas de contatos.
 
-1. **HTML cru no conteúdo** — mensagens do Gist contêm `<br>`, `<p>`, `<a>` etc. que são exibidas como texto literal
-2. **Anexos como texto** — URLs de imagens do Gist CDN mostradas como strings em vez de thumbnails/links clicáveis
+## Nova estrutura do wizard
 
-### Plano de implementação
+### Step 1 — "Clientes" (novo)
+Lista apenas os **domínios/empresas** encontrados. Para cada grupo, o usuário escolhe:
+- **Vincular a cliente existente** (select de clientes)
+- **Criar novo cliente** (input de nome)
+- **Ignorar** (novo — não importa contatos desse domínio)
 
-#### `src/pages/InteractionsPage.tsx`
+Sem tabela de contatos. Apenas mostra o domínio, nome da empresa (se houver) e quantidade de contatos como informação contextual (ex: "nkstore.com.br — 42 contatos").
 
-**1. Sanitizar e renderizar HTML no conteúdo**
+Botão "Próximo" avança ao Step 2 (filtrando apenas os grupos não-ignorados).
 
-Criar helper `renderContent` que:
-- Converte `<br>` e `<br/>` em `\n`
-- Remove tags HTML perigosas (`<script>`, `<style>`, `<iframe>`)
-- Permite tags seguras: `<a>`, `<b>`, `<strong>`, `<em>`, `<i>`, `<p>`, `<ul>`, `<ol>`, `<li>`
-- Usa `dangerouslySetInnerHTML` com o HTML sanitizado para o painel de detalhe (conteúdo completo)
-- Na timeline (row truncado): strip all HTML → texto puro → truncar a 200 chars
+### Step 2 — "Contatos" (novo)
+Para cada grupo **não ignorado**, mostra a tabela de contatos com checkbox individual para selecionar quais contatos importar. Também mostra a seção de Teammates.
 
-```typescript
-const stripHtml = (html: string) => html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+Botão "Confirmar Vínculos" avança ao Step 3 (atual "confirmation").
 
-const sanitizeHtml = (html: string) =>
-  html
-    .replace(/<script[\s\S]*?<\/script>/gi, "")
-    .replace(/<style[\s\S]*?<\/style>/gi, "")
-    .replace(/<iframe[\s\S]*?<\/iframe>/gi, "");
-```
+### Step 3 — "Confirmação" (atual)
+Sem alterações significativas, apenas ajusta os contadores para refletir apenas os selecionados.
 
-- `InteractionRow`: usa `truncate(stripHtml(content), 200)` — sem HTML
-- `DetailPanel`: usa `<div dangerouslySetInnerHTML={{ __html: sanitizeHtml(content) }} />` com classes de prose
+### Step 4 — "Importação" (atual, só onboarding)
+Sem alterações.
 
-**2. Renderizar anexos como thumbnails/links**
+## Alterações em `src/pages/ClientsPage.tsx`
 
-Alterar a seção de anexos no `DetailPanel` para:
-- Detectar se a URL é imagem (`.jpg`, `.png`, `.gif`, `.webp`, ou contém `image` no path)
-- Se imagem: renderizar `<img>` com thumbnail clicável (abre em nova aba)
-- Se outro arquivo: link clicável com ícone de download
-- Extrair nome do arquivo da URL se `a.name` não existir
+1. Alterar `WizardStep` para `"clients" | "contacts" | "confirmation" | "import"`
+2. Step inicial passa de `"discovery"` para `"clients"`
+3. Adicionar opção `"ignore"` ao `GroupMapping.type` (tipo `"existing" | "new" | "ignore"`)
+4. **Step "clients"**: renderiza cards compactos por domínio — só domínio, empresa, count, e select (vincular/criar/ignorar) + input/select conforme tipo
+5. **Step "contacts"**: para cada grupo não-ignorado, mostra tabela de contatos com checkboxes. Novo state `selectedContacts: Map<number, boolean>` para controle individual. Também mostra teammates aqui.
+6. Ajustar `handleConfirmMappings` para filtrar apenas contatos selecionados e grupos não-ignorados
+7. Ajustar `summaryContactCount` para contar apenas selecionados
 
-Na `InteractionRow`: se há anexos, mostrar badge pequeno "📎 N anexos" ao lado do conteúdo
-
-**3. Estilos para HTML renderizado**
-
-Adicionar classes Tailwind prose no container de conteúdo do DetailPanel:
-```
-className="text-sm leading-relaxed prose prose-sm prose-neutral dark:prose-invert max-w-none"
-```
-
-Isso garante que `<a>`, `<p>`, `<ul>` etc. renderizem com estilo adequado.
-
-### Arquivo modificado
-- `src/pages/InteractionsPage.tsx`
-
-### Sem alterações
-- Edge functions, ClientContext, AppSidebar, outras páginas
+Nenhum outro arquivo será alterado.
 
