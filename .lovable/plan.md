@@ -1,36 +1,42 @@
 
 
-## Problem
+# Wizard de Contatos Gist: Separar em 2 etapas
 
-The `ingest-gist-historical` function itself works correctly (logs confirm pages 245→275/294 processing fine). The issue is the **frontend loop losing state** when the preview page reloads or disconnects during the ~10-minute import process.
+## Problema
+Atualmente, o Step A ("Discovery") mostra tudo junto: a lista de domínios/empresas com as opções de vincular/criar/ignorar E os contatos individuais de cada grupo. Isso é confuso quando há muitos domínios com dezenas de contatos.
 
-## Fix: Add resume capability to the frontend
+## Nova estrutura do wizard
 
-### 1. Frontend: `src/pages/InteractionsPage.tsx`
+### Step 1 — "Clientes" (novo)
+Lista apenas os **domínios/empresas** encontrados. Para cada grupo, o usuário escolhe:
+- **Vincular a cliente existente** (select de clientes)
+- **Criar novo cliente** (input de nome)
+- **Ignorar** (novo — não importa contatos desse domínio)
 
-- **Remove the `delete_client_id` from automatic first-call behavior** — make it a separate explicit button so re-runs don't wipe data
-- **Add a "resume page" input** — let user specify starting page (default 1) so if the loop breaks at page 275, they can resume from 276
-- **Persist last known page in `localStorage`** — automatically save `next_page` after each batch so on refresh, the UI shows where it stopped
-- **On mount, check localStorage** for a saved page and offer to resume
+Sem tabela de contatos. Apenas mostra o domínio, nome da empresa (se houver) e quantidade de contatos como informação contextual (ex: "nkstore.com.br — 42 contatos").
 
-### 2. Separate "Limpar dados" button
+Botão "Próximo" avança ao Step 2 (filtrando apenas os grupos não-ignorados).
 
-- Move the delete logic to a separate button so it's explicit and doesn't run on every retry
-- This prevents accidentally wiping already-imported data when resuming
+### Step 2 — "Contatos" (novo)
+Para cada grupo **não ignorado**, mostra a tabela de contatos com checkbox individual para selecionar quais contatos importar. Também mostra a seção de Teammates.
 
-### 3. Show progress as percentage
+Botão "Confirmar Vínculos" avança ao Step 3 (atual "confirmation").
 
-- Since we know totalPages=294, show `página X/294` in the progress log
-- Add the total pages to the edge function response so the frontend can display progress percentage
+### Step 3 — "Confirmação" (atual)
+Sem alterações significativas, apenas ajusta os contadores para refletir apenas os selecionados.
 
-### Changes
+### Step 4 — "Importação" (atual, só onboarding)
+Sem alterações.
 
-**`supabase/functions/ingest-gist-historical/index.ts`**:
-- Add `total_pages` to the response JSON (extracted from `last` URL)
+## Alterações em `src/pages/ClientsPage.tsx`
 
-**`src/pages/InteractionsPage.tsx`**:
-- Add `startPage` state with localStorage persistence
-- Add separate "Limpar interações" button for the delete operation
-- Show resume prompt if localStorage has a saved page
-- Display progress as `página X/totalPages`
+1. Alterar `WizardStep` para `"clients" | "contacts" | "confirmation" | "import"`
+2. Step inicial passa de `"discovery"` para `"clients"`
+3. Adicionar opção `"ignore"` ao `GroupMapping.type` (tipo `"existing" | "new" | "ignore"`)
+4. **Step "clients"**: renderiza cards compactos por domínio — só domínio, empresa, count, e select (vincular/criar/ignorar) + input/select conforme tipo
+5. **Step "contacts"**: para cada grupo não-ignorado, mostra tabela de contatos com checkboxes. Novo state `selectedContacts: Map<number, boolean>` para controle individual. Também mostra teammates aqui.
+6. Ajustar `handleConfirmMappings` para filtrar apenas contatos selecionados e grupos não-ignorados
+7. Ajustar `summaryContactCount` para contar apenas selecionados
+
+Nenhum outro arquivo será alterado.
 
