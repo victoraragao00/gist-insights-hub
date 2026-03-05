@@ -1,5 +1,7 @@
 import { LayoutDashboard, ShieldAlert, Settings, Users } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
+import umodeLogo from "@/assets/umode-logo-full.png";
+import umodeIcon from "@/assets/umode-icon.png";
 import { useLocation } from "react-router-dom";
 import {
   Sidebar,
