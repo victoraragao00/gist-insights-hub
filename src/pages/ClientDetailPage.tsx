@@ -230,6 +230,19 @@ const ClientDetailPage = () => {
     },
   });
 
+  const { data: totalInteractionsCount = 0 } = useQuery<number>({
+    queryKey: ["detail_total_interactions", clientId, user?.id],
+    enabled: !!clientId && !!user?.id,
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("interactions")
+        .select("id", { count: "exact", head: true })
+        .eq("client_id", clientId!);
+      if (error) throw error;
+      return count ?? 0;
+    },
+  });
+
   // ── Computed stats ──
 
   const stats = useMemo(() => {
@@ -359,8 +372,8 @@ const ClientDetailPage = () => {
       <div className="space-y-6 p-6">
         <Skeleton className="h-8 w-64" />
         <Skeleton className="h-4 w-40" />
-        <div className="grid grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-24 rounded-xl" />)}
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+          {[1, 2, 3, 4, 5, 6].map((i) => <Skeleton key={i} className="h-24 rounded-xl" />)}
         </div>
       </div>
     );
@@ -450,10 +463,16 @@ const ClientDetailPage = () => {
         {/* ── TAB 1: Visão Geral ── */}
         <TabsContent value="overview" className="space-y-6">
           {/* KPI Row */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+            <KPICard label="Total de Interações" value={String(totalInteractionsCount)} sub="histórico completo" />
             <KPICard label="Interações 30d" value={String(stats.total_30d)} sub="últimos 30 dias" />
             <KPICard label="Tom predominante" value={dominantTone.label} sub="maior frequência" />
             <KPICard label="Fora de escopo %" value={`${stats.out_of_scope_pct}%`} sub="do total de interações" />
+            <KPICard
+              label="Último Acesso (Plataforma)"
+              value={meta.last_seen_at ? formatDate(meta.last_seen_at) : "Não disponível"}
+              sub="via Gist tracking"
+            />
             <KPICard label="Tempo médio resposta" value="Em breve" sub="funcionalidade futura" />
           </div>
 
