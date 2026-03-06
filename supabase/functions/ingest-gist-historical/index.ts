@@ -51,6 +51,20 @@ Deno.serve(async (req) => {
 
     // Create job
     const supaAdmin = createClient(supabaseUrl, serviceKey);
+
+    // Incremental: get last completed ingest timestamp
+    const { data: lastJob } = await supaAdmin
+      .from('sync_jobs')
+      .select('completed_at')
+      .eq('type', 'ingest_historical')
+      .eq('status', 'completed')
+      .order('completed_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (lastJob?.completed_at) {
+      payload.since_timestamp = lastJob.completed_at;
+    }
     const { data: job, error: jobErr } = await supaAdmin
       .from('sync_jobs')
       .insert({
