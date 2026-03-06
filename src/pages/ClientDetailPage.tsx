@@ -433,16 +433,16 @@ const ClientDetailPage = () => {
         <div className="space-y-1">
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold text-foreground">{client.name}</h1>
-            <Badge className="bg-primary/10 text-primary border-0 text-xs">Ativo</Badge>
+            <Badge className={`border-0 text-xs ${client.active ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>{client.active ? "Ativo" : "Inativo"}</Badge>
             <Badge variant="outline" className={`text-xs border-0 ${dominantTone.className}`}>
               {dominantTone.label}
             </Badge>
           </div>
           <p className="text-sm text-muted-foreground">
-            slug: {client.slug} · {bindings.length} canais · Atualizado {stats.last_contact ? formatDate(stats.last_contact) : "—"}{" "}
+            slug: {client.slug} · {bindings.length} canais · Última msg {stats.last_contact ? formatDate(stats.last_contact) : "—"}{" "}
             <span className="inline-flex items-center gap-1 ml-2 text-muted-foreground/70">
               <span className="inline-block h-2 w-2 rounded-full bg-muted-foreground/40" />
-              Gist sync: automático (6h)
+              Último acesso Gist: {meta.last_seen_at ? formatRelativeTime(meta.last_seen_at) : "—"}
             </span>
           </p>
         </div>
