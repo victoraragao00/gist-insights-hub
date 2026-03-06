@@ -339,6 +339,59 @@ export type Database = {
           },
         ]
       }
+      sync_jobs: {
+        Row: {
+          client_id: string | null
+          completed_at: string | null
+          created_at: string | null
+          created_by: string | null
+          id: string
+          max_retries: number | null
+          payload: Json | null
+          progress: Json | null
+          retry_count: number | null
+          started_at: string | null
+          status: Database["public"]["Enums"]["job_status"] | null
+          type: Database["public"]["Enums"]["job_type"]
+        }
+        Insert: {
+          client_id?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          max_retries?: number | null
+          payload?: Json | null
+          progress?: Json | null
+          retry_count?: number | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["job_status"] | null
+          type: Database["public"]["Enums"]["job_type"]
+        }
+        Update: {
+          client_id?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          max_retries?: number | null
+          payload?: Json | null
+          progress?: Json | null
+          retry_count?: number | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["job_status"] | null
+          type?: Database["public"]["Enums"]["job_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sync_jobs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_client_access: {
         Row: {
           client_id: string
@@ -393,6 +446,12 @@ export type Database = {
         | "transcription_tactiq"
         | "manual"
       interaction_type: "text" | "audio" | "image" | "file" | "system"
+      job_status: "pending" | "running" | "completed" | "failed" | "cancelled"
+      job_type:
+        | "sync_contacts"
+        | "ingest_historical"
+        | "classify_batch"
+        | "transcribe_audio"
       tone_severity: "ok" | "atencao" | "alerta" | "critico"
     }
     CompositeTypes: {
@@ -532,6 +591,13 @@ export const Constants = {
         "manual",
       ],
       interaction_type: ["text", "audio", "image", "file", "system"],
+      job_status: ["pending", "running", "completed", "failed", "cancelled"],
+      job_type: [
+        "sync_contacts",
+        "ingest_historical",
+        "classify_batch",
+        "transcribe_audio",
+      ],
       tone_severity: ["ok", "atencao", "alerta", "critico"],
     },
   },

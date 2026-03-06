@@ -1,80 +1,42 @@
 
 
-## Análise do SQL proposto para `sync_jobs`
+# Wizard de Contatos Gist: Separar em 2 etapas
 
-### Veredito: **Quase correto, mas precisa de 3 ajustes**
+## Problema
+Atualmente, o Step A ("Discovery") mostra tudo junto: a lista de domínios/empresas com as opções de vincular/criar/ignorar E os contatos individuais de cada grupo. Isso é confuso quando há muitos domínios com dezenas de contatos.
 
----
+## Nova estrutura do wizard
 
-### 1. FK para `auth.users` — **Problema**
+### Step 1 — "Clientes" (novo)
+Lista apenas os **domínios/empresas** encontrados. Para cada grupo, o usuário escolhe:
+- **Vincular a cliente existente** (select de clientes)
+- **Criar novo cliente** (input de nome)
+- **Ignorar** (novo — não importa contatos desse domínio)
 
-```sql
-created_by UUID REFERENCES auth.users(id)
-```
+Sem tabela de contatos. Apenas mostra o domínio, nome da empresa (se houver) e quantidade de contatos como informação contextual (ex: "nkstore.com.br — 42 contatos").
 
-O projeto segue o padrão de **nunca** referenciar `auth.users` diretamente com FK. Isso causa problemas com o schema gerenciado pelo Supabase. Remover a FK constraint e manter apenas o campo UUID:
+Botão "Próximo" avança ao Step 2 (filtrando apenas os grupos não-ignorados).
 
-```sql
-created_by UUID  -- sem REFERENCES auth.users(id)
-```
+### Step 2 — "Contatos" (novo)
+Para cada grupo **não ignorado**, mostra a tabela de contatos com checkbox individual para selecionar quais contatos importar. Também mostra a seção de Teammates.
 
----
+Botão "Confirmar Vínculos" avança ao Step 3 (atual "confirmation").
 
-### 2. RLS SELECT policy — **Problema de recursão potencial**
+### Step 3 — "Confirmação" (atual)
+Sem alterações significativas, apenas ajusta os contadores para refletir apenas os selecionados.
 
-```sql
-CREATE POLICY sync_jobs_access ON sync_jobs FOR SELECT USING (
-  created_by = auth.uid()
-  OR client_id IN (SELECT client_id FROM user_client_access WHERE user_id = auth.uid())
-);
-```
+### Step 4 — "Importação" (atual, só onboarding)
+Sem alterações.
 
-O projeto já tem a função `user_accessible_client_ids(auth.uid())` como SECURITY DEFINER para evitar problemas com RLS. Usar o padrão existente e tornar a policy **RESTRICTIVE** (padrão do projeto):
+## Alterações em `src/pages/ClientsPage.tsx`
 
-```sql
-CREATE POLICY sync_jobs_access ON sync_jobs FOR SELECT TO authenticated
-USING (
-  created_by = auth.uid()
-  OR client_id IN (SELECT user_accessible_client_ids(auth.uid()))
-);
-```
+1. Alterar `WizardStep` para `"clients" | "contacts" | "confirmation" | "import"`
+2. Step inicial passa de `"discovery"` para `"clients"`
+3. Adicionar opção `"ignore"` ao `GroupMapping.type` (tipo `"existing" | "new" | "ignore"`)
+4. **Step "clients"**: renderiza cards compactos por domínio — só domínio, empresa, count, e select (vincular/criar/ignorar) + input/select conforme tipo
+5. **Step "contacts"**: para cada grupo não-ignorado, mostra tabela de contatos com checkboxes. Novo state `selectedContacts: Map<number, boolean>` para controle individual. Também mostra teammates aqui.
+6. Ajustar `handleConfirmMappings` para filtrar apenas contatos selecionados e grupos não-ignorados
+7. Ajustar `summaryContactCount` para contar apenas selecionados
 
----
-
-### 3. INSERT policy — **Falta `TO authenticated`**
-
-Adicionar `TO authenticated` para consistência e segurança (impede acesso anon):
-
-```sql
-CREATE POLICY sync_jobs_insert ON sync_jobs FOR INSERT TO authenticated
-WITH CHECK (created_by = auth.uid());
-```
-
----
-
-### 4. Enums e conflitos — **OK**
-
-- `job_status` e `job_type` não existem no banco atual (enums existentes: `channel_type`, `interaction_type`, `tone_severity`, `alert_channel`).
-- Tabela `sync_jobs` não existe.
-- Índices não conflitam.
-
----
-
-### 5. Faltando UPDATE policy
-
-As edge functions precisam atualizar `status`, `progress`, `started_at`, `completed_at`. Sem policy de UPDATE, isso só funciona via service_role. Se as edge functions já usam service_role key (que é o caso atual), está OK. Mas se quiser permitir cancelamento pelo frontend, precisa de:
-
-```sql
-CREATE POLICY sync_jobs_update ON sync_jobs FOR UPDATE TO authenticated
-USING (created_by = auth.uid())
-WITH CHECK (created_by = auth.uid());
-```
-
----
-
-### Recomendação
-
-**Não executar direto no SQL editor.** Usar a migration tool do Lovable para que o schema fique versionado e o `types.ts` seja atualizado automaticamente. Se rodar direto, os tipos TypeScript não serão gerados e o frontend não terá autocomplete para a tabela.
-
-Posso implementar isso com a migration tool na próxima mensagem — basta aprovar.
+Nenhum outro arquivo será alterado.
 
