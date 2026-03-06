@@ -345,6 +345,7 @@ export type Database = {
           completed_at: string | null
           created_at: string | null
           created_by: string | null
+          heartbeat_at: string | null
           id: string
           max_retries: number | null
           payload: Json | null
@@ -359,6 +360,7 @@ export type Database = {
           completed_at?: string | null
           created_at?: string | null
           created_by?: string | null
+          heartbeat_at?: string | null
           id?: string
           max_retries?: number | null
           payload?: Json | null
@@ -373,6 +375,7 @@ export type Database = {
           completed_at?: string | null
           created_at?: string | null
           created_by?: string | null
+          heartbeat_at?: string | null
           id?: string
           max_retries?: number | null
           payload?: Json | null
@@ -429,6 +432,30 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      claim_next_job: {
+        Args: never
+        Returns: {
+          client_id: string | null
+          completed_at: string | null
+          created_at: string | null
+          created_by: string | null
+          heartbeat_at: string | null
+          id: string
+          max_retries: number | null
+          payload: Json | null
+          progress: Json | null
+          retry_count: number | null
+          started_at: string | null
+          status: Database["public"]["Enums"]["job_status"] | null
+          type: Database["public"]["Enums"]["job_type"]
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "sync_jobs"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       deactivate_stale_clients: { Args: { _days: number }; Returns: number }
       user_accessible_client_ids: {
         Args: { _user_id: string }

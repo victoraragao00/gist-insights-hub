@@ -5,3 +5,9 @@ verify_jwt = false
 
 [functions.sync-gist-contacts]
 verify_jwt = false
+
+[functions.ingest-gist-historical]
+verify_jwt = false
+
+[functions.process-jobs]
+verify_jwt = false

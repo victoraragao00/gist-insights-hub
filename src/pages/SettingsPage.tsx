@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Users, MessageCircle, Phone, Hash, Mail, Mic, Download, Loader2, Check, Upload, MoreHorizontal, RefreshCw, X, ShieldAlert } from "lucide-react";
+import { Users, MessageCircle, Phone, Hash, Mail, Mic, Download, Loader2, Check, Upload, MoreHorizontal, RefreshCw, X, ShieldAlert, RotateCcw, Clock, CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger,
@@ -24,7 +24,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { GistContactWizard } from "@/components/GistContactWizard";
 import { useAuth } from "@/context/AuthContext";
-import { useClient } from "@/context/ClientContext";
+import { useClient, type SyncJobRecord } from "@/context/ClientContext";
 
 // ── Types ──────────────────────────────────────────────
 
@@ -62,11 +62,30 @@ function formatSyncDate(dateStr: string | null): string {
   return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }) + `, ${time}`;
 }
 
+function jobTypeLabel(type: string): string {
+  switch (type) {
+    case 'sync_contacts': return 'Contatos';
+    case 'ingest_historical': return 'Histórico';
+    default: return type;
+  }
+}
+
+function jobStatusBadge(status: string) {
+  switch (status) {
+    case 'pending': return <Badge variant="outline" className="text-xs bg-yellow-50 text-yellow-700 border-yellow-200"><Clock className="h-3 w-3 mr-1" />Pendente</Badge>;
+    case 'running': return <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200"><Loader2 className="h-3 w-3 mr-1 animate-spin" />Executando</Badge>;
+    case 'completed': return <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200"><CheckCircle2 className="h-3 w-3 mr-1" />Concluído</Badge>;
+    case 'failed': return <Badge variant="outline" className="text-xs bg-red-50 text-red-700 border-red-200"><XCircle className="h-3 w-3 mr-1" />Falhou</Badge>;
+    case 'cancelled': return <Badge variant="outline" className="text-xs bg-muted text-muted-foreground"><X className="h-3 w-3 mr-1" />Cancelado</Badge>;
+    default: return <Badge variant="outline" className="text-xs">{status}</Badge>;
+  }
+}
+
 // ── Component ──────────────────────────────────────────
 
 const SettingsPage = () => {
   const { user } = useAuth();
-  const { importing, importProgress, handleImportHistory, syncState, runSync, cancelSync } = useClient();
+  const { syncState, startSync, cancelSync } = useClient();
 
   // Wizard state
   const [wizardOpen, setWizardOpen] = useState(false);
@@ -157,6 +176,22 @@ const SettingsPage = () => {
     },
   });
 
+  // Job history
+  const { data: jobHistory = [] } = useQuery<SyncJobRecord[]>({
+    queryKey: ["sync_jobs_history", user?.id],
+    enabled: !!user?.id,
+    staleTime: 30 * 1000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("sync_jobs")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(15);
+      if (error) throw error;
+      return (data ?? []) as SyncJobRecord[];
+    },
+  });
+
   // Pre-select active clients on mount
   useEffect(() => {
     if (syncClients.length > 0 && selectedClientIds.length === 0) {
@@ -202,11 +237,6 @@ const SettingsPage = () => {
     setSelectedClientIds((prev) => prev.filter((id) => !filteredIds.has(id)));
   };
 
-  const selectedClients = useMemo(
-    () => syncClients.filter((c) => selectedClientIds.includes(c.id)),
-    [syncClients, selectedClientIds]
-  );
-
   const syncLabel = useMemo(() => {
     const parts: string[] = [];
     if (syncContacts) parts.push("Contatos");
@@ -235,12 +265,27 @@ const SettingsPage = () => {
   };
 
   const handleRunSync = () => {
-    runSync({
-      syncContacts,
-      syncHistory,
-      selectedClients: selectedClients.map((c) => ({ id: c.id, name: c.name })),
-    });
+    startSync({ syncContacts, syncHistory });
   };
+
+  // ── Retry handler ──
+  const handleRetryJob = useCallback(async (jobId: string) => {
+    const { error } = await supabase
+      .from('sync_jobs')
+      .update({ status: 'pending' as any, retry_count: 0, completed_at: null, heartbeat_at: null } as any)
+      .eq('id', jobId);
+    if (error) {
+      toast.error("Erro ao retentar: " + error.message);
+    } else {
+      toast.success("Job reenfileirado com sucesso.");
+      queryClient.invalidateQueries({ queryKey: ["sync_jobs_history"] });
+    }
+  }, [queryClient]);
+
+  // ── Import history (creates job directly) ──
+  const handleImportHistory = useCallback(() => {
+    startSync({ syncContacts: false, syncHistory: true });
+  }, [startSync]);
 
   // ── Inactivation rule handler ──
 
@@ -318,7 +363,7 @@ const SettingsPage = () => {
                       <DropdownMenuContent align="end">
                         {integ.id === "gist" && integ.connected ? (
                           <>
-                            <DropdownMenuItem onClick={handleImportHistory} disabled={importing}>
+                            <DropdownMenuItem onClick={handleImportHistory} disabled={syncing}>
                               <Download className="h-4 w-4 mr-2" />
                               Importar Histórico
                             </DropdownMenuItem>
@@ -345,37 +390,6 @@ const SettingsPage = () => {
               </Card>
             ))}
           </div>
-
-          {/* Import progress */}
-          {importProgress && (
-            <Card className="border-0 shadow-sm">
-              <CardContent className="p-4 text-sm space-y-1">
-                {!importProgress.done ? (
-                  <>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Importando página {importProgress.currentPage}...
-                      </div>
-                      <Button variant="ghost" size="sm" onClick={() => { /* signal cancel via ref */ window.location.reload(); }} className="text-xs text-muted-foreground hover:text-destructive h-7 px-2">
-                        <X className="h-3.5 w-3.5 mr-1" /> Parar
-                      </Button>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      {importProgress.conversationsTotal} conversas | {importProgress.messagesTotal} mensagens importadas
-                    </p>
-                  </>
-                ) : importProgress.error ? (
-                  <p className="text-destructive">Erro: {importProgress.error}</p>
-                ) : (
-                  <div className="flex items-center gap-2 text-primary">
-                    <Check className="h-4 w-4" />
-                    Importação concluída: {importProgress.conversationsTotal} conversas, {importProgress.messagesTotal} mensagens
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
         </TabsContent>
 
         {/* ═══ Tab: Sincronização ═══ */}
@@ -384,7 +398,7 @@ const SettingsPage = () => {
           <div>
             <h2 className="text-lg font-semibold text-foreground">Sincronização de Dados</h2>
             <p className="text-sm text-muted-foreground">
-              Selecione os clientes e o que deseja sincronizar, depois clique em Executar.
+              Selecione o que deseja sincronizar e clique em Executar. O processamento acontece em segundo plano.
             </p>
           </div>
 
@@ -595,19 +609,14 @@ const SettingsPage = () => {
             </div>
           </div>
 
-          {/* Progress panel (shown while syncing — detailed view on this page) */}
+          {/* Progress panel (shown while syncing) */}
           {syncing && (
             <Card className="border border-primary/20 bg-primary/5 shadow-sm">
               <CardContent className="p-5 space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-sm font-medium text-foreground">
                     <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                    Sincronizando: {syncState.currentClientName ?? "Preparando..."}
-                    {syncState.totalClients > 0 && (
-                      <span className="text-muted-foreground">
-                        ({syncState.currentClientIndex}/{syncState.totalClients})
-                      </span>
-                    )}
+                    Sincronizando: {syncState.currentLabel ?? "Preparando..."}
                     {syncState.elapsedDisplay && (
                       <span className="text-muted-foreground">— {syncState.elapsedDisplay}</span>
                     )}
@@ -625,26 +634,19 @@ const SettingsPage = () => {
                   />
                 </div>
 
-                {/* Per-client status list */}
-                {syncState.completedResults.length > 0 && (
-                  <div className="space-y-1 max-h-48 overflow-y-auto text-sm">
-                    {syncState.completedResults.map((result) => (
-                      <div key={result.clientId} className="flex items-center gap-2 py-0.5">
-                        {result.error ? (
-                          <span className="text-destructive text-xs">✗</span>
-                        ) : (
+                {/* Per-job status */}
+                {syncState.jobs.length > 0 && (
+                  <div className="space-y-1 text-sm">
+                    {syncState.jobs.map((job) => (
+                      <div key={job.id} className="flex items-center gap-2 py-0.5">
+                        {job.status === 'completed' ? (
                           <Check className="h-3.5 w-3.5 text-green-600 shrink-0" />
+                        ) : job.status === 'failed' ? (
+                          <XCircle className="h-3.5 w-3.5 text-destructive shrink-0" />
+                        ) : (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin text-primary shrink-0" />
                         )}
-                        <span className="text-muted-foreground">{result.clientName}</span>
-                        {!result.error && result.messages > 0 && (
-                          <span className="text-xs text-muted-foreground ml-auto tabular-nums">{result.messages.toLocaleString("pt-BR")} msgs</span>
-                        )}
-                        {!result.error && result.contacts > 0 && (
-                          <span className="text-xs text-muted-foreground ml-auto tabular-nums">{result.contacts.toLocaleString("pt-BR")} contatos</span>
-                        )}
-                        {result.error && (
-                          <span className="text-xs text-destructive ml-auto">erro</span>
-                        )}
+                        <span className="text-muted-foreground">{jobTypeLabel(job.type)}</span>
                       </div>
                     ))}
                   </div>
@@ -653,14 +655,77 @@ const SettingsPage = () => {
             </Card>
           )}
 
+          {/* Job History */}
+          {jobHistory.length > 0 && (
+            <div className="space-y-3">
+              <h3 className="text-sm font-medium text-foreground">Histórico de Jobs</h3>
+              <div className="rounded-xl border border-border bg-card overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Tipo</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Criado em</TableHead>
+                      <TableHead>Duração</TableHead>
+                      <TableHead className="text-right">Resultado</TableHead>
+                      <TableHead className="w-10"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {jobHistory.map((job) => {
+                      const progress = (job.progress ?? {}) as Record<string, unknown>;
+                      const contacts = (progress.contacts_processed as number) || 0;
+                      const messages = (progress.messages_inserted as number) || 0;
+                      const duration = job.started_at && job.completed_at
+                        ? Math.round((new Date(job.completed_at).getTime() - new Date(job.started_at).getTime()) / 1000)
+                        : null;
+
+                      return (
+                        <TableRow key={job.id}>
+                          <TableCell className="font-medium text-sm">{jobTypeLabel(job.type)}</TableCell>
+                          <TableCell>{jobStatusBadge(job.status)}</TableCell>
+                          <TableCell className="text-sm text-muted-foreground">{formatSyncDate(job.created_at)}</TableCell>
+                          <TableCell className="text-sm text-muted-foreground tabular-nums">
+                            {duration !== null ? `${duration}s` : "—"}
+                          </TableCell>
+                          <TableCell className="text-right text-xs text-muted-foreground tabular-nums">
+                            {job.type === 'sync_contacts' && contacts > 0 && `${contacts} contatos`}
+                            {job.type === 'ingest_historical' && messages > 0 && `${messages} msgs`}
+                          </TableCell>
+                          <TableCell>
+                            {job.status === 'failed' && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7"
+                                    onClick={() => handleRetryJob(job.id)}
+                                  >
+                                    <RotateCcw className="h-3.5 w-3.5" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Retentar</TooltipContent>
+                              </Tooltip>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          )}
+
           {/* Step 3 — Execute bar */}
           <div className="sticky bottom-0 bg-background border-t border-border -mx-6 px-6 py-4 flex items-center justify-between">
             <p className="text-sm text-muted-foreground">
-              {selectedClientIds.length} clientes selecionados · {syncLabel}
+              {syncLabel}
             </p>
             <Button
               onClick={handleRunSync}
-              disabled={syncing || selectedClientIds.length === 0 || (!syncContacts && !syncHistory)}
+              disabled={syncing || (!syncContacts && !syncHistory)}
               className="gap-2"
             >
               {syncing ? (

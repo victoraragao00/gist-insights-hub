@@ -1,8 +1,10 @@
-import { createContext, useContext, useState, useCallback, useRef, type ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useEffect, useRef, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
+
+// ── Types ──
 
 interface Client {
   id: string;
@@ -13,79 +15,44 @@ interface Client {
   created_at: string;
 }
 
-interface ImportProgress {
-  currentPage: number;
-  conversationsTotal: number;
-  messagesTotal: number;
-  done: boolean;
-  error?: string;
-}
-
-interface IngestionResult {
-  conversations_fetched: number;
-  messages_fetched: number;
-  messages_inserted: number;
-  messages_skipped: number;
-  errors: string[];
-  has_more: boolean;
-  next_page?: number;
-}
-
-// ── Sync types ──
-
-export interface ClientSyncResult {
-  clientId: string;
-  clientName: string;
-  contacts: number;
-  messages: number;
-  error?: string;
+export interface SyncJobRecord {
+  id: string;
+  type: string;
+  status: string;
+  client_id: string | null;
+  payload: Record<string, unknown> | null;
+  progress: Record<string, unknown> | null;
+  retry_count: number | null;
+  max_retries: number | null;
+  created_by: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  heartbeat_at: string | null;
+  created_at: string | null;
 }
 
 export interface SyncState {
   syncing: boolean;
-  cancelled: boolean;
-  currentClientName: string | null;
-  currentClientIndex: number;
-  totalClients: number;
-  completedResults: ClientSyncResult[];
-  startedAt: number | null;
+  jobs: SyncJobRecord[];
   progressPct: number;
+  currentLabel: string | null;
   elapsedDisplay: string | null;
 }
 
 export interface SyncParams {
   syncContacts: boolean;
   syncHistory: boolean;
-  selectedClients: { id: string; name: string }[];
 }
 
 const INITIAL_SYNC_STATE: SyncState = {
   syncing: false,
-  cancelled: false,
-  currentClientName: null,
-  currentClientIndex: 0,
-  totalClients: 0,
-  completedResults: [],
-  startedAt: null,
+  jobs: [],
   progressPct: 0,
+  currentLabel: null,
   elapsedDisplay: null,
 };
 
-interface ClientContextValue {
-  clients: Client[];
-  selectedClient: Client | null;
-  setSelectedClient: (client: Client) => void;
-  loading: boolean;
-  importing: boolean;
-  importProgress: ImportProgress | null;
-  handleImportHistory: () => Promise<void>;
-  // Sync
-  syncState: SyncState;
-  runSync: (params: SyncParams) => Promise<void>;
-  cancelSync: () => void;
-}
-
-const ClientContext = createContext<ClientContextValue | undefined>(undefined);
+const TERMINAL_STATUSES = new Set(['completed', 'failed', 'cancelled']);
 
 function formatElapsed(ms: number): string {
   const totalSec = Math.floor(ms / 1000);
@@ -95,16 +62,62 @@ function formatElapsed(ms: number): string {
   return `${min}min ${sec}s`;
 }
 
+function computeJobProgress(job: SyncJobRecord): number {
+  if (TERMINAL_STATUSES.has(job.status)) return 100;
+  const progress = job.progress as Record<string, unknown> | null;
+  if (!progress) return 0;
+  const page = (progress.next_page as number) || 0;
+  const total = (progress.total_pages as number) || 0;
+  if (total > 0 && page > 0) return Math.min(Math.round((page / total) * 100), 95);
+  return job.status === 'running' ? 10 : 0;
+}
+
+function computeSyncState(jobs: SyncJobRecord[], startedAt: number | null): SyncState {
+  if (jobs.length === 0) return INITIAL_SYNC_STATE;
+
+  const allTerminal = jobs.every(j => TERMINAL_STATUSES.has(j.status));
+  const syncing = !allTerminal;
+
+  const totalPct = jobs.reduce((sum, j) => sum + computeJobProgress(j), 0);
+  const progressPct = Math.round(totalPct / jobs.length);
+
+  const activeJob = jobs.find(j => j.status === 'running') || jobs.find(j => j.status === 'pending');
+  let currentLabel: string | null = null;
+  if (activeJob) {
+    currentLabel = activeJob.type === 'sync_contacts' ? 'Contatos (global)' : 'Histórico (global)';
+  }
+
+  let elapsedDisplay: string | null = null;
+  if (syncing && startedAt) {
+    elapsedDisplay = `Em andamento há ${formatElapsed(Date.now() - startedAt)}`;
+  }
+
+  return { syncing, jobs, progressPct, currentLabel, elapsedDisplay };
+}
+
+// ── Context ──
+
+interface ClientContextValue {
+  clients: Client[];
+  selectedClient: Client | null;
+  setSelectedClient: (client: Client) => void;
+  loading: boolean;
+  syncState: SyncState;
+  startSync: (params: SyncParams) => Promise<void>;
+  cancelSync: () => void;
+}
+
+const ClientContext = createContext<ClientContextValue | undefined>(undefined);
+
 export function ClientProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
-  const [importing, setImporting] = useState(false);
-  const [importProgress, setImportProgress] = useState<ImportProgress | null>(null);
-
-  // ── Sync state ──
-  const [syncState, setSyncState] = useState<SyncState>(INITIAL_SYNC_STATE);
-  const cancelledRef = useRef(false);
+  const [activeJobIds, setActiveJobIds] = useState<string[]>([]);
+  const [jobs, setJobs] = useState<SyncJobRecord[]>([]);
+  const [startedAt, setStartedAt] = useState<number | null>(null);
+  const fallbackRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const channelRef = useRef<any>(null);
 
   const { data: clients = [], isLoading } = useQuery<Client[]>({
     queryKey: ["clients", user?.id],
@@ -121,197 +134,160 @@ export function ClientProvider({ children }: { children: ReactNode }) {
     },
   });
 
-  // Auto-select first client when list loads
+  // Auto-select first client
   if (clients.length > 0 && !selectedClient) {
     setSelectedClient(clients[0]);
   }
 
-  // ── Import history (existing) ──
+  // ── Realtime subscription for active jobs ──
+  useEffect(() => {
+    if (activeJobIds.length === 0) return;
 
-  const handleImportHistory = useCallback(async () => {
-    setImporting(true);
-    setImportProgress({ currentPage: 1, conversationsTotal: 0, messagesTotal: 0, done: false });
+    // Subscribe to changes on sync_jobs
+    const channel = supabase
+      .channel('sync-jobs-watch')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'sync_jobs',
+        },
+        (payload) => {
+          const updated = payload.new as SyncJobRecord;
+          if (!activeJobIds.includes(updated.id)) return;
 
-    let page = 1;
-    let totalConversations = 0;
-    let totalMessages = 0;
-    let hasMore = true;
+          setJobs(prev => {
+            const idx = prev.findIndex(j => j.id === updated.id);
+            if (idx === -1) return prev;
+            const next = [...prev];
+            next[idx] = updated;
+            return next;
+          });
+        }
+      )
+      .subscribe();
 
-    try {
-      while (hasMore) {
-        setImportProgress({
-          currentPage: page,
-          conversationsTotal: totalConversations,
-          messagesTotal: totalMessages,
-          done: false,
-        });
+    channelRef.current = channel;
 
-        const { data, error } = await supabase.functions.invoke("ingest-gist-historical", {
-          body: { page },
-        });
+    return () => {
+      supabase.removeChannel(channel);
+      channelRef.current = null;
+    };
+  }, [activeJobIds]);
 
-        if (error) throw new Error(typeof error === "string" ? error : "Erro na importação");
-
-        const result = data as IngestionResult | null;
-        if (!result) throw new Error("Resposta vazia");
-
-        totalConversations += result.conversations_fetched;
-        totalMessages += result.messages_fetched;
-        hasMore = result.has_more;
-        page = result.next_page ?? page + 1;
-      }
-
-      setImportProgress({
-        currentPage: page,
-        conversationsTotal: totalConversations,
-        messagesTotal: totalMessages,
-        done: true,
-      });
-
-      queryClient.invalidateQueries({ queryKey: ["interactions_count"] });
-      toast.success(`✓ Importação concluída: ${totalConversations} conversas, ${totalMessages} mensagens`);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Erro desconhecido";
-      setImportProgress((prev) => prev ? { ...prev, done: true, error: msg } : null);
-      toast.error("Erro na importação: " + msg);
-    } finally {
-      setImporting(false);
+  // ── Fallback polling (30s) ──
+  useEffect(() => {
+    if (activeJobIds.length === 0) {
+      if (fallbackRef.current) { clearInterval(fallbackRef.current); fallbackRef.current = null; }
+      return;
     }
-  }, [queryClient]);
 
-  // ── Sync logic (moved from SettingsPage) ──
-
-  const cancelSync = useCallback(() => {
-    cancelledRef.current = true;
-    setSyncState((prev) => ({ ...prev, cancelled: true }));
-  }, []);
-
-  const runSync = useCallback(async (params: SyncParams) => {
-    const { syncContacts, syncHistory, selectedClients } = params;
-    if (selectedClients.length === 0 && !syncContacts) return;
-
-    cancelledRef.current = false;
-    const startedAt = Date.now();
-
-    // Total steps: 1 for contacts (if checked) + 1 for history (global, not per client)
-    const contactsStep = syncContacts ? 1 : 0;
-    const historySteps = syncHistory ? 1 : 0;
-    const totalSteps = contactsStep + historySteps;
-
-    setSyncState({
-      syncing: true,
-      cancelled: false,
-      currentClientName: null,
-      currentClientIndex: 0,
-      totalClients: totalSteps,
-      completedResults: [],
-      startedAt,
-      progressPct: 0,
-      elapsedDisplay: null,
-    });
-
-    const results: ClientSyncResult[] = [];
-    let completedSteps = 0;
-
-    const updateProgress = (currentName: string, stepIndex: number, subProgress = 0) => {
-      const basePct = (completedSteps / totalSteps) * 100;
-      const stepPct = (1 / totalSteps) * 100;
-      const pct = Math.round(basePct + stepPct * Math.min(subProgress, 0.95));
-      const elapsed = Date.now() - startedAt;
-
-      setSyncState((prev) => ({
-        ...prev,
-        currentClientName: currentName,
-        currentClientIndex: completedSteps + 1,
-        completedResults: [...results],
-        progressPct: pct,
-        elapsedDisplay: `Em andamento há ${formatElapsed(elapsed)}`,
-      }));
+    const poll = async () => {
+      const { data } = await supabase
+        .from('sync_jobs')
+        .select('*')
+        .in('id', activeJobIds);
+      if (data) setJobs(data as SyncJobRecord[]);
     };
 
-    // 1. Sync contacts (global)
-    if (syncContacts && !cancelledRef.current) {
-      updateProgress("Contatos (global)", 0);
-      try {
-        let page = 1;
-        let hasMore = true;
-        let totalContacts = 0;
-        let denominator = 31;
-        while (hasMore && !cancelledRef.current) {
-          const { data, error } = await supabase.functions.invoke("sync-gist-contacts", {
-            body: { page, max_pages: 5 },
-          });
-          if (error) throw error;
-          if (data?.result?.total_pages) denominator = data.result.total_pages;
-          totalContacts += data?.result?.contacts_processed ?? 0;
-          hasMore = data?.result?.has_more ?? false;
-          page = data?.result?.next_page ?? page + 1;
-          updateProgress("Contatos (global)", 0, Math.min(page / denominator, 0.95));
-          await new Promise((r) => setTimeout(r, 1000));
-        }
-        results.push({ clientId: "__contacts__", clientName: "Contatos (global)", contacts: totalContacts, messages: 0 });
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : "Erro desconhecido";
-        results.push({ clientId: "__contacts__", clientName: "Contatos (global)", contacts: 0, messages: 0, error: msg });
+    fallbackRef.current = setInterval(poll, 30000);
+    return () => { if (fallbackRef.current) { clearInterval(fallbackRef.current); fallbackRef.current = null; } };
+  }, [activeJobIds]);
+
+  // ── Clear fallback when all jobs terminal ──
+  useEffect(() => {
+    if (jobs.length === 0 || activeJobIds.length === 0) return;
+
+    const allTerminal = jobs.every(j => TERMINAL_STATUSES.has(j.status));
+    if (allTerminal) {
+      if (fallbackRef.current) { clearInterval(fallbackRef.current); fallbackRef.current = null; }
+
+      // Toast summary
+      const hasError = jobs.some(j => j.status === 'failed');
+      const hasCancelled = jobs.some(j => j.status === 'cancelled');
+      const totalContacts = jobs
+        .filter(j => j.type === 'sync_contacts')
+        .reduce((s, j) => s + ((j.progress as any)?.contacts_processed || 0), 0);
+      const totalMessages = jobs
+        .filter(j => j.type === 'ingest_historical')
+        .reduce((s, j) => s + ((j.progress as any)?.messages_inserted || 0), 0);
+
+      if (hasCancelled) {
+        toast.info("Sincronização cancelada pelo usuário.");
+      } else if (hasError) {
+        toast.warning(`Sincronização concluída com erro(s) — ${totalContacts} contatos, ${totalMessages} mensagens`);
+      } else {
+        toast.success(`Sincronização completa — ${totalContacts} contatos, ${totalMessages} mensagens novas`);
       }
-      completedSteps++;
-    }
 
-    // 2. Sync history (single global pass — backend resolves client_id per conversation)
-    if (syncHistory && !cancelledRef.current) {
-      updateProgress("Histórico (global)", contactsStep);
-      let totalMessages = 0;
-      try {
-        let page = 1;
-        let hasMore = true;
-        let denominator = 50; // default, updated dynamically
-        while (hasMore && !cancelledRef.current) {
-          const { data, error } = await supabase.functions.invoke("ingest-gist-historical", {
-            body: { page, max_pages: 5 },
-          });
-          if (error) throw error;
-          if (data?.result?.total_pages) denominator = data.result.total_pages;
-          totalMessages += data?.result?.messages_inserted ?? 0;
-          hasMore = data?.result?.has_more ?? false;
-          page = data?.result?.next_page ?? page + 1;
-          updateProgress("Histórico (global)", contactsStep, Math.min(page / denominator, 0.95));
-          await new Promise((r) => setTimeout(r, 1000));
-        }
-        results.push({ clientId: "__history__", clientName: "Histórico (global)", contacts: 0, messages: totalMessages });
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : "Erro desconhecido";
-        results.push({ clientId: "__history__", clientName: "Histórico (global)", contacts: 0, messages: totalMessages, error: msg });
+      localStorage.setItem("cx_hub_last_sync", new Date().toISOString());
+      queryClient.invalidateQueries({ queryKey: ["sync_clients"] });
+      queryClient.invalidateQueries({ queryKey: ["clients"] });
+      queryClient.invalidateQueries({ queryKey: ["sync_jobs_history"] });
+
+      // Reset after brief delay so UI shows 100%
+      setTimeout(() => {
+        setActiveJobIds([]);
+        setJobs([]);
+        setStartedAt(null);
+      }, 2000);
+    }
+  }, [jobs, activeJobIds, queryClient]);
+
+  // ── Elapsed timer ──
+  const [, forceUpdate] = useState(0);
+  useEffect(() => {
+    if (!startedAt) return;
+    const timer = setInterval(() => forceUpdate(n => n + 1), 1000);
+    return () => clearInterval(timer);
+  }, [startedAt]);
+
+  const syncState = computeSyncState(jobs, startedAt);
+
+  // ── Start sync ──
+  const startSync = useCallback(async (params: SyncParams) => {
+    const { syncContacts, syncHistory } = params;
+    if (!syncContacts && !syncHistory) return;
+
+    const newJobIds: string[] = [];
+    const newJobs: SyncJobRecord[] = [];
+
+    if (syncContacts) {
+      const { data, error } = await supabase.functions.invoke("sync-gist-contacts", { body: {} });
+      if (error) { toast.error("Erro ao criar job de contatos: " + (typeof error === 'string' ? error : 'erro')); return; }
+      if (data?.job_id) {
+        newJobIds.push(data.job_id);
+        newJobs.push({ id: data.job_id, type: 'sync_contacts', status: 'pending', client_id: null, payload: {}, progress: {}, retry_count: 0, max_retries: 3, created_by: user?.id ?? null, started_at: null, completed_at: null, heartbeat_at: null, created_at: new Date().toISOString() });
       }
-      completedSteps++;
     }
 
-    localStorage.setItem("cx_hub_last_sync", new Date().toISOString());
-
-    // Final state
-    setSyncState((prev) => ({
-      ...prev,
-      syncing: false,
-      currentClientName: null,
-      completedResults: [...results],
-      progressPct: 100,
-      elapsedDisplay: null,
-    }));
-
-    const totalContacts = results.reduce((s, r) => s + r.contacts, 0);
-    const totalMessages = results.reduce((s, r) => s + r.messages, 0);
-    const errorCount = results.filter((r) => r.error).length;
-
-    if (cancelledRef.current) {
-      toast.info("Sincronização cancelada pelo usuário.");
-    } else if (errorCount > 0) {
-      toast.warning(`Sincronização concluída com ${errorCount} erro(s) — ${totalContacts} contatos, ${totalMessages} mensagens`);
-    } else {
-      toast.success(`Sincronização completa — ${totalContacts} contatos, ${totalMessages} mensagens novas`);
+    if (syncHistory) {
+      const { data, error } = await supabase.functions.invoke("ingest-gist-historical", { body: {} });
+      if (error) { toast.error("Erro ao criar job de histórico: " + (typeof error === 'string' ? error : 'erro')); return; }
+      if (data?.job_id) {
+        newJobIds.push(data.job_id);
+        newJobs.push({ id: data.job_id, type: 'ingest_historical', status: 'pending', client_id: null, payload: {}, progress: {}, retry_count: 0, max_retries: 3, created_by: user?.id ?? null, started_at: null, completed_at: null, heartbeat_at: null, created_at: new Date().toISOString() });
+      }
     }
 
-    queryClient.invalidateQueries({ queryKey: ["sync_clients"] });
-    queryClient.invalidateQueries({ queryKey: ["clients"] });
-  }, [queryClient]);
+    if (newJobIds.length > 0) {
+      setActiveJobIds(newJobIds);
+      setJobs(newJobs);
+      setStartedAt(Date.now());
+    }
+  }, [user?.id]);
+
+  // ── Cancel sync ──
+  const cancelSync = useCallback(async () => {
+    for (const jobId of activeJobIds) {
+      await supabase
+        .from('sync_jobs')
+        .update({ status: 'cancelled' as any, completed_at: new Date().toISOString() })
+        .eq('id', jobId)
+        .in('status', ['pending', 'running'] as any);
+    }
+  }, [activeJobIds]);
 
   return (
     <ClientContext.Provider
@@ -320,11 +296,8 @@ export function ClientProvider({ children }: { children: ReactNode }) {
         selectedClient,
         setSelectedClient,
         loading: isLoading,
-        importing,
-        importProgress,
-        handleImportHistory,
         syncState,
-        runSync,
+        startSync,
         cancelSync,
       }}
     >
