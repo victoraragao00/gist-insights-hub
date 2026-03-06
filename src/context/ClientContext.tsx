@@ -139,6 +139,35 @@ export function ClientProvider({ children }: { children: ReactNode }) {
     setSelectedClient(clients[0]);
   }
 
+  // ── Detect existing active jobs on mount ──
+  useEffect(() => {
+    if (!user?.id) return;
+    const fetchActiveJobs = async () => {
+      const { data } = await supabase
+        .from('sync_jobs')
+        .select('*')
+        .in('status', ['pending', 'running'] as any)
+        .order('created_at', { ascending: true });
+      if (data && data.length > 0) {
+        const ids = data.map((j: any) => j.id);
+        setActiveJobIds(prev => {
+          const merged = new Set([...prev, ...ids]);
+          return Array.from(merged);
+        });
+        setJobs(prev => {
+          const existingIds = new Set(prev.map(j => j.id));
+          const newJobs = (data as SyncJobRecord[]).filter(j => !existingIds.has(j.id));
+          return newJobs.length > 0 ? [...prev, ...newJobs] : prev;
+        });
+        if (!startedAt) {
+          const earliest = data.find((j: any) => j.started_at);
+          setStartedAt(earliest?.started_at ? new Date(earliest.started_at).getTime() : Date.now());
+        }
+      }
+    };
+    fetchActiveJobs();
+  }, [user?.id]);
+
   // ── Realtime subscription for active jobs ──
   useEffect(() => {
     if (activeJobIds.length === 0) return;
