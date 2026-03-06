@@ -17,13 +17,8 @@ function SyncProgressBar() {
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 text-xs text-foreground">
           <span className="font-medium truncate">
-            {syncState.currentClientName ?? "Preparando..."}
+            {syncState.currentLabel ?? "Preparando..."}
           </span>
-          {syncState.totalClients > 0 && (
-            <span className="text-muted-foreground shrink-0">
-              ({syncState.currentClientIndex}/{syncState.totalClients})
-            </span>
-          )}
           <span className="text-muted-foreground shrink-0">
             — {syncState.progressPct}%
           </span>
