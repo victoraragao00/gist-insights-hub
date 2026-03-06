@@ -205,6 +205,10 @@ async function handleSyncContacts(
     }
   }
 
+  // Incremental: skip contacts older than since_timestamp
+  const sinceTs = (job.payload as any)?.since_timestamp;
+  const sinceUnix = sinceTs ? Math.floor(new Date(sinceTs).getTime() / 1000) : 0;
+
   let currentPage = startPage;
   let pagesProcessed = 0;
   let hasMore = false;
@@ -212,7 +216,7 @@ async function handleSyncContacts(
 
   while (pagesProcessed < MAX_PAGES_PER_RUN) {
     const url = `${GIST_BASE}/contacts?order_by=last_seen_at&order=desc&per_page=60&page=${currentPage}`;
-    console.log(`[process-jobs:contacts] fetching page ${currentPage}...`);
+    console.log(`[process-jobs:contacts] fetching page ${currentPage}... (since=${sinceTs ?? 'full'})`);
 
     const contactsRes = await gistGetWithRetry<GistContactsResponse>(apiKey, url);
     const contacts = contactsRes.contacts ?? [];
@@ -222,7 +226,15 @@ async function handleSyncContacts(
 
     totalPages = pages?.total_pages ?? totalPages;
 
+    let reachedOldContacts = false;
     for (const contact of contacts) {
+      // Break when contacts are older than last sync
+      const contactLastSeenUnix = typeof contact.last_seen_at === 'number' ? contact.last_seen_at
+        : contact.last_seen_at ? Math.floor(new Date(contact.last_seen_at).getTime() / 1000) : 0;
+      if (sinceUnix > 0 && contactLastSeenUnix > 0 && contactLastSeenUnix < sinceUnix) {
+        reachedOldContacts = true;
+        break;
+      }
       try {
         contactsProcessed++;
         const contactLastSeen = parseLastSeen(contact.last_seen_at);
@@ -267,6 +279,11 @@ async function handleSyncContacts(
 
     pagesProcessed++;
     await updateHeartbeat();
+
+    if (reachedOldContacts) {
+      console.log(`[process-jobs:contacts] Reached old contacts at page ${currentPage}, stopping.`);
+      break;
+    }
 
     const hasNextPage = pages?.next != null && pages.next !== '';
     if (!hasNextPage) break;
@@ -366,6 +383,10 @@ async function handleIngestHistorical(
   let pagesProcessed = 0;
   let totalPagesCount = (progress.total_pages as number) || 0;
 
+  // Incremental: skip conversations older than since_timestamp
+  const sinceTs = (job.payload as any)?.since_timestamp;
+  const sinceUnix = sinceTs ? Math.floor(new Date(sinceTs).getTime() / 1000) : 0;
+
   while (pagesProcessed < MAX_PAGES_PER_RUN) {
     const convosResponse = await gistGetWithRetry<GistConversationsResponse>(
       apiKey,
@@ -377,11 +398,17 @@ async function handleIngestHistorical(
     totalPagesCount = totalPages || totalPagesCount;
     const hasNextPage = !!convosResponse.pages?.next;
 
-    console.log(`[process-jobs:history] Page ${currentPage}/${totalPagesCount} — ${conversations.length} convos`);
+    console.log(`[process-jobs:history] Page ${currentPage}/${totalPagesCount} — ${conversations.length} convos (since=${sinceTs ?? 'full'})`);
     conversationsFetched += conversations.length;
     pagesProcessed++;
 
+    let reachedOldData = false;
     for (const convo of conversations) {
+      // Break entirely when we hit conversations older than our last sync
+      if (sinceUnix > 0 && convo.updated_at < sinceUnix) {
+        reachedOldData = true;
+        break;
+      }
       try {
         let msgPage = 1;
         let msgHasMore = true;
@@ -459,6 +486,11 @@ async function handleIngestHistorical(
 
     await updateHeartbeat();
 
+    if (reachedOldData) {
+      console.log(`[process-jobs:history] Reached old data at page ${currentPage}, stopping.`);
+      break;
+    }
+
     if (hasNextPage) {
       currentPage++;
       if (pagesProcessed >= MAX_PAGES_PER_RUN) { hasMore = true; break; }
@@ -506,19 +538,17 @@ Deno.serve(async (req) => {
     // 1. Reset orphan jobs (running > 5min without heartbeat)
     const { data: orphans } = await supaAdmin
       .from('sync_jobs')
-      .update({ status: 'pending' })
+      .select('id, retry_count')
       .eq('status', 'running')
-      .lt('heartbeat_at', new Date(Date.now() - 5 * 60 * 1000).toISOString())
-      .select('id');
+      .lt('heartbeat_at', new Date(Date.now() - 5 * 60 * 1000).toISOString());
 
     if (orphans && orphans.length > 0) {
       console.log(`[process-jobs] Reset ${orphans.length} orphan job(s)`);
-      // Increment retry_count for orphans
       for (const o of orphans) {
-        await supaAdmin.rpc('increment_retry', { job_id: o.id }).catch(() => {
-          // Fallback: direct update
-          supaAdmin.from('sync_jobs').update({ retry_count: supaAdmin.sql`retry_count + 1` }).eq('id', o.id);
-        });
+        await supaAdmin.from('sync_jobs').update({
+          status: 'pending',
+          retry_count: (o.retry_count ?? 0) + 1,
+        }).eq('id', o.id);
       }
     }
 
@@ -612,12 +642,20 @@ Deno.serve(async (req) => {
         }).eq('id', job.id);
       }
     } else if (result.has_more) {
-      // More work to do — back to pending for next cron tick
+      // More work to do — back to pending, then auto-chain
       await supaAdmin.from('sync_jobs').update({
         status: 'pending',
         heartbeat_at: null,
         progress: result.progress,
       }).eq('id', job.id);
+
+      // Auto-chain: fire-and-forget to process next batch immediately
+      const selfUrl = `${supabaseUrl}/functions/v1/process-jobs`;
+      fetch(selfUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}` },
+        body: JSON.stringify({}),
+      }).catch(() => {}); // ignore errors, pg_cron is the safety net
     } else {
       // Completed
       await supaAdmin.from('sync_jobs').update({
