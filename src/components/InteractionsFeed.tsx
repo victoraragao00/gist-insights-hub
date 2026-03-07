@@ -505,8 +505,8 @@ export const InteractionsFeed = ({ clientId }: { clientId: string }) => {
         {/* Conversation list */}
         <div
           className={cn(
-            "flex-1 min-w-0 overflow-hidden",
-            selectedConversation && !isMobile ? "border-r border-border" : ""
+            "min-w-0 overflow-hidden transition-all duration-200",
+            selectedConversation && !isMobile ? "w-[320px] shrink-0 border-r border-border" : "flex-1"
           )}
         >
           <ScrollArea className="h-full">
