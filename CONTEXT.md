@@ -11,8 +11,8 @@
 | 0 | Auth (signup/login, RLS) | Concluído |
 | 1 | Modelo de dados CX (clients, participants, interactions, sync_jobs) | Concluído |
 | 2 | Integrações Gist (proxy, bindings, discover, confirm-mapping) | Concluído |
-| 3 | Sync Engine (enqueue + process-jobs worker) | Concluído — issues de refinamento abertas |
-| 4 | Classificação IA (classify_batch via Gemini/Claude) | Concluído — safety filter resolvido |
+| 3 | Sync Engine (enqueue + process-jobs worker) | Concluído |
+| 4 | Classificação IA (classify_batch via Gemini/Claude) | Concluído |
 | 5 | Dashboard e KPIs | Em progresso — KPIs live do Gist funcionais |
 | 6 | Auditorias e Alertas | Placeholder |
 | 7 | Insights IA avançados | Placeholder |
@@ -44,7 +44,10 @@
 ### IA / Classificação
 - **Primária:** `gemini-2.5-flash` via `GEMINI_API_KEY`
 - **Fallback:** `claude-sonnet-4` via `CLAUDE_API_KEY`
-- **Safety filter (resolvido issue #5):** Quando Gemini bloqueia por safety, marca com defaults (`gemini-safety-default`) em vez de gastar chamada no Claude.
+- **Safety filter:** Quando Gemini bloqueia por safety, marca com defaults (`gemini-safety-default`) em vez de gastar chamada no Claude.
+- **Timeout:** 30s Gemini, 45s Claude via `AbortSignal.timeout()`
+- **JSON recovery:** `parseWithRecovery()` recupera arrays truncados antes de cair no fallback
+- **Auto-chain limit:** `MAX_BATCHES_PER_JOB = 50` (1.000 interações/job), depois o cron cria novo
 
 ### Colaboração Claude Code + Lovable
 - **Claude Code:** code reviews, refactors, testes, docs, scripts utilitários
