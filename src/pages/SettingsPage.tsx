@@ -262,6 +262,18 @@ const SettingsPage = () => {
     },
   });
 
+  // Realtime: auto-refresh job history on INSERT/UPDATE
+  useEffect(() => {
+    if (!user?.id) return;
+    const channel = supabase
+      .channel('job-history-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sync_jobs' }, () => {
+        queryClient.invalidateQueries({ queryKey: ["sync_jobs_history"] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user?.id, queryClient]);
+
   // Pre-select active clients on mount
   useEffect(() => {
     if (syncClients.length > 0 && selectedClientIds.length === 0) {
