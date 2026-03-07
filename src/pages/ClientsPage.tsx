@@ -119,6 +119,26 @@ function computeStats(interactions: InteractionRow[], clientId: string): ClientS
   return { total_30d: total, dominant_tone: dominant, health_pct: healthPct, last_contact: lastContact };
 }
 
+// ── Sort Button ──
+
+type SortCol = "name" | "total" | "tone" | "health" | "last_contact";
+
+function SortButton({ label, col, current, dir, onClick, className = "" }: {
+  label: string; col: SortCol; current: SortCol; dir: "asc" | "desc"; onClick: (col: SortCol) => void; className?: string;
+}) {
+  const active = current === col;
+  const Icon = active ? (dir === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown;
+  return (
+    <button
+      className={`inline-flex items-center gap-1 hover:text-foreground transition-colors ${className}`}
+      onClick={(e) => { e.stopPropagation(); onClick(col); }}
+    >
+      {label}
+      <Icon className={`h-3 w-3 ${active ? "text-foreground" : "text-muted-foreground/50"}`} />
+    </button>
+  );
+}
+
 // ── Component ──
 
 const ClientsPage = () => {
