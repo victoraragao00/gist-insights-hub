@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -15,7 +16,7 @@ import {
 } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Users, MessageCircle, Phone, Hash, Mail, Mic, Download, Loader2, Check, Upload, MoreHorizontal, RefreshCw, X, ShieldAlert, RotateCcw, Clock, CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
+import { Users, MessageCircle, Phone, Hash, Mail, Mic, Download, Loader2, Check, Upload, MoreHorizontal, RefreshCw, X, ShieldAlert, RotateCcw, Clock, CheckCircle2, XCircle, AlertTriangle, CalendarClock } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger,
@@ -408,6 +409,9 @@ const SettingsPage = () => {
               Última sincronização completa: {formatSyncDate(lastSyncRaw)}
             </div>
           )}
+
+          {/* Auto-sync schedule */}
+          <AutoSyncCard />
 
           {/* Step 1 — What to sync */}
           <div className="space-y-3">
