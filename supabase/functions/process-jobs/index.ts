@@ -488,6 +488,7 @@ async function handleIngestHistorical(
             classified_at: null,
             raw_payload: msg as unknown,
             attachments: msg.attachments ?? [],
+            conversation_id: convo.id ? String(convo.id) : null,
           };
         });
 
