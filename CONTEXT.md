@@ -28,7 +28,7 @@
 | #4 | Realtime INSERT no ClientContext + Realtime job history | Resolvido — SettingsPage OK, INSERT com guard | Lovable |
 | #5 | classify_batch safety filter deve marcar defaults, não fallback Claude | Resolvido — marca defaults com `gemini-safety-default` | Lovable |
 | #6 | INSERT listener deve filtrar por activeJobIds | Resolvido — guard `activeJobIds.length === 0` | Lovable |
-| #7 | INSERT listener tem lógica invertida — tracks unknown jobs | Aberto | Lovable |
+| #7 | INSERT listener tem lógica invertida — tracks unknown jobs | Resolvido (commit `f363d89`) | Lovable |
 
 ---
 
@@ -55,7 +55,6 @@
 
 ## Próximos Passos Prioritários
 
-1. **Lovable:** Resolver issue #7 (INSERT listener lógica invertida — baixa prioridade, impacto mínimo)
-2. **Geral:** Verificar se `GEMINI_API_KEY` está configurada nos secrets do Supabase (estava falhando)
-3. **Geral:** Rodar classify_batch até zerar backlog de interações não classificadas
-4. **Fase 5:** Avançar dashboard com dados classificados (temas, tons, sentimentos)
+1. **Geral:** Verificar se `GEMINI_API_KEY` está configurada nos secrets do Supabase (estava falhando)
+2. **Geral:** Rodar classify_batch até zerar backlog de interações não classificadas
+3. **Fase 5:** Avançar dashboard com dados classificados (temas, tons, sentimentos)
