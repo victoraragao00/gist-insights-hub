@@ -585,7 +585,25 @@ Respond ONLY with the JSON array, no markdown or explanation.`;
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contents: [{ parts: [{ text: `${systemPrompt}\n\nInteractions:\n${userPrompt}` }] }],
-            generationConfig: { responseMimeType: 'application/json' },
+            generationConfig: {
+              responseMimeType: 'application/json',
+              responseSchema: {
+                type: 'ARRAY',
+                items: {
+                  type: 'OBJECT',
+                  properties: {
+                    id: { type: 'STRING' },
+                    theme: { type: 'STRING', enum: [...VALID_THEMES] },
+                    theme_detail: { type: 'STRING' },
+                    tone: { type: 'STRING', enum: ['ok', 'atencao', 'alerta', 'critico'] },
+                    tone_detail: { type: 'STRING' },
+                    sentiment: { type: 'NUMBER' },
+                    is_out_of_scope: { type: 'BOOLEAN' },
+                  },
+                  required: ['id', 'theme', 'tone', 'sentiment'],
+                },
+              },
+            },
           }),
         },
       );
