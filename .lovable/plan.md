@@ -1,31 +1,39 @@
 
-# Sincronização Automática Agendada — IMPLEMENTADO
 
-## O que foi feito
+## Correção: Progress Acumulativo no `handleClassifyBatch`
 
-### 1. Tabela `app_settings`
-- Criada com RLS (SELECT/UPDATE para authenticated)
-- Flag `auto_sync_enabled = true` inserida
+### Análise
 
-### 2. RLS para jobs automáticos
-- `sync_jobs_automated_select`: jobs sem `created_by` visíveis a qualquer autenticado
-- `sync_jobs_automated_update`: qualquer autenticado pode cancelar jobs automáticos travados
+O main loop (L644-650) persiste `result.progress` diretamente no job a cada auto-chain. Se o handler retornar `{ classified: 5 }` em cada batch, o progress será sobrescrito — perdendo o total acumulado.
 
-### 3. Edge Function `schedule-sync`
-- Verifica `auto_sync_enabled` antes de criar jobs
-- Busca `since_timestamp` do último job concluído de cada tipo
-- Chama `create_job_if_none_active` com `_created_by = NULL`
-- Fire-and-forget para `process-jobs`
+Os outros handlers (`handleSyncContacts`, `handleIngestHistorical`) não têm esse problema porque usam contadores diferentes ou completam em um batch. Para `classify_batch` com ~1,470 batches, a acumulação é essencial.
 
-### 4. Crons (pg_cron, horários em UTC ajustados para BRT)
-| Nome | Schedule (UTC) | BRT | Função |
-|------|---------------|-----|--------|
-| `schedule-sync-bh` | `*/5 11-21 * * 1-5` | 08:00–18:55 Seg-Sex | schedule-sync |
-| `schedule-sync-eod` | `59 2 * * 2-6` | 23:59 Seg-Sex | schedule-sync |
-| `process-jobs-fallback` | `*/3 11-22 * * 1-5` | 08:00–19:00 Seg-Sex | process-jobs |
+### Correção no handler
 
-Cron antigo `process-jobs` (`*/2 * * * *` 24/7) removido.
+Dentro de `handleClassifyBatch`, antes do return:
 
-### 5. UI — Toggle na SettingsPage
-- Card "Agendamento Automático" com Switch, Badge de status, info estática
-- Lê/escreve `app_settings.auto_sync_enabled`
+```typescript
+const previousClassified = (job.progress as any)?.classified ?? 0;
+
+return {
+  has_more: rows.length === 20,
+  progress: {
+    classified: previousClassified + classifiedCount,
+    model_used,
+  },
+};
+```
+
+Isso garante que cada batch soma ao total anterior. O main loop persiste `result.progress` no job (L649), e na próxima iteração o handler lê `job.progress.classified` já acumulado.
+
+### Nenhuma outra alteração
+
+O main loop não precisa de mudança — ele já persiste `result.progress` tal qual. A responsabilidade de acumular fica no handler.
+
+### Plano completo atualizado
+
+Incorporar esta correção ao `handleClassifyBatch` na implementação. Os 3 arquivos a alterar permanecem os mesmos:
+
+1. `process-jobs/index.ts` — novo `handleClassifyBatch` (com progress acumulativo) + case no switch
+2. `schedule-sync/index.ts` — adicionar `'classify_batch'` ao array
+
