@@ -216,6 +216,7 @@ export type Database = {
           classified_at: string | null
           client_id: string
           content: string | null
+          conversation_id: string | null
           created_at: string | null
           external_id: string | null
           id: string
@@ -244,6 +245,7 @@ export type Database = {
           classified_at?: string | null
           client_id: string
           content?: string | null
+          conversation_id?: string | null
           created_at?: string | null
           external_id?: string | null
           id?: string
@@ -272,6 +274,7 @@ export type Database = {
           classified_at?: string | null
           client_id?: string
           content?: string | null
+          conversation_id?: string | null
           created_at?: string | null
           external_id?: string | null
           id?: string
