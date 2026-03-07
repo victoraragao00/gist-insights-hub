@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Plus, MoreHorizontal, Search } from "lucide-react";
+import { Plus, MoreHorizontal, Search, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
@@ -125,6 +125,17 @@ const ClientsPage = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
+  const [sortKey, setSortKey] = useState<"name" | "total" | "tone" | "health" | "last_contact">("last_contact");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+
+  const toggleSort = useCallback((key: typeof sortKey) => {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir(key === "name" ? "asc" : "desc");
+    }
+  }, [sortKey]);
 
   const thirtyDaysAgo = useMemo(
     () => new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
@@ -162,18 +173,38 @@ const ClientsPage = () => {
     },
   });
 
-  // Compute stats per client and sort by last interaction DESC
+  const TONE_RANK: Record<string, number> = { ok: 0, atencao: 1, alerta: 2, critico: 3 };
+
   const clientsWithStats = useMemo(() => {
     const q = search.toLowerCase().trim();
-    return clients
+    const list = clients
       .map((c) => ({ ...c, stats: computeStats(interactions, c.id) }))
-      .filter((c) => !q || c.name.toLowerCase().includes(q) || c.slug.toLowerCase().includes(q))
-      .sort((a, b) => {
-        const aDate = a.stats.last_contact ?? "";
-        const bDate = b.stats.last_contact ?? "";
-        return bDate.localeCompare(aDate);
-      });
-  }, [clients, interactions, search]);
+      .filter((c) => !q || c.name.toLowerCase().includes(q) || c.slug.toLowerCase().includes(q));
+
+    list.sort((a, b) => {
+      let cmp = 0;
+      switch (sortKey) {
+        case "name":
+          cmp = a.name.localeCompare(b.name, "pt-BR");
+          break;
+        case "total":
+          cmp = a.stats.total_30d - b.stats.total_30d;
+          break;
+        case "tone":
+          cmp = (TONE_RANK[a.stats.dominant_tone] ?? 0) - (TONE_RANK[b.stats.dominant_tone] ?? 0);
+          break;
+        case "health":
+          cmp = a.stats.health_pct - b.stats.health_pct;
+          break;
+        case "last_contact":
+          cmp = (a.stats.last_contact ?? "").localeCompare(b.stats.last_contact ?? "");
+          break;
+      }
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+
+    return list;
+  }, [clients, interactions, search, sortKey, sortDir]);
 
   return (
     <div className="space-y-6">
@@ -222,12 +253,22 @@ const ClientsPage = () => {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Cliente</TableHead>
+                <TableHead>
+                  <SortButton label="Cliente" col="name" current={sortKey} dir={sortDir} onClick={toggleSort} />
+                </TableHead>
                 <TableHead>Canais</TableHead>
-                <TableHead className="text-right">Interações (30d)</TableHead>
-                <TableHead>Tom predominante</TableHead>
-                <TableHead>Saúde</TableHead>
-                <TableHead>Último contato</TableHead>
+                <TableHead className="text-right">
+                  <SortButton label="Interações (30d)" col="total" current={sortKey} dir={sortDir} onClick={toggleSort} className="justify-end" />
+                </TableHead>
+                <TableHead>
+                  <SortButton label="Tom predominante" col="tone" current={sortKey} dir={sortDir} onClick={toggleSort} />
+                </TableHead>
+                <TableHead>
+                  <SortButton label="Saúde" col="health" current={sortKey} dir={sortDir} onClick={toggleSort} />
+                </TableHead>
+                <TableHead>
+                  <SortButton label="Último contato" col="last_contact" current={sortKey} dir={sortDir} onClick={toggleSort} />
+                </TableHead>
                 <TableHead className="w-10" />
               </TableRow>
             </TableHeader>
