@@ -822,7 +822,7 @@ Retorne apenas o JSON array. Sem texto adicional, sem markdown, sem explicaçõe
   if (geminiKey) {
     try {
       const geminiRes = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${geminiKey}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -875,7 +875,7 @@ Retorne apenas o JSON array. Sem texto adicional, sem markdown, sem explicaçõe
           const text = candidate?.content?.parts?.[0]?.text;
           if (text) {
             classifications = parseWithRecovery(text);
-            modelUsed = 'gemini-2.5-flash';
+            modelUsed = 'gemini-2.5-pro';
             console.log(`[process-jobs:classify] Gemini returned ${classifications?.length ?? 0} classifications`);
           } else {
             console.warn(`[process-jobs:classify] Gemini returned no text. Candidate: ${JSON.stringify(candidate)}`);
