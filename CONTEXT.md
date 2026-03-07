@@ -12,7 +12,7 @@
 | 1 | Modelo de dados CX (clients, participants, interactions, sync_jobs) | Concluído |
 | 2 | Integrações Gist (proxy, bindings, discover, confirm-mapping) | Concluído |
 | 3 | Sync Engine (enqueue + process-jobs worker) | Concluído — issues de refinamento abertas |
-| 4 | Classificação IA (classify_batch via Gemini/Claude) | Concluído — safety filter pendente (issue #5) |
+| 4 | Classificação IA (classify_batch via Gemini/Claude) | Concluído — safety filter resolvido |
 | 5 | Dashboard e KPIs | Em progresso — KPIs live do Gist funcionais |
 | 6 | Auditorias e Alertas | Placeholder |
 | 7 | Insights IA avançados | Placeholder |
@@ -24,10 +24,11 @@
 | # | Issue | Status | Responsável |
 |---|-------|--------|-------------|
 | #2 | gist-proxy build error (`unknown` error type) | Resolvido (commit `1f03c50`) | Lovable |
-| #3 | Gemini logging + safety filter | Parcialmente resolvido — logging OK, safety filter errado | Lovable |
-| #4 | Realtime INSERT no ClientContext + Realtime job history | Parcialmente resolvido — SettingsPage OK, INSERT sem filtro | Lovable |
+| #3 | Gemini logging + safety filter | Resolvido (commits `81ccf37` + `5b54f46`) | Lovable |
+| #4 | Realtime INSERT no ClientContext + Realtime job history | Resolvido — SettingsPage OK, INSERT com guard | Lovable |
 | #5 | classify_batch safety filter deve marcar defaults, não fallback Claude | Resolvido — marca defaults com `gemini-safety-default` | Lovable |
-| #6 | INSERT listener deve filtrar por activeJobIds | Resolvido — só rastreia INSERTs quando há sync ativo | Lovable |
+| #6 | INSERT listener deve filtrar por activeJobIds | Resolvido — guard `activeJobIds.length === 0` | Lovable |
+| #7 | INSERT listener tem lógica invertida — tracks unknown jobs | Aberto | Lovable |
 
 ---
 
@@ -42,7 +43,7 @@
 ### IA / Classificação
 - **Primária:** `gemini-2.5-flash` via `GEMINI_API_KEY`
 - **Fallback:** `claude-sonnet-4` via `CLAUDE_API_KEY`
-- **Safety filter (pendente issue #5):** Quando Gemini bloqueia por safety, marcar com defaults em vez de gastar chamada no Claude.
+- **Safety filter (resolvido issue #5):** Quando Gemini bloqueia por safety, marca com defaults (`gemini-safety-default`) em vez de gastar chamada no Claude.
 
 ### Colaboração Claude Code + Lovable
 - **Claude Code:** code reviews, refactors, testes, docs, scripts utilitários
@@ -54,8 +55,7 @@
 
 ## Próximos Passos Prioritários
 
-1. **Lovable:** Resolver issues #5 e #6 (safety filter + INSERT filter)
-2. **Lovable:** Deploy das edge functions corrigidas (`process-jobs`)
-3. **Geral:** Verificar se `GEMINI_API_KEY` está configurada nos secrets do Supabase (estava falhando)
-4. **Geral:** Rodar classify_batch até zerar backlog de interações não classificadas
-5. **Fase 5:** Avançar dashboard com dados classificados (temas, tons, sentimentos)
+1. **Lovable:** Resolver issue #7 (INSERT listener lógica invertida — baixa prioridade, impacto mínimo)
+2. **Geral:** Verificar se `GEMINI_API_KEY` está configurada nos secrets do Supabase (estava falhando)
+3. **Geral:** Rodar classify_batch até zerar backlog de interações não classificadas
+4. **Fase 5:** Avançar dashboard com dados classificados (temas, tons, sentimentos)
