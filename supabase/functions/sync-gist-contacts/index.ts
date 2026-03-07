@@ -23,7 +23,7 @@ Deno.serve(async (req) => {
 
     // Auth check
     const authHeader = req.headers.get('Authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
+    if (!authHeader) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -33,15 +33,14 @@ Deno.serve(async (req) => {
       global: { headers: { Authorization: authHeader } },
     });
 
-    const token = authHeader.replace('Bearer ', '');
-    const { data: claimsData, error: claimsError } = await supaAuth.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims) {
+    const { data: authData, error: authError } = await supaAuth.auth.getUser();
+    if (authError || !authData.user) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const callerUserId = claimsData.claims.sub as string;
+    const callerUserId = authData.user.id;
 
     // Parse body for payload params
     let payload: Record<string, unknown> = {};
@@ -50,7 +49,6 @@ Deno.serve(async (req) => {
       if (body.skip_inactivation) payload.skip_inactivation = true;
     } catch { /* no body */ }
 
-    // Create job
     const supaAdmin = createClient(supabaseUrl, serviceKey);
 
     // Incremental: get last completed sync timestamp
@@ -66,23 +64,23 @@ Deno.serve(async (req) => {
     if (lastJob?.completed_at) {
       payload.since_timestamp = lastJob.completed_at;
     }
-    const { data: job, error: jobErr } = await supaAdmin
-      .from('sync_jobs')
-      .insert({
-        type: 'sync_contacts',
-        status: 'pending',
-        created_by: callerUserId,
-        payload,
-        progress: {},
-      })
-      .select('id')
-      .single();
 
-    if (jobErr) throw new Error('Failed to create job: ' + jobErr.message);
+    // Atomic: create job only if none active (FOR UPDATE SKIP LOCKED)
+    const { data: result, error: rpcErr } = await supaAdmin.rpc('create_job_if_none_active', {
+      _type: 'sync_contacts',
+      _created_by: callerUserId,
+      _payload: payload,
+    });
 
-    console.log(`[sync-gist-contacts] Created job ${job.id} for user ${callerUserId}`);
+    if (rpcErr) throw new Error('Failed to create job: ' + rpcErr.message);
 
-    return new Response(JSON.stringify({ success: true, job_id: job.id }), {
+    const row = Array.isArray(result) ? result[0] : result;
+    const jobId = row.job_id;
+    const alreadyRunning = row.already_running;
+
+    console.log(`[sync-gist-contacts] ${alreadyRunning ? 'Reused existing' : 'Created'} job ${jobId} for user ${callerUserId}`);
+
+    return new Response(JSON.stringify({ success: true, job_id: jobId, already_running: alreadyRunning }), {
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error) {
