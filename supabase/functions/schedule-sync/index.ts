@@ -46,7 +46,7 @@ Deno.serve(async (req) => {
     const results: Record<string, unknown> = {};
 
     // 2. Create jobs for each type
-    const jobTypes = ['sync_contacts', 'ingest_historical'] as const;
+    const jobTypes = ['sync_contacts', 'ingest_historical', 'classify_batch'] as const;
 
     for (const jobType of jobTypes) {
       // Get since_timestamp from last completed job of this type
