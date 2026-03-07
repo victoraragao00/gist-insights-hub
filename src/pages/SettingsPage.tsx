@@ -55,11 +55,16 @@ interface SyncClient {
 function formatSyncDate(dateStr: string | null): string {
   if (!dateStr) return "—";
   const d = new Date(dateStr);
-  const time = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
   const now = new Date();
-  const diffDays = Math.floor((now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
-  if (diffDays === 0) return `Hoje, ${time}`;
-  if (diffDays === 1) return `Ontem, ${time}`;
+  const time = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+
+  const isSameDay = (a: Date, b: Date) =>
+    a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+
+  if (isSameDay(d, now)) return `Hoje, ${time}`;
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (isSameDay(d, yesterday)) return `Ontem, ${time}`;
   return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }) + `, ${time}`;
 }
 
