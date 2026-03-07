@@ -80,6 +80,19 @@ Deno.serve(async (req) => {
 
     console.log(`[ingest-gist-historical] ${alreadyRunning ? 'Reused existing' : 'Created'} job ${jobId} for user ${callerUserId}`);
 
+    // Fire-and-forget: trigger process-jobs immediately
+    if (!alreadyRunning) {
+      fetch(`${supabaseUrl}/functions/v1/process-jobs`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${anonKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({}),
+      }).catch(() => { /* fire and forget */ });
+      console.log('[ingest-gist-historical] Triggered process-jobs');
+    }
+
     return new Response(JSON.stringify({ success: true, job_id: jobId, already_running: alreadyRunning }), {
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
