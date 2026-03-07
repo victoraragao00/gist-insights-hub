@@ -1,42 +1,97 @@
 
 
-# Wizard de Contatos Gist: Separar em 2 etapas
+## Guarda Atômica contra Duplicatas
 
-## Problema
-Atualmente, o Step A ("Discovery") mostra tudo junto: a lista de domínios/empresas com as opções de vincular/criar/ignorar E os contatos individuais de cada grupo. Isso é confuso quando há muitos domínios com dezenas de contatos.
+A observação está correta. Um SELECT simples seguido de INSERT tem race condition — dois requests simultâneos podem ambos ver "nenhum job ativo" e criar dois jobs.
 
-## Nova estrutura do wizard
+### Solução: RPC com INSERT ... ON CONFLICT ou CTE atômico
 
-### Step 1 — "Clientes" (novo)
-Lista apenas os **domínios/empresas** encontrados. Para cada grupo, o usuário escolhe:
-- **Vincular a cliente existente** (select de clientes)
-- **Criar novo cliente** (input de nome)
-- **Ignorar** (novo — não importa contatos desse domínio)
+Criar uma database function `create_job_if_none_active` que faz check + insert numa única operação atômica usando `FOR UPDATE SKIP LOCKED`:
 
-Sem tabela de contatos. Apenas mostra o domínio, nome da empresa (se houver) e quantidade de contatos como informação contextual (ex: "nkstore.com.br — 42 contatos").
+```sql
+CREATE OR REPLACE FUNCTION public.create_job_if_none_active(
+  _type job_type,
+  _created_by uuid,
+  _payload jsonb DEFAULT '{}'
+)
+RETURNS TABLE(job_id uuid, already_running boolean)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $$
+DECLARE
+  _existing_id uuid;
+  _new_id uuid;
+BEGIN
+  -- Lock any active job of this type to prevent race condition
+  SELECT id INTO _existing_id
+  FROM sync_jobs
+  WHERE type = _type AND status IN ('pending', 'running')
+  LIMIT 1
+  FOR UPDATE SKIP LOCKED;
 
-Botão "Próximo" avança ao Step 2 (filtrando apenas os grupos não-ignorados).
+  IF _existing_id IS NOT NULL THEN
+    job_id := _existing_id;
+    already_running := true;
+    RETURN NEXT;
+    RETURN;
+  END IF;
 
-### Step 2 — "Contatos" (novo)
-Para cada grupo **não ignorado**, mostra a tabela de contatos com checkbox individual para selecionar quais contatos importar. Também mostra a seção de Teammates.
+  -- No active job found — create one
+  INSERT INTO sync_jobs (type, status, created_by, payload, progress)
+  VALUES (_type, 'pending', _created_by, _payload, '{}')
+  RETURNING id INTO _new_id;
 
-Botão "Confirmar Vínculos" avança ao Step 3 (atual "confirmation").
+  job_id := _new_id;
+  already_running := false;
+  RETURN NEXT;
+END;
+$$;
+```
 
-### Step 3 — "Confirmação" (atual)
-Sem alterações significativas, apenas ajusta os contadores para refletir apenas os selecionados.
+### Mudanças nos Edge Functions
 
-### Step 4 — "Importação" (atual, só onboarding)
-Sem alterações.
+Ambos `ingest-gist-historical/index.ts` e `sync-gist-contacts/index.ts` substituem o bloco SELECT lastJob + INSERT por:
 
-## Alterações em `src/pages/ClientsPage.tsx`
+```typescript
+// Incremental: get since_timestamp
+const { data: lastJob } = await supaAdmin
+  .from('sync_jobs')
+  .select('completed_at')
+  .eq('type', 'ingest_historical')
+  .eq('status', 'completed')
+  .order('completed_at', { ascending: false })
+  .limit(1)
+  .single();
 
-1. Alterar `WizardStep` para `"clients" | "contacts" | "confirmation" | "import"`
-2. Step inicial passa de `"discovery"` para `"clients"`
-3. Adicionar opção `"ignore"` ao `GroupMapping.type` (tipo `"existing" | "new" | "ignore"`)
-4. **Step "clients"**: renderiza cards compactos por domínio — só domínio, empresa, count, e select (vincular/criar/ignorar) + input/select conforme tipo
-5. **Step "contacts"**: para cada grupo não-ignorado, mostra tabela de contatos com checkboxes. Novo state `selectedContacts: Map<number, boolean>` para controle individual. Também mostra teammates aqui.
-6. Ajustar `handleConfirmMappings` para filtrar apenas contatos selecionados e grupos não-ignorados
-7. Ajustar `summaryContactCount` para contar apenas selecionados
+if (lastJob?.completed_at) {
+  payload.since_timestamp = lastJob.completed_at;
+}
 
-Nenhum outro arquivo será alterado.
+// Atomic: create job only if none active
+const { data: result, error: rpcErr } = await supaAdmin.rpc('create_job_if_none_active', {
+  _type: 'ingest_historical',  // ou 'sync_contacts'
+  _created_by: callerUserId,
+  _payload: payload,
+});
+
+if (rpcErr) throw new Error('Failed: ' + rpcErr.message);
+
+const { job_id, already_running } = result[0];
+```
+
+Se `already_running === true`, retorna o job existente sem criar novo. Zero race condition.
+
+### Frontend: desabilitar botão
+
+`SettingsPage.tsx` — desabilitar os botões "Sincronizar" quando `syncState.syncing === true`.
+
+### Arquivos modificados
+
+| Arquivo | Mudança |
+|---------|---------|
+| Migration SQL | Criar function `create_job_if_none_active` |
+| `supabase/functions/ingest-gist-historical/index.ts` | Usar RPC atômico |
+| `supabase/functions/sync-gist-contacts/index.ts` | Usar RPC atômico |
+| `src/pages/SettingsPage.tsx` | Desabilitar botões durante sync |
 
