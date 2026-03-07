@@ -64,12 +64,16 @@ function formatLastContact(dateStr: string | null): string {
   if (!dateStr) return "—";
   const d = new Date(dateStr);
   const now = new Date();
-  const diffMs = now.getTime() - d.getTime();
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
   const time = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 
-  if (diffDays === 0) return `Hoje, ${time}`;
-  if (diffDays === 1) return `Ontem, ${time}`;
+  const todayStr = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
+  const dStr = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const yesterdayStr = `${yesterday.getFullYear()}-${yesterday.getMonth()}-${yesterday.getDate()}`;
+
+  if (dStr === todayStr) return `Hoje, ${time}`;
+  if (dStr === yesterdayStr) return `Ontem, ${time}`;
   const day = d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
   return `${day}, ${time}`;
 }
