@@ -606,6 +606,7 @@ Respond ONLY with the JSON array, no markdown or explanation.`;
 
   let classifications: any[] | null = null;
   let modelUsed = '';
+  let fallbackReason: string | null = null;
 
   // Try Gemini first
   if (geminiKey) {
@@ -615,7 +616,7 @@ Respond ONLY with the JSON array, no markdown or explanation.`;
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          signal: AbortSignal.timeout(30_000),
+          signal: AbortSignal.timeout(55_000),
           body: JSON.stringify({
             contents: [{ parts: [{ text: `${systemPrompt}\n\nInteractions:\n${userPrompt}` }] }],
             generationConfig: {
@@ -673,10 +674,13 @@ Respond ONLY with the JSON array, no markdown or explanation.`;
         }
       } else {
         const errBody = await geminiRes.text();
+        fallbackReason = `gemini_http_${geminiRes.status}`;
         console.error(`[process-jobs:classify] Gemini HTTP ${geminiRes.status}: ${errBody.substring(0, 500)}`);
       }
     } catch (err) {
-      console.error(`[process-jobs:classify] Gemini exception: ${err instanceof Error ? err.message : err}`);
+      const msg = err instanceof Error ? err.message : String(err);
+      fallbackReason = msg.includes('timed out') ? 'gemini_timeout' : `gemini_exception: ${msg.substring(0, 100)}`;
+      console.error(`[process-jobs:classify] Gemini exception: ${msg}`);
     }
   }
 
@@ -768,12 +772,20 @@ Respond ONLY with the JSON array, no markdown or explanation.`;
 
   console.log(`[process-jobs:classify] Classified ${classifiedCount}/${rows.length} using ${modelUsed} (total: ${previousClassified + classifiedCount})`);
 
+  // Track fallback stats cumulatively
+  const prevFallbacks = (job.progress as any)?.fallback_reasons ?? {};
+  if (fallbackReason) {
+    prevFallbacks[fallbackReason] = (prevFallbacks[fallbackReason] ?? 0) + 1;
+  }
+
   return {
     has_more: rows.length === CLASSIFY_BATCH_SIZE,
     progress: {
       classified: previousClassified + classifiedCount,
       batches_processed: batchesProcessed,
       model_used: modelUsed,
+      ...(fallbackReason ? { last_fallback_reason: fallbackReason } : {}),
+      fallback_reasons: prevFallbacks,
     },
   };
 }
