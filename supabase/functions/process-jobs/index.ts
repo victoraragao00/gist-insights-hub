@@ -488,6 +488,7 @@ async function handleIngestHistorical(
             classified_at: null,
             raw_payload: msg as unknown,
             attachments: msg.attachments ?? [],
+            conversation_id: convo.id ? String(convo.id) : null,
           };
         });
 
@@ -539,9 +540,9 @@ async function handleIngestHistorical(
   };
 }
 
-// ── Classify Batch Handler ──
+// ── Classify Batch Handler (conversation-level) ──
 
-const CLASSIFY_BATCH_SIZE = 20;
+const CLASSIFY_CONV_BATCH_SIZE = 10; // 10 conversations per batch
 
 async function handleClassifyBatch(
   supaAdmin: any,
@@ -555,56 +556,99 @@ async function handleClassifyBatch(
     return { has_more: false, progress: {}, error: 'Missing GEMINI_API_KEY and CLAUDE_API_KEY' };
   }
 
-  // Fetch unclassified interactions
-  const { data: rows, error: fetchErr } = await supaAdmin
+  // Auto-chain limit
+  const previousProgress = job.progress as Record<string, unknown>;
+  const batchesProcessed = ((previousProgress?.batches_processed as number) ?? 0) + 1;
+  if (batchesProcessed > MAX_BATCHES_PER_JOB) {
+    console.log(`[process-jobs:classify] Hit MAX_BATCHES_PER_JOB (${MAX_BATCHES_PER_JOB}), letting cron create a new job.`);
+    return { has_more: false, progress: { ...previousProgress, batches_processed: batchesProcessed - 1 } };
+  }
+
+  // 1. Find conversations that have unclassified messages
+  const { data: convRows, error: convErr } = await supaAdmin
     .from('interactions')
-    .select('id, content, sender_side')
+    .select('conversation_id')
     .is('classified_at', null)
     .not('content', 'is', null)
     .neq('content', '')
+    .not('conversation_id', 'is', null)
     .gte('occurred_at', new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString())
     .order('occurred_at', { ascending: false })
-    .limit(CLASSIFY_BATCH_SIZE);
+    .limit(200);
 
-  if (fetchErr) {
-    return { has_more: false, progress: {}, error: `Fetch error: ${fetchErr.message}` };
+  if (convErr) {
+    return { has_more: false, progress: {}, error: `Fetch error: ${convErr.message}` };
   }
 
-  if (!rows || rows.length === 0) {
-    console.log('[process-jobs:classify] No unclassified interactions found');
-    return { has_more: false, progress: { classified: (job.progress as any)?.classified ?? 0, model_used: 'none' } };
+  const distinctConvIds = [...new Set((convRows ?? []).map((r: { conversation_id: string }) => r.conversation_id).filter(Boolean))];
+  const batchConvIds = distinctConvIds.slice(0, CLASSIFY_CONV_BATCH_SIZE);
+
+  if (batchConvIds.length === 0) {
+    console.log('[process-jobs:classify] No unclassified conversations found');
+    return { has_more: false, progress: { classified: (previousProgress?.classified as number) ?? 0, model_used: 'none' } };
   }
 
-  // Auto-chain limit
-  const batchesProcessed = ((job.progress as any)?.batches_processed ?? 0) + 1;
-  if (batchesProcessed > MAX_BATCHES_PER_JOB) {
-    console.log(`[process-jobs:classify] Hit MAX_BATCHES_PER_JOB (${MAX_BATCHES_PER_JOB}), letting cron create a new job.`);
-    return { has_more: false, progress: { ...(job.progress as any), batches_processed: batchesProcessed - 1 } };
+  console.log(`[process-jobs:classify] Processing ${batchConvIds.length} conversations (batch ${batchesProcessed}/${MAX_BATCHES_PER_JOB})`);
+
+  // 2. Fetch all messages for these conversations
+  const { data: allMessages, error: msgErr } = await supaAdmin
+    .from('interactions')
+    .select('id, content, sender_side, occurred_at, conversation_id')
+    .in('conversation_id', batchConvIds)
+    .not('content', 'is', null)
+    .order('occurred_at', { ascending: true });
+
+  if (msgErr) {
+    return { has_more: false, progress: {}, error: `Messages fetch error: ${msgErr.message}` };
   }
 
-  console.log(`[process-jobs:classify] Processing ${rows.length} interactions (batch ${batchesProcessed}/${MAX_BATCHES_PER_JOB})`);
+  // Group by conversation
+  const conversations = new Map<string, Array<{ id: string; content: string; sender_side: string; occurred_at: string; conversation_id: string }>>();
+  for (const msg of (allMessages ?? [])) {
+    if (!conversations.has(msg.conversation_id)) conversations.set(msg.conversation_id, []);
+    conversations.get(msg.conversation_id)!.push(msg);
+  }
 
+  // 3. Build prompt
   const VALID_THEMES = [
     'integracao_erp', 'agendamento', 'permissoes', 'cobranca_followup',
     'gestao_demandas', 'workflow', 'importacao_dados', 'intermediacao',
     'bugs', 'criacao_campos', 'treinamento', 'elogio', 'governanca', 'outro',
   ] as const;
 
-  const systemPrompt = `You are a customer interaction classifier for a B2B SaaS platform (fashion/textile industry). For each interaction, return a JSON array where each element has:
-- "id": the interaction UUID (copy exactly from input)
+  const systemPrompt = `You are a customer interaction classifier for a B2B SaaS platform (fashion/textile industry).
+
+You will receive CONVERSATIONS (groups of messages in chronological order). Classify each CONVERSATION as a whole — consider the full context of the thread, not individual messages in isolation.
+
+For each conversation, return a JSON array where each element has:
+- "conversation_id": the conversation ID (copy exactly from input)
 - "theme": MUST be one of these exact slugs: ${VALID_THEMES.map(t => `"${t}"`).join(', ')}
 - "theme_detail": a short description in Portuguese (max 50 chars) of the specific topic
 - "tone": MUST be one of: "ok", "atencao", "alerta", "critico"
 - "tone_detail": a short justification in Portuguese (max 80 chars) for the tone classification
 - "sentiment": a number from -1.0 (very negative) to 1.0 (very positive)
-- "is_out_of_scope": boolean, true if the message is automated/system/irrelevant (e.g. "joined the conversation", bot messages, empty messages)
+- "is_out_of_scope": boolean, true if the conversation is automated/system/irrelevant
 
-CRITICAL: The "theme" field MUST be exactly one of the listed slugs. Do NOT invent new slugs.
+IMPORTANT RULES:
+- Classify based on the OVERALL conversation context, not individual messages
+- Short messages like "Ok", "Cadê?", "Obrigado" in the context of a normal conversation should NOT elevate the tone to "atenção" or above
+- Only use "atencao"/"alerta"/"critico" when the conversation as a whole shows frustration, urgency, or conflict
+- The "theme" field MUST be exactly one of the listed slugs
+
 Respond ONLY with the JSON array, no markdown or explanation.`;
 
-  const userPrompt = JSON.stringify(rows.map((r: any) => ({ id: r.id, content: r.content, sender_side: r.sender_side })));
+  const conversationPayload = Array.from(conversations.entries()).map(([convId, msgs]) => ({
+    conversation_id: convId,
+    messages: msgs.map(m => ({
+      sender: m.sender_side,
+      content: m.content,
+      timestamp: m.occurred_at,
+    })),
+  }));
 
-  let classifications: any[] | null = null;
+  const userPrompt = JSON.stringify(conversationPayload);
+
+  let classifications: Array<{ conversation_id: string; theme?: string; theme_detail?: string; tone?: string; tone_detail?: string; sentiment?: number; is_out_of_scope?: boolean }> | null = null;
   let modelUsed = '';
   let fallbackReason: string | null = null;
 
@@ -618,7 +662,7 @@ Respond ONLY with the JSON array, no markdown or explanation.`;
           headers: { 'Content-Type': 'application/json' },
           signal: AbortSignal.timeout(55_000),
           body: JSON.stringify({
-            contents: [{ parts: [{ text: `${systemPrompt}\n\nInteractions:\n${userPrompt}` }] }],
+            contents: [{ parts: [{ text: `${systemPrompt}\n\nConversations:\n${userPrompt}` }] }],
             generationConfig: {
               responseMimeType: 'application/json',
               responseSchema: {
@@ -626,7 +670,7 @@ Respond ONLY with the JSON array, no markdown or explanation.`;
                 items: {
                   type: 'OBJECT',
                   properties: {
-                    id: { type: 'STRING' },
+                    conversation_id: { type: 'STRING' },
                     theme: { type: 'STRING', enum: [...VALID_THEMES] },
                     theme_detail: { type: 'STRING' },
                     tone: { type: 'STRING', enum: ['ok', 'atencao', 'alerta', 'critico'] },
@@ -634,7 +678,7 @@ Respond ONLY with the JSON array, no markdown or explanation.`;
                     sentiment: { type: 'NUMBER' },
                     is_out_of_scope: { type: 'BOOLEAN' },
                   },
-                  required: ['id', 'theme', 'tone', 'sentiment'],
+                  required: ['conversation_id', 'theme', 'tone', 'sentiment'],
                 },
               },
             },
@@ -651,9 +695,8 @@ Respond ONLY with the JSON array, no markdown or explanation.`;
 
         if (finishReason === 'SAFETY') {
           console.warn(`[process-jobs:classify] Gemini blocked by safety filter. Marking batch with defaults.`);
-          // Mark all rows with safe defaults instead of wasting a Claude call
-          classifications = rows.map((r: any) => ({
-            id: r.id,
+          classifications = batchConvIds.map((convId: string) => ({
+            conversation_id: convId,
             theme: 'outro',
             theme_detail: 'Bloqueado por filtro de segurança',
             tone: 'ok',
@@ -706,7 +749,6 @@ Respond ONLY with the JSON array, no markdown or explanation.`;
         const claudeData = await claudeRes.json();
         const text = claudeData.content?.[0]?.text;
         if (text) {
-          // Strip markdown fences if present
           const cleaned = text.replace(/^```json?\s*/i, '').replace(/\s*```$/i, '').trim();
           classifications = parseWithRecovery(cleaned);
           modelUsed = 'claude-sonnet-4';
@@ -720,32 +762,32 @@ Respond ONLY with the JSON array, no markdown or explanation.`;
   }
 
   if (!classifications || !Array.isArray(classifications)) {
-    throw new Error('Both Gemini and Claude failed to classify interactions');
+    throw new Error('Both Gemini and Claude failed to classify conversations');
   }
 
-  // Filter out items with truncated/invalid UUIDs — they'll be reprocessed next batch
-  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  const beforeCount = classifications.length;
-  classifications = classifications.filter((c: any) => c.id && UUID_RE.test(c.id));
-  if (classifications.length < beforeCount) {
-    console.warn(`[process-jobs:classify] Dropped ${beforeCount - classifications.length} items with invalid UUIDs`);
-  }
+  // Filter: keep only classifications for conversation_ids we requested
+  classifications = classifications.filter((c) => c.conversation_id && batchConvIds.includes(c.conversation_id));
 
-  // Validate and sanitize themes — fallback invalid slugs to 'outro'
+  // Validate and sanitize themes
   const validThemeSet = new Set<string>(VALID_THEMES);
   for (const c of classifications) {
     if (c.theme && !validThemeSet.has(c.theme)) {
-      console.warn(`[process-jobs:classify] Invalid theme "${c.theme}" for ${c.id}, falling back to "outro"`);
+      console.warn(`[process-jobs:classify] Invalid theme "${c.theme}" for conv ${c.conversation_id}, falling back to "outro"`);
       c.theme = 'outro';
     }
   }
 
-  // Update each interaction
+  // 6. Propagate classification to all messages in each conversation
   let classifiedCount = 0;
   const now = new Date().toISOString();
 
   for (const c of classifications) {
-    if (!c.id) continue;
+    if (!c.conversation_id) continue;
+    const convMsgs = conversations.get(c.conversation_id);
+    if (!convMsgs) continue;
+
+    const msgIds = convMsgs.map((m) => m.id);
+
     const { error: updErr } = await supaAdmin
       .from('interactions')
       .update({
@@ -758,30 +800,32 @@ Respond ONLY with the JSON array, no markdown or explanation.`;
         classified_at: now,
         classification_model: modelUsed,
       })
-      .eq('id', c.id);
+      .in('id', msgIds);
+
     if (updErr) {
-      console.error(`[process-jobs:classify] Update error for ${c.id}: ${updErr.message}`);
+      console.error(`[process-jobs:classify] Update error for conv ${c.conversation_id}: ${updErr.message}`);
     } else {
-      classifiedCount++;
+      classifiedCount += convMsgs.length;
     }
   }
 
   await updateHeartbeat();
 
-  const previousClassified = (job.progress as any)?.classified ?? 0;
+  const previousClassified = (previousProgress?.classified as number) ?? 0;
 
-  console.log(`[process-jobs:classify] Classified ${classifiedCount}/${rows.length} using ${modelUsed} (total: ${previousClassified + classifiedCount})`);
+  console.log(`[process-jobs:classify] Classified ${classifiedCount} msgs across ${classifications.length} conversations using ${modelUsed} (total: ${previousClassified + classifiedCount})`);
 
   // Track fallback stats cumulatively
-  const prevFallbacks = (job.progress as any)?.fallback_reasons ?? {};
+  const prevFallbacks = (previousProgress?.fallback_reasons as Record<string, number>) ?? {};
   if (fallbackReason) {
     prevFallbacks[fallbackReason] = (prevFallbacks[fallbackReason] ?? 0) + 1;
   }
 
   return {
-    has_more: rows.length === CLASSIFY_BATCH_SIZE,
+    has_more: distinctConvIds.length > CLASSIFY_CONV_BATCH_SIZE,
     progress: {
       classified: previousClassified + classifiedCount,
+      conversations_processed: ((previousProgress?.conversations_processed as number) ?? 0) + batchConvIds.length,
       batches_processed: batchesProcessed,
       model_used: modelUsed,
       ...(fallbackReason ? { last_fallback_reason: fallbackReason } : {}),
