@@ -204,7 +204,10 @@ export function ClientProvider({ children }: { children: ReactNode }) {
         },
         (payload) => {
           const inserted = payload.new as SyncJobRecord;
-          // Auto-track new jobs created externally (e.g. by cron/schedule)
+          // Only auto-track if we already have active jobs (user initiated a sync)
+          // This prevents random cron jobs from hijacking the UI
+          if (activeJobIds.length === 0) return;
+          if (activeJobIds.includes(inserted.id)) return;
           setActiveJobIds(prev => {
             if (prev.includes(inserted.id)) return prev;
             return [...prev, inserted.id];
@@ -213,7 +216,6 @@ export function ClientProvider({ children }: { children: ReactNode }) {
             if (prev.some(j => j.id === inserted.id)) return prev;
             return [...prev, inserted];
           });
-          if (!startedAt) setStartedAt(Date.now());
         }
       )
       .subscribe();

@@ -26,8 +26,8 @@
 | #2 | gist-proxy build error (`unknown` error type) | Resolvido (commit `1f03c50`) | Lovable |
 | #3 | Gemini logging + safety filter | Parcialmente resolvido — logging OK, safety filter errado | Lovable |
 | #4 | Realtime INSERT no ClientContext + Realtime job history | Parcialmente resolvido — SettingsPage OK, INSERT sem filtro | Lovable |
-| #5 | classify_batch safety filter deve marcar defaults, não fallback Claude | Aberto | Lovable |
-| #6 | INSERT listener deve filtrar por activeJobIds | Aberto | Lovable |
+| #5 | classify_batch safety filter deve marcar defaults, não fallback Claude | Resolvido — marca defaults com `gemini-safety-default` | Lovable |
+| #6 | INSERT listener deve filtrar por activeJobIds | Resolvido — só rastreia INSERTs quando há sync ativo | Lovable |
 
 ---
 
