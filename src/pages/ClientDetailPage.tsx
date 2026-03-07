@@ -125,14 +125,18 @@ const DOC_ICONS: Record<string, string> = {
   pdf: "📄", xlsx: "📊", xls: "📊", docx: "📋", doc: "📋",
 };
 
+function isSameLocalDay(a: Date, b: Date): boolean {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
 function formatDate(dateStr: string): string {
   const d = new Date(dateStr);
   const now = new Date();
-  const diffMs = now.getTime() - d.getTime();
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
   const time = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
-  if (diffDays === 0) return `Hoje, ${time}`;
-  if (diffDays === 1) return `Ontem, ${time}`;
+  if (isSameLocalDay(d, now)) return `Hoje, ${time}`;
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (isSameLocalDay(d, yesterday)) return `Ontem, ${time}`;
   return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }) + `, ${time}`;
 }
 
@@ -142,14 +146,16 @@ function formatRelativeTime(dateStr: string): string {
   const diffMs = now.getTime() - d.getTime();
   const diffMinutes = Math.floor(diffMs / (1000 * 60));
   const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
   const time = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 
   if (diffMinutes < 1) return "agora mesmo";
   if (diffMinutes < 60) return `há ${diffMinutes} minuto${diffMinutes > 1 ? "s" : ""}`;
   if (diffHours < 24) return `há ${diffHours} hora${diffHours > 1 ? "s" : ""}`;
-  if (diffDays === 0) return `hoje às ${time}`;
-  if (diffDays === 1) return `ontem às ${time}`;
+  if (isSameLocalDay(d, now)) return `hoje às ${time}`;
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (isSameLocalDay(d, yesterday)) return `ontem às ${time}`;
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
   return `há ${diffDays} dia${diffDays > 1 ? "s" : ""}`;
 }
 
