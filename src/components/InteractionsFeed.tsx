@@ -63,6 +63,36 @@ const AVATAR_COLORS = [
   "bg-fuchsia-600 text-white",
 ];
 
+// ---------- Attachment Helpers ----------
+interface Attachment {
+  url: string;
+  content_type?: string;
+  name?: string;
+  [key: string]: unknown;
+}
+
+function isImageAttachment(att: Attachment): boolean {
+  if (att.content_type?.startsWith("image/")) return true;
+  const ext = att.url?.split(".").pop()?.toLowerCase() ?? "";
+  return ["png", "jpg", "jpeg", "gif", "webp"].includes(ext);
+}
+
+function getAttachmentName(att: Attachment): string {
+  if (att.name) return att.name;
+  try {
+    const pathname = new URL(att.url).pathname;
+    return pathname.split("/").pop() ?? "arquivo";
+  } catch {
+    return "arquivo";
+  }
+}
+
+function parseAttachments(raw: any): Attachment[] {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw.filter((a: any) => a?.url);
+  return [];
+}
+
 // ---------- Helpers ----------
 const stripHtml = (html: string) => html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
 const truncate = (text: string, max: number) => (text.length <= max ? text : text.slice(0, max) + "…");
@@ -231,6 +261,11 @@ function ConversationRow({
               {humanizeTheme(conversation.primaryTheme)}
             </span>
           )}
+          {conversation.messages.some((m) => parseAttachments(m.attachments).length > 0) && (
+            <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
+              <Paperclip className="h-2.5 w-2.5" />
+            </span>
+          )}
           <span className="text-[10px] text-muted-foreground ml-auto">
             {conversation.messageCount} msg{conversation.messageCount !== 1 ? "s" : ""}
           </span>
@@ -249,29 +284,28 @@ function MessageBubble({ interaction }: { interaction: Interaction }) {
     ? "Bot"
     : "uMode";
 
-  // Bubble styles
   let bubbleBg: string;
   let bubbleText: string;
   let borderRadius: string;
 
   if (inbound) {
-    // Client — left
     bubbleBg = "bg-card";
     bubbleText = "text-card-foreground";
     borderRadius = "rounded-xl rounded-bl-sm";
   } else if (bot) {
-    // Bot — right
     bubbleBg = "bg-accent";
     bubbleText = "text-accent-foreground";
     borderRadius = "rounded-xl rounded-br-sm";
   } else {
-    // uMode/agent — right
     bubbleBg = "bg-[hsl(263,70%,58%)]";
     bubbleText = "text-white";
     borderRadius = "rounded-xl rounded-br-sm";
   }
 
   const align = inbound ? "items-start" : "items-end";
+  const attachments = parseAttachments(interaction.attachments);
+  const imageAtts = attachments.filter(isImageAttachment);
+  const fileAtts = attachments.filter((a) => !isImageAttachment(a));
 
   return (
     <div className={cn("flex flex-col gap-1", align)}>
@@ -286,6 +320,39 @@ function MessageBubble({ interaction }: { interaction: Interaction }) {
           ) : (
             <p className="text-sm text-muted-foreground">—</p>
           )}
+
+          {/* Attachments */}
+          {attachments.length > 0 && (
+            <div className="mt-2 space-y-2">
+              {imageAtts.length > 0 && (
+                <div className={imageAtts.length > 1 ? "grid grid-cols-2 gap-2" : ""}>
+                  {imageAtts.map((att, i) => (
+                    <a key={i} href={att.url} target="_blank" rel="noopener noreferrer">
+                      <img
+                        src={att.url}
+                        alt={getAttachmentName(att)}
+                        className="max-h-48 rounded-lg object-cover hover:opacity-90 transition-opacity"
+                        loading="lazy"
+                      />
+                    </a>
+                  ))}
+                </div>
+              )}
+              {fileAtts.map((att, i) => (
+                <a
+                  key={i}
+                  href={att.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 text-xs text-muted-foreground hover:underline"
+                >
+                  <Paperclip className="h-3 w-3" />
+                  {getAttachmentName(att)}
+                </a>
+              ))}
+            </div>
+          )}
+
           {interaction.tone && interaction.tone !== "ok" && (
             <span className={cn("inline-block mt-1 text-[10px] px-1.5 py-0.5 rounded font-medium", TONE_COLORS[interaction.tone])}>
               {TONE_LABELS[interaction.tone]}
