@@ -91,21 +91,22 @@ function AutoSyncCard() {
     queryKey: ["app_settings", "auto_sync_enabled"],
     staleTime: 60 * 1000,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("app_settings" as any)
+      const { data, error } = await (supabase as any)
+        .from("app_settings")
         .select("value")
         .eq("key", "auto_sync_enabled")
         .single();
       if (error) throw error;
-      return data?.value === true || data?.value === "true";
+      const val = data?.value;
+      return val === true || val === "true";
     },
   });
 
   const toggleMutation = useMutation({
     mutationFn: async (enabled: boolean) => {
-      const { error } = await supabase
-        .from("app_settings" as any)
-        .update({ value: enabled, updated_at: new Date().toISOString() } as any)
+      const { error } = await (supabase as any)
+        .from("app_settings")
+        .update({ value: enabled, updated_at: new Date().toISOString() })
         .eq("key", "auto_sync_enabled");
       if (error) throw error;
     },
