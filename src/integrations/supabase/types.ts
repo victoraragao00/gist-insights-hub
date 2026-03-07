@@ -474,6 +474,16 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      client_stats_30d: {
+        Args: { _user_id: string }
+        Returns: {
+          client_id: string
+          dominant_tone: string
+          health_pct: number
+          last_contact: string
+          total_30d: number
+        }[]
+      }
       create_job_if_none_active: {
         Args: {
           _created_by: string
