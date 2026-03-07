@@ -250,7 +250,6 @@ export function ClientProvider({ children }: { children: ReactNode }) {
         toast.success(`Sincronização completa — ${totalContacts} contatos, ${totalMessages} mensagens novas`);
       }
 
-      localStorage.setItem("cx_hub_last_sync", new Date().toISOString());
       queryClient.invalidateQueries({ queryKey: ["sync_clients"] });
       queryClient.invalidateQueries({ queryKey: ["clients"] });
       queryClient.invalidateQueries({ queryKey: ["sync_jobs_history"] });
