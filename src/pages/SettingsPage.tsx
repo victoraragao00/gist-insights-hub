@@ -314,7 +314,10 @@ const SettingsPage = () => {
     return parts.join(" + ") || "—";
   }, [syncContacts, syncHistory]);
 
-  const lastSyncRaw = typeof window !== "undefined" ? localStorage.getItem("cx_hub_last_sync") : null;
+  const lastSyncDate = useMemo(() => {
+    const completed = jobHistory.find(j => j.status === 'completed');
+    return completed?.completed_at ?? null;
+  }, [jobHistory]);
 
   const handleToggleContacts = (checked: boolean) => {
     if (!checked && !syncHistory) {
@@ -472,10 +475,10 @@ const SettingsPage = () => {
             </p>
           </div>
 
-          {lastSyncRaw && (
+          {lastSyncDate && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 rounded-lg px-4 py-2">
               <RefreshCw className="h-3.5 w-3.5" />
-              Última sincronização completa: {formatSyncDate(lastSyncRaw)}
+              Última sincronização completa: {formatSyncDate(lastSyncDate)}
             </div>
           )}
 
