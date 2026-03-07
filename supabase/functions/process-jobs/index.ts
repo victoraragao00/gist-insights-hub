@@ -818,80 +818,79 @@ Retorne apenas o JSON array. Sem texto adicional, sem markdown, sem explicaçõe
   let modelUsed = '';
   let fallbackReason: string | null = null;
 
-  // Try Gemini first
-  if (geminiKey) {
-    try {
-      const geminiRes = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          signal: AbortSignal.timeout(55_000),
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: `${systemPrompt}\n\nConversations:\n${userPrompt}` }] }],
-            generationConfig: {
-              responseMimeType: 'application/json',
-              responseSchema: {
-                type: 'ARRAY',
-                items: {
-                  type: 'OBJECT',
-                  properties: {
-                    conversation_id: { type: 'STRING' },
-                    theme: { type: 'STRING', enum: [...VALID_THEMES] },
-                    theme_detail: { type: 'STRING' },
-                    tone: { type: 'STRING', enum: ['ok', 'atencao', 'alerta', 'critico'] },
-                    tone_detail: { type: 'STRING' },
-                    sentiment: { type: 'NUMBER' },
-                    is_out_of_scope: { type: 'BOOLEAN' },
-                  },
-                  required: ['conversation_id', 'theme', 'tone', 'sentiment'],
-                },
-              },
-            },
-          }),
-        },
-      );
-      if (geminiRes.ok) {
-        const geminiData = await geminiRes.json();
-        const candidate = geminiData.candidates?.[0];
-        const finishReason = candidate?.finishReason;
-        const safetyRatings = candidate?.safetyRatings;
-
-        console.log(`[process-jobs:classify] Gemini finishReason=${finishReason}, safetyRatings=${JSON.stringify(safetyRatings ?? [])}`);
-
-        if (finishReason === 'SAFETY') {
-          console.warn(`[process-jobs:classify] Gemini blocked by safety filter. Marking batch with defaults.`);
-          classifications = batchConvIds.map((convId: string) => ({
-            conversation_id: convId,
-            theme: 'outro',
-            theme_detail: 'Bloqueado por filtro de segurança',
-            tone: 'ok',
-            tone_detail: 'Classificação padrão (safety filter)',
-            sentiment: 0,
-            is_out_of_scope: true,
-          }));
-          modelUsed = 'gemini-safety-default';
-        } else {
-          const text = candidate?.content?.parts?.[0]?.text;
-          if (text) {
-            classifications = parseWithRecovery(text);
-            modelUsed = 'gemini-2.5-flash';
-            console.log(`[process-jobs:classify] Gemini returned ${classifications?.length ?? 0} classifications`);
-          } else {
-            console.warn(`[process-jobs:classify] Gemini returned no text. Candidate: ${JSON.stringify(candidate)}`);
-          }
-        }
-      } else {
-        const errBody = await geminiRes.text();
-        fallbackReason = `gemini_http_${geminiRes.status}`;
-        console.error(`[process-jobs:classify] Gemini HTTP ${geminiRes.status}: ${errBody.substring(0, 500)}`);
-      }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      fallbackReason = msg.includes('timed out') ? 'gemini_timeout' : `gemini_exception: ${msg.substring(0, 100)}`;
-      console.error(`[process-jobs:classify] Gemini exception: ${msg}`);
-    }
-  }
+  // TEMPORARILY COMMENTED OUT — forcing Claude fallback
+  // if (geminiKey) {
+  //   try {
+  //     const geminiRes = await fetch(
+  //       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
+  //       {
+  //         method: 'POST',
+  //         headers: { 'Content-Type': 'application/json' },
+  //         signal: AbortSignal.timeout(55_000),
+  //         body: JSON.stringify({
+  //           contents: [{ parts: [{ text: `${systemPrompt}\n\nConversations:\n${userPrompt}` }] }],
+  //           generationConfig: {
+  //             responseMimeType: 'application/json',
+  //             responseSchema: {
+  //               type: 'ARRAY',
+  //               items: {
+  //                 type: 'OBJECT',
+  //                 properties: {
+  //                   conversation_id: { type: 'STRING' },
+  //                   theme: { type: 'STRING', enum: [...VALID_THEMES] },
+  //                   theme_detail: { type: 'STRING' },
+  //                   tone: { type: 'STRING', enum: ['ok', 'atencao', 'alerta', 'critico'] },
+  //                   tone_detail: { type: 'STRING' },
+  //                   sentiment: { type: 'NUMBER' },
+  //                   is_out_of_scope: { type: 'BOOLEAN' },
+  //                 },
+  //                 required: ['conversation_id', 'theme', 'tone', 'sentiment'],
+  //               },
+  //             },
+  //           },
+  //         }),
+  //       },
+  //     );
+  //     if (geminiRes.ok) {
+  //       const geminiData = await geminiRes.json();
+  //       const candidate = geminiData.candidates?.[0];
+  //       const finishReason = candidate?.finishReason;
+  //       const safetyRatings = candidate?.safetyRatings;
+  //       console.log(`[process-jobs:classify] Gemini finishReason=${finishReason}, safetyRatings=${JSON.stringify(safetyRatings ?? [])}`);
+  //       if (finishReason === 'SAFETY') {
+  //         console.warn(`[process-jobs:classify] Gemini blocked by safety filter. Marking batch with defaults.`);
+  //         classifications = batchConvIds.map((convId: string) => ({
+  //           conversation_id: convId,
+  //           theme: 'outro',
+  //           theme_detail: 'Bloqueado por filtro de segurança',
+  //           tone: 'ok',
+  //           tone_detail: 'Classificação padrão (safety filter)',
+  //           sentiment: 0,
+  //           is_out_of_scope: true,
+  //         }));
+  //         modelUsed = 'gemini-safety-default';
+  //       } else {
+  //         const text = candidate?.content?.parts?.[0]?.text;
+  //         if (text) {
+  //           classifications = parseWithRecovery(text);
+  //           modelUsed = 'gemini-2.5-flash';
+  //           console.log(`[process-jobs:classify] Gemini returned ${classifications?.length ?? 0} classifications`);
+  //         } else {
+  //           console.warn(`[process-jobs:classify] Gemini returned no text. Candidate: ${JSON.stringify(candidate)}`);
+  //         }
+  //       }
+  //     } else {
+  //       const errBody = await geminiRes.text();
+  //       fallbackReason = `gemini_http_${geminiRes.status}`;
+  //       console.error(`[process-jobs:classify] Gemini HTTP ${geminiRes.status}: ${errBody.substring(0, 500)}`);
+  //     }
+  //   } catch (err) {
+  //     const msg = err instanceof Error ? err.message : String(err);
+  //     fallbackReason = msg.includes('timed out') ? 'gemini_timeout' : `gemini_exception: ${msg.substring(0, 100)}`;
+  //     console.error(`[process-jobs:classify] Gemini exception: ${msg}`);
+  //   }
+  // }
+  console.log('[process-jobs:classify] Gemini TEMPORARILY DISABLED — using Claude fallback');
 
   // Fallback to Claude
   if (!classifications && claudeKey) {
