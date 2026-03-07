@@ -1,0 +1,1 @@
+UPDATE sync_jobs SET status = 'cancelled', completed_at = now() WHERE id IN ('8eff7088-008e-4e2a-a06f-f8bbf3962e44', '926c14c8-5626-4e46-a7ff-4cf95f64538d') AND status = 'pending';
