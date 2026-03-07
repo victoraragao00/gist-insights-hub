@@ -616,7 +616,18 @@ Respond ONLY with the JSON array, no markdown or explanation.`;
         console.log(`[process-jobs:classify] Gemini finishReason=${finishReason}, safetyRatings=${JSON.stringify(safetyRatings ?? [])}`);
 
         if (finishReason === 'SAFETY') {
-          console.warn(`[process-jobs:classify] Gemini blocked by safety filter. Falling back to Claude.`);
+          console.warn(`[process-jobs:classify] Gemini blocked by safety filter. Marking batch with defaults.`);
+          // Mark all rows with safe defaults instead of wasting a Claude call
+          classifications = rows.map((r: any) => ({
+            id: r.id,
+            theme: 'outro',
+            theme_detail: 'Bloqueado por filtro de segurança',
+            tone: 'ok',
+            tone_detail: 'Classificação padrão (safety filter)',
+            sentiment: 0,
+            is_out_of_scope: true,
+          }));
+          modelUsed = 'gemini-safety-default';
         } else {
           const text = candidate?.content?.parts?.[0]?.text;
           if (text) {
