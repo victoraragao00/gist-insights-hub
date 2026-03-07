@@ -207,7 +207,7 @@ export function ClientProvider({ children }: { children: ReactNode }) {
           // Only auto-track if we already have active jobs (user initiated a sync)
           // This prevents random cron jobs from hijacking the UI
           if (activeJobIds.length === 0) return;
-          if (activeJobIds.includes(inserted.id)) return;
+          if (!activeJobIds.includes(inserted.id)) return;
           setActiveJobIds(prev => {
             if (prev.includes(inserted.id)) return prev;
             return [...prev, inserted.id];
