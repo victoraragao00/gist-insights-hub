@@ -534,7 +534,7 @@ export const InteractionsFeed = ({ clientId }: { clientId: string }) => {
 
         {/* Thread panel — desktop */}
         {selectedConversation && !isMobile && (
-          <div className="w-[420px] shrink-0">
+          <div className="flex-1 min-w-0">
             <ThreadPanel
               conversation={selectedConversation}
               onClose={() => setSelectedConvId(null)}
