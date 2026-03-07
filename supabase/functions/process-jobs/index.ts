@@ -609,13 +609,27 @@ Respond ONLY with the JSON array, no markdown or explanation.`;
       );
       if (geminiRes.ok) {
         const geminiData = await geminiRes.json();
-        const text = geminiData.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (text) {
-          classifications = JSON.parse(text);
-          modelUsed = 'gemini-2.5-flash';
+        const candidate = geminiData.candidates?.[0];
+        const finishReason = candidate?.finishReason;
+        const safetyRatings = candidate?.safetyRatings;
+
+        console.log(`[process-jobs:classify] Gemini finishReason=${finishReason}, safetyRatings=${JSON.stringify(safetyRatings ?? [])}`);
+
+        if (finishReason === 'SAFETY') {
+          console.warn(`[process-jobs:classify] Gemini blocked by safety filter. Falling back to Claude.`);
+        } else {
+          const text = candidate?.content?.parts?.[0]?.text;
+          if (text) {
+            classifications = JSON.parse(text);
+            modelUsed = 'gemini-2.5-flash';
+            console.log(`[process-jobs:classify] Gemini returned ${classifications?.length ?? 0} classifications`);
+          } else {
+            console.warn(`[process-jobs:classify] Gemini returned no text. Candidate: ${JSON.stringify(candidate)}`);
+          }
         }
       } else {
-        console.error(`[process-jobs:classify] Gemini error: ${geminiRes.status} ${await geminiRes.text()}`);
+        const errBody = await geminiRes.text();
+        console.error(`[process-jobs:classify] Gemini HTTP ${geminiRes.status}: ${errBody.substring(0, 500)}`);
       }
     } catch (err) {
       console.error(`[process-jobs:classify] Gemini exception: ${err instanceof Error ? err.message : err}`);

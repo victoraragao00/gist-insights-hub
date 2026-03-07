@@ -195,6 +195,27 @@ export function ClientProvider({ children }: { children: ReactNode }) {
           });
         }
       )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'sync_jobs',
+        },
+        (payload) => {
+          const inserted = payload.new as SyncJobRecord;
+          // Auto-track new jobs created externally (e.g. by cron/schedule)
+          setActiveJobIds(prev => {
+            if (prev.includes(inserted.id)) return prev;
+            return [...prev, inserted.id];
+          });
+          setJobs(prev => {
+            if (prev.some(j => j.id === inserted.id)) return prev;
+            return [...prev, inserted];
+          });
+          if (!startedAt) setStartedAt(Date.now());
+        }
+      )
       .subscribe();
 
     channelRef.current = channel;
