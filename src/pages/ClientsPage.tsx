@@ -31,13 +31,15 @@ interface ClientRow {
   }>;
 }
 
-interface InteractionRow {
-  client_id: string;
-  tone: string | null;
-  occurred_at: string;
+interface ClientStats {
+  total_30d: number;
+  dominant_tone: string;
+  health_pct: number;
+  last_contact: string | null;
 }
 
-interface ClientStats {
+interface ClientStatsRow {
+  client_id: string;
   total_30d: number;
   dominant_tone: string;
   health_pct: number;
