@@ -29,6 +29,7 @@
 | #5 | classify_batch safety filter deve marcar defaults, não fallback Claude | Resolvido — marca defaults com `gemini-safety-default` | Lovable |
 | #6 | INSERT listener deve filtrar por activeJobIds | Resolvido — guard `activeJobIds.length === 0` | Lovable |
 | #7 | INSERT listener tem lógica invertida — tracks unknown jobs | Resolvido (commit `f363d89`) | Lovable |
+| #8 | classify_batch trava e subutiliza Gemini (timeout, JSON truncado, auto-chain sem limite) | Resolvido | Lovable |
 
 ---
 
