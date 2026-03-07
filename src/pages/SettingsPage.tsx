@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -15,7 +16,7 @@ import {
 } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Users, MessageCircle, Phone, Hash, Mail, Mic, Download, Loader2, Check, Upload, MoreHorizontal, RefreshCw, X, ShieldAlert, RotateCcw, Clock, CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
+import { Users, MessageCircle, Phone, Hash, Mail, Mic, Download, Loader2, Check, Upload, MoreHorizontal, RefreshCw, X, ShieldAlert, RotateCcw, Clock, CheckCircle2, XCircle, AlertTriangle, CalendarClock } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger,
@@ -79,6 +80,75 @@ function jobStatusBadge(status: string) {
     case 'cancelled': return <Badge variant="outline" className="text-xs bg-muted text-muted-foreground"><X className="h-3 w-3 mr-1" />Cancelado</Badge>;
     default: return <Badge variant="outline" className="text-xs">{status}</Badge>;
   }
+}
+
+// ── Auto-Sync Card ──────────────────────────────────────
+
+function AutoSyncCard() {
+  const queryClient = useQueryClient();
+
+  const { data: autoSyncEnabled, isLoading } = useQuery<boolean>({
+    queryKey: ["app_settings", "auto_sync_enabled"],
+    staleTime: 60 * 1000,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("app_settings")
+        .select("value")
+        .eq("key", "auto_sync_enabled")
+        .single();
+      if (error) throw error;
+      const val = data?.value;
+      return val === true || val === "true";
+    },
+  });
+
+  const toggleMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const { error } = await (supabase as any)
+        .from("app_settings")
+        .update({ value: enabled, updated_at: new Date().toISOString() })
+        .eq("key", "auto_sync_enabled");
+      if (error) throw error;
+    },
+    onSuccess: (_, enabled) => {
+      queryClient.invalidateQueries({ queryKey: ["app_settings", "auto_sync_enabled"] });
+      toast.success(enabled ? "Agendamento automático ativado" : "Agendamento automático desativado");
+    },
+    onError: () => {
+      toast.error("Erro ao alterar configuração");
+    },
+  });
+
+  const enabled = autoSyncEnabled ?? false;
+
+  return (
+    <Card className="border shadow-sm">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <CalendarClock className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-semibold">Agendamento Automático</CardTitle>
+            <Badge variant={enabled ? "default" : "outline"} className="text-xs">
+              {enabled ? "Ativo" : "Inativo"}
+            </Badge>
+          </div>
+          <Switch
+            checked={enabled}
+            onCheckedChange={(checked) => toggleMutation.mutate(checked)}
+            disabled={isLoading || toggleMutation.isPending}
+          />
+        </div>
+        <CardDescription className="text-xs">
+          Sincronização automática de contatos e histórico durante horário comercial.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="text-xs text-muted-foreground space-y-1">
+        <p>📅 Seg-Sex, 08:00–19:00 (a cada 5 min) + 23:59</p>
+        <p>🔄 Incremental — processa apenas dados novos desde a última execução</p>
+        <p>🛡️ Duplicatas são prevenidas automaticamente</p>
+      </CardContent>
+    </Card>
+  );
 }
 
 // ── Component ──────────────────────────────────────────
@@ -408,6 +478,9 @@ const SettingsPage = () => {
               Última sincronização completa: {formatSyncDate(lastSyncRaw)}
             </div>
           )}
+
+          {/* Auto-sync schedule */}
+          <AutoSyncCard />
 
           {/* Step 1 — What to sync */}
           <div className="space-y-3">

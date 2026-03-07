@@ -1,42 +1,31 @@
 
+# Sincronização Automática Agendada — IMPLEMENTADO
 
-# Wizard de Contatos Gist: Separar em 2 etapas
+## O que foi feito
 
-## Problema
-Atualmente, o Step A ("Discovery") mostra tudo junto: a lista de domínios/empresas com as opções de vincular/criar/ignorar E os contatos individuais de cada grupo. Isso é confuso quando há muitos domínios com dezenas de contatos.
+### 1. Tabela `app_settings`
+- Criada com RLS (SELECT/UPDATE para authenticated)
+- Flag `auto_sync_enabled = true` inserida
 
-## Nova estrutura do wizard
+### 2. RLS para jobs automáticos
+- `sync_jobs_automated_select`: jobs sem `created_by` visíveis a qualquer autenticado
+- `sync_jobs_automated_update`: qualquer autenticado pode cancelar jobs automáticos travados
 
-### Step 1 — "Clientes" (novo)
-Lista apenas os **domínios/empresas** encontrados. Para cada grupo, o usuário escolhe:
-- **Vincular a cliente existente** (select de clientes)
-- **Criar novo cliente** (input de nome)
-- **Ignorar** (novo — não importa contatos desse domínio)
+### 3. Edge Function `schedule-sync`
+- Verifica `auto_sync_enabled` antes de criar jobs
+- Busca `since_timestamp` do último job concluído de cada tipo
+- Chama `create_job_if_none_active` com `_created_by = NULL`
+- Fire-and-forget para `process-jobs`
 
-Sem tabela de contatos. Apenas mostra o domínio, nome da empresa (se houver) e quantidade de contatos como informação contextual (ex: "nkstore.com.br — 42 contatos").
+### 4. Crons (pg_cron, horários em UTC ajustados para BRT)
+| Nome | Schedule (UTC) | BRT | Função |
+|------|---------------|-----|--------|
+| `schedule-sync-bh` | `*/5 11-21 * * 1-5` | 08:00–18:55 Seg-Sex | schedule-sync |
+| `schedule-sync-eod` | `59 2 * * 2-6` | 23:59 Seg-Sex | schedule-sync |
+| `process-jobs-fallback` | `*/3 11-22 * * 1-5` | 08:00–19:00 Seg-Sex | process-jobs |
 
-Botão "Próximo" avança ao Step 2 (filtrando apenas os grupos não-ignorados).
+Cron antigo `process-jobs` (`*/2 * * * *` 24/7) removido.
 
-### Step 2 — "Contatos" (novo)
-Para cada grupo **não ignorado**, mostra a tabela de contatos com checkbox individual para selecionar quais contatos importar. Também mostra a seção de Teammates.
-
-Botão "Confirmar Vínculos" avança ao Step 3 (atual "confirmation").
-
-### Step 3 — "Confirmação" (atual)
-Sem alterações significativas, apenas ajusta os contadores para refletir apenas os selecionados.
-
-### Step 4 — "Importação" (atual, só onboarding)
-Sem alterações.
-
-## Alterações em `src/pages/ClientsPage.tsx`
-
-1. Alterar `WizardStep` para `"clients" | "contacts" | "confirmation" | "import"`
-2. Step inicial passa de `"discovery"` para `"clients"`
-3. Adicionar opção `"ignore"` ao `GroupMapping.type` (tipo `"existing" | "new" | "ignore"`)
-4. **Step "clients"**: renderiza cards compactos por domínio — só domínio, empresa, count, e select (vincular/criar/ignorar) + input/select conforme tipo
-5. **Step "contacts"**: para cada grupo não-ignorado, mostra tabela de contatos com checkboxes. Novo state `selectedContacts: Map<number, boolean>` para controle individual. Também mostra teammates aqui.
-6. Ajustar `handleConfirmMappings` para filtrar apenas contatos selecionados e grupos não-ignorados
-7. Ajustar `summaryContactCount` para contar apenas selecionados
-
-Nenhum outro arquivo será alterado.
-
+### 5. UI — Toggle na SettingsPage
+- Card "Agendamento Automático" com Switch, Badge de status, info estática
+- Lê/escreve `app_settings.auto_sync_enabled`
