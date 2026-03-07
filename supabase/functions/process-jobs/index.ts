@@ -572,7 +572,7 @@ async function handleClassifyBatch(
     .not('content', 'is', null)
     .neq('content', '')
     .not('conversation_id', 'is', null)
-    .gte('occurred_at', new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString())
+    .gte('occurred_at', new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString())
     .order('occurred_at', { ascending: false })
     .limit(200);
 
@@ -634,6 +634,19 @@ IMPORTANT RULES:
 - Short messages like "Ok", "Cadê?", "Obrigado" in the context of a normal conversation should NOT elevate the tone to "atenção" or above
 - Only use "atencao"/"alerta"/"critico" when the conversation as a whole shows frustration, urgency, or conflict
 - The "theme" field MUST be exactly one of the listed slugs
+
+TONE CALIBRATION RULES (critical — follow strictly):
+- Legitimate operational urgency (deadlines, invoicing, driver waiting, production blocked) with POLITE tone = "ok", NOT "atencao". Business pressure is not interpersonal conflict.
+- High message volume or persistence due to unresolved issues = "ok" or at most "atencao" if there are signs of growing impatience. Persistence alone is NOT aggression.
+- Reserve "alerta" ONLY for explicit disqualification language, visible frustration with rude phrasing, or repeated escalation with no courtesy.
+- Reserve "critico" ONLY for direct verbal abuse, threats, or ultimatums. Self-aware frustration with apologies (e.g., "desculpa parecer grossa") is "alerta" at most, NOT "critico".
+- If the conversation ends with thanks, resolution, or positive closure, the tone should generally be "ok" regardless of mid-conversation tension.
+
+THEME DISAMBIGUATION RULES:
+- "bugs" = functionality that exists but is broken or not working as expected (error messages, features not responding, incorrect behavior)
+- "permissoes" = access configuration issues (user can't see a menu, needs role change, login/password problems)
+- "criacao_campos" = requests for NEW functionality, fields, reports, or compositions that don't exist yet
+- Do NOT use "outro" if the conversation clearly fits one of the specific themes above
 
 Respond ONLY with the JSON array, no markdown or explanation.`;
 
