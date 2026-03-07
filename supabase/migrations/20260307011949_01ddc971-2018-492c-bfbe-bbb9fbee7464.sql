@@ -1,0 +1,1 @@
+DROP POLICY "app_settings_update" ON app_settings;
