@@ -660,6 +660,14 @@ Respond ONLY with the JSON array, no markdown or explanation.`;
     throw new Error('Both Gemini and Claude failed to classify interactions');
   }
 
+  // Filter out items with truncated/invalid UUIDs — they'll be reprocessed next batch
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const beforeCount = classifications.length;
+  classifications = classifications.filter((c: any) => c.id && UUID_RE.test(c.id));
+  if (classifications.length < beforeCount) {
+    console.warn(`[process-jobs:classify] Dropped ${beforeCount - classifications.length} items with invalid UUIDs`);
+  }
+
   // Validate and sanitize themes — fallback invalid slugs to 'outro'
   const validThemeSet = new Set<string>(VALID_THEMES);
   for (const c of classifications) {
