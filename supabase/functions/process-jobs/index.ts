@@ -552,15 +552,22 @@ async function handleClassifyBatch(
 
   console.log(`[process-jobs:classify] Processing ${rows.length} interactions`);
 
-  const systemPrompt = `You are a customer interaction classifier. For each interaction, return a JSON array where each element has:
-- "id": the interaction UUID
-- "theme": one of: "onboarding", "suporte_tecnico", "financeiro", "comercial", "produto_feedback", "bug_report", "cancelamento", "renovacao", "integracao", "treinamento", "consultoria", "reclamacao", "elogio", "outros"
-- "theme_detail": a short description (max 50 chars) of the specific topic
-- "tone": one of: "ok", "atencao", "alerta", "critico"
-- "tone_detail": a short justification (max 80 chars) for the tone classification
-- "sentiment": a number from -1.0 (very negative) to 1.0 (very positive)
-- "is_out_of_scope": boolean, true if the message is automated/system/irrelevant (e.g. "joined the conversation")
+  const VALID_THEMES = [
+    'integracao_erp', 'agendamento', 'permissoes', 'cobranca_followup',
+    'gestao_demandas', 'workflow', 'importacao_dados', 'intermediacao',
+    'bugs', 'criacao_campos', 'treinamento', 'elogio', 'governanca', 'outro',
+  ] as const;
 
+  const systemPrompt = `You are a customer interaction classifier for a B2B SaaS platform (fashion/textile industry). For each interaction, return a JSON array where each element has:
+- "id": the interaction UUID (copy exactly from input)
+- "theme": MUST be one of these exact slugs: ${VALID_THEMES.map(t => `"${t}"`).join(', ')}
+- "theme_detail": a short description in Portuguese (max 50 chars) of the specific topic
+- "tone": MUST be one of: "ok", "atencao", "alerta", "critico"
+- "tone_detail": a short justification in Portuguese (max 80 chars) for the tone classification
+- "sentiment": a number from -1.0 (very negative) to 1.0 (very positive)
+- "is_out_of_scope": boolean, true if the message is automated/system/irrelevant (e.g. "joined the conversation", bot messages, empty messages)
+
+CRITICAL: The "theme" field MUST be exactly one of the listed slugs. Do NOT invent new slugs.
 Respond ONLY with the JSON array, no markdown or explanation.`;
 
   const userPrompt = JSON.stringify(rows.map((r: any) => ({ id: r.id, content: r.content, sender_side: r.sender_side })));
@@ -578,7 +585,25 @@ Respond ONLY with the JSON array, no markdown or explanation.`;
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contents: [{ parts: [{ text: `${systemPrompt}\n\nInteractions:\n${userPrompt}` }] }],
-            generationConfig: { responseMimeType: 'application/json' },
+            generationConfig: {
+              responseMimeType: 'application/json',
+              responseSchema: {
+                type: 'ARRAY',
+                items: {
+                  type: 'OBJECT',
+                  properties: {
+                    id: { type: 'STRING' },
+                    theme: { type: 'STRING', enum: [...VALID_THEMES] },
+                    theme_detail: { type: 'STRING' },
+                    tone: { type: 'STRING', enum: ['ok', 'atencao', 'alerta', 'critico'] },
+                    tone_detail: { type: 'STRING' },
+                    sentiment: { type: 'NUMBER' },
+                    is_out_of_scope: { type: 'BOOLEAN' },
+                  },
+                  required: ['id', 'theme', 'tone', 'sentiment'],
+                },
+              },
+            },
           }),
         },
       );
@@ -633,6 +658,15 @@ Respond ONLY with the JSON array, no markdown or explanation.`;
 
   if (!classifications || !Array.isArray(classifications)) {
     throw new Error('Both Gemini and Claude failed to classify interactions');
+  }
+
+  // Validate and sanitize themes — fallback invalid slugs to 'outro'
+  const validThemeSet = new Set<string>(VALID_THEMES);
+  for (const c of classifications) {
+    if (c.theme && !validThemeSet.has(c.theme)) {
+      console.warn(`[process-jobs:classify] Invalid theme "${c.theme}" for ${c.id}, falling back to "outro"`);
+      c.theme = 'outro';
+    }
   }
 
   // Update each interaction
