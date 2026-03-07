@@ -1,39 +1,26 @@
 
+# Classificação Automática (classify_batch) — IMPLEMENTADO
 
-## Correção: Progress Acumulativo no `handleClassifyBatch`
+## O que foi feito
 
-### Análise
+### 1. Handler `handleClassifyBatch` em `process-jobs/index.ts`
+- Query: `interactions WHERE classified_at IS NULL AND content IS NOT NULL AND content != '' AND occurred_at >= now() - 90 days ORDER BY occurred_at DESC LIMIT 20`
+- Fallback: Gemini 2.5 Flash → Claude Sonnet 4 (se Gemini falhar)
+- Campos atualizados: `theme`, `theme_detail`, `tone`, `tone_detail`, `sentiment`, `is_out_of_scope`, `classified_at`, `classification_model`
+- Progress acumulativo: `classified: previousClassified + classifiedCount`
+- Heartbeat chamado após UPDATE do batch
 
-O main loop (L644-650) persiste `result.progress` diretamente no job a cada auto-chain. Se o handler retornar `{ classified: 5 }` em cada batch, o progress será sobrescrito — perdendo o total acumulado.
+### 2. Case no switch do main loop
+- `case 'classify_batch'` adicionado, chamando `handleClassifyBatch(supaAdmin, job, updateHeartbeat)`
 
-Os outros handlers (`handleSyncContacts`, `handleIngestHistorical`) não têm esse problema porque usam contadores diferentes ou completam em um batch. Para `classify_batch` com ~1,470 batches, a acumulação é essencial.
+### 3. Agendamento automático
+- `classify_batch` adicionado ao array `jobTypes` em `schedule-sync/index.ts`
 
-### Correção no handler
-
-Dentro de `handleClassifyBatch`, antes do return:
-
-```typescript
-const previousClassified = (job.progress as any)?.classified ?? 0;
-
-return {
-  has_more: rows.length === 20,
-  progress: {
-    classified: previousClassified + classifiedCount,
-    model_used,
-  },
-};
-```
-
-Isso garante que cada batch soma ao total anterior. O main loop persiste `result.progress` no job (L649), e na próxima iteração o handler lê `job.progress.classified` já acumulado.
-
-### Nenhuma outra alteração
-
-O main loop não precisa de mudança — ele já persiste `result.progress` tal qual. A responsabilidade de acumular fica no handler.
-
-### Plano completo atualizado
-
-Incorporar esta correção ao `handleClassifyBatch` na implementação. Os 3 arquivos a alterar permanecem os mesmos:
-
-1. `process-jobs/index.ts` — novo `handleClassifyBatch` (com progress acumulativo) + case no switch
-2. `schedule-sync/index.ts` — adicionar `'classify_batch'` ao array
-
+### Resiliência (coberta pelo main loop genérico)
+| Mecanismo | Cobertura |
+|-----------|-----------|
+| Auto-chain | Handler retorna `has_more: true` quando batch = 20 |
+| Heartbeat | `updateHeartbeat()` chamado após UPDATE |
+| Retry | throw → main loop incrementa retry_count |
+| Fallback | Gemini → Claude dentro do handler |
+| Órfãos | Query genérica de reset já cobre |
