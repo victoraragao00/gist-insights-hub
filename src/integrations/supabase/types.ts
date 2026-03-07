@@ -456,6 +456,17 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      create_job_if_none_active: {
+        Args: {
+          _created_by: string
+          _payload?: Json
+          _type: Database["public"]["Enums"]["job_type"]
+        }
+        Returns: {
+          already_running: boolean
+          job_id: string
+        }[]
+      }
       deactivate_stale_clients: { Args: { _days: number }; Returns: number }
       user_accessible_client_ids: {
         Args: { _user_id: string }
