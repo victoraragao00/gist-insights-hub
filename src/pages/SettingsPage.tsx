@@ -82,6 +82,74 @@ function jobStatusBadge(status: string) {
   }
 }
 
+// ── Auto-Sync Card ──────────────────────────────────────
+
+function AutoSyncCard() {
+  const queryClient = useQueryClient();
+
+  const { data: autoSyncEnabled, isLoading } = useQuery<boolean>({
+    queryKey: ["app_settings", "auto_sync_enabled"],
+    staleTime: 60 * 1000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("app_settings" as any)
+        .select("value")
+        .eq("key", "auto_sync_enabled")
+        .single();
+      if (error) throw error;
+      return data?.value === true || data?.value === "true";
+    },
+  });
+
+  const toggleMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const { error } = await supabase
+        .from("app_settings" as any)
+        .update({ value: enabled, updated_at: new Date().toISOString() } as any)
+        .eq("key", "auto_sync_enabled");
+      if (error) throw error;
+    },
+    onSuccess: (_, enabled) => {
+      queryClient.invalidateQueries({ queryKey: ["app_settings", "auto_sync_enabled"] });
+      toast.success(enabled ? "Agendamento automático ativado" : "Agendamento automático desativado");
+    },
+    onError: () => {
+      toast.error("Erro ao alterar configuração");
+    },
+  });
+
+  const enabled = autoSyncEnabled ?? false;
+
+  return (
+    <Card className="border shadow-sm">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <CalendarClock className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-semibold">Agendamento Automático</CardTitle>
+            <Badge variant={enabled ? "default" : "outline"} className="text-xs">
+              {enabled ? "Ativo" : "Inativo"}
+            </Badge>
+          </div>
+          <Switch
+            checked={enabled}
+            onCheckedChange={(checked) => toggleMutation.mutate(checked)}
+            disabled={isLoading || toggleMutation.isPending}
+          />
+        </div>
+        <CardDescription className="text-xs">
+          Sincronização automática de contatos e histórico durante horário comercial.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="text-xs text-muted-foreground space-y-1">
+        <p>📅 Seg-Sex, 08:00–19:00 (a cada 5 min) + 23:59</p>
+        <p>🔄 Incremental — processa apenas dados novos desde a última execução</p>
+        <p>🛡️ Duplicatas são prevenidas automaticamente</p>
+      </CardContent>
+    </Card>
+  );
+}
+
 // ── Component ──────────────────────────────────────────
 
 const SettingsPage = () => {
