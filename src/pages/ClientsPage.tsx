@@ -87,40 +87,6 @@ function getHealthColor(pct: number): string {
   return "bg-red-500";
 }
 
-function computeStats(interactions: InteractionRow[], clientId: string): ClientStats {
-  const clientInteractions = interactions.filter((i) => i.client_id === clientId);
-  const total = clientInteractions.length;
-
-  if (total === 0) {
-    return { total_30d: 0, dominant_tone: "ok", health_pct: 0, last_contact: null };
-  }
-
-  // Dominant tone (most frequent non-ok, fallback to ok)
-  const toneCounts: Record<string, number> = {};
-  let nonOkCount = 0;
-  clientInteractions.forEach((i) => {
-    const t = i.tone ?? "ok";
-    toneCounts[t] = (toneCounts[t] || 0) + 1;
-    if (t !== "ok") nonOkCount++;
-  });
-
-  let dominant = "ok";
-  let maxCount = 0;
-  for (const [tone, count] of Object.entries(toneCounts)) {
-    if (tone !== "ok" && count > maxCount) {
-      dominant = tone;
-      maxCount = count;
-    }
-  }
-  if (maxCount === 0) dominant = "ok";
-
-  const healthPct = Math.round((nonOkCount / total) * 100);
-  const lastContact = clientInteractions.reduce((max, i) =>
-    i.occurred_at > max ? i.occurred_at : max, clientInteractions[0].occurred_at);
-
-  return { total_30d: total, dominant_tone: dominant, health_pct: healthPct, last_contact: lastContact };
-}
-
 // ── Sort Button ──
 
 type SortCol = "name" | "total" | "tone" | "health" | "last_contact";
@@ -159,11 +125,6 @@ const ClientsPage = () => {
     }
   }, [sortKey]);
 
-  const thirtyDaysAgo = useMemo(
-    () => new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-    []
-  );
-
   const { data: clients = [], isLoading: loadingClients } = useQuery<ClientRow[]>({
     queryKey: ["clients_list", user?.id],
     enabled: !!user?.id,
@@ -180,27 +141,33 @@ const ClientsPage = () => {
     },
   });
 
-  const { data: interactions = [] } = useQuery<InteractionRow[]>({
-    queryKey: ["interactions_30d_all", user?.id, thirtyDaysAgo],
+  const { data: statsMap = {} } = useQuery<Record<string, ClientStats>>({
+    queryKey: ["client_stats_30d", user?.id],
     enabled: !!user?.id,
     staleTime: 5 * 60 * 1000,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("interactions")
-        .select("client_id, tone, occurred_at")
-        .gte("occurred_at", thirtyDaysAgo)
-        .limit(200);
+      const { data, error } = await supabase.rpc("client_stats_30d", { _user_id: user!.id });
       if (error) throw error;
-      return (data ?? []) as InteractionRow[];
+      const map: Record<string, ClientStats> = {};
+      (data as ClientStatsRow[] ?? []).forEach((r) => {
+        map[r.client_id] = {
+          total_30d: Number(r.total_30d),
+          dominant_tone: r.dominant_tone,
+          health_pct: r.health_pct,
+          last_contact: r.last_contact,
+        };
+      });
+      return map;
     },
   });
 
+  const DEFAULT_STATS: ClientStats = { total_30d: 0, dominant_tone: "ok", health_pct: 0, last_contact: null };
   const TONE_RANK: Record<string, number> = { ok: 0, atencao: 1, alerta: 2, critico: 3 };
 
   const clientsWithStats = useMemo(() => {
     const q = search.toLowerCase().trim();
     const list = clients
-      .map((c) => ({ ...c, stats: computeStats(interactions, c.id) }))
+      .map((c) => ({ ...c, stats: statsMap[c.id] ?? DEFAULT_STATS }))
       .filter((c) => !q || c.name.toLowerCase().includes(q) || c.slug.toLowerCase().includes(q));
 
     list.sort((a, b) => {
@@ -226,7 +193,7 @@ const ClientsPage = () => {
     });
 
     return list;
-  }, [clients, interactions, search, sortKey, sortDir]);
+  }, [clients, statsMap, search, sortKey, sortDir]);
 
   return (
     <div className="space-y-6">
