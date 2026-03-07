@@ -801,6 +801,37 @@ Para cada conversa, siga esta sequência mental:
 
 ---
 
+REGRA ADICIONAL DE SENTIMENTO:
+- Conversas funcionais resolvidas com "obrigada" simples = 0.3 a 0.5, não 0.7+
+- Reserve 0.7+ para satisfação EXPLÍCITA além do agradecimento padrão ("excelente!", "vocês são demais!", "resolveu super rápido")
+- Conversas com problema persistente por dias, mesmo com encerramento cortês, não devem ter sentimento acima de 0.3
+
+---
+
+## EXEMPLOS DE REFERÊNCIA (use para calibrar tema e tom)
+
+EXEMPLO 1 — integracao_erp, NÃO bugs:
+Conversa: cliente reporta erro na lista "Linx - Produtos pendentes". Produtos aparecem como pendentes mas já foram integrados, ou não aparecem quando deveriam.
+Classificação correta: tema=integracao_erp (é problema de sincronização entre uMode e ERP Linx)
+Erro comum: classificar como bugs porque parece funcionalidade quebrada. Se envolve Linx, SAP, ERP ou fila de integração = integracao_erp.
+
+EXEMPLO 2 — bugs, NÃO permissoes nem gestao_demandas:
+Conversa: cliente relata que não consegue marcar/atribuir um usuário em tarefas dentro da plataforma. A funcionalidade existe mas não opera.
+Classificação correta: tema=bugs (funcionalidade da plataforma que não opera como esperado)
+Erro comum: classificar como permissoes (parece problema de acesso) ou gestao_demandas (parece pedido de ação). Se a funcionalidade EXISTE mas NÃO FUNCIONA = bugs.
+
+EXEMPLO 3 — atencao legítimo com tom cortês:
+Conversa: cliente reporta problema de integração que persiste por 2+ semanas. Envia follow-ups diários como "Oi, notícias?" sempre com tom educado. Menciona urgência real: "o motorista vem às 14h", "preciso liberar para faturamento".
+Classificação correta: tom=atencao (persistência prolongada por não-resolução indica tensão acumulada, mesmo com linguagem cortês)
+Erro comum: classificar como ok porque cada mensagem individual é educada. Se o MESMO problema voltou 3+ vezes sem resolução, o mínimo é atencao.
+
+EXEMPLO 4 — atencao quando há múltiplos problemas simultâneos:
+Conversa: cliente reporta 5+ problemas diferentes numa sessão de 6 horas. Cada problema é tratado com cordialidade, mas o volume de falhas simultâneas gera tensão acumulada.
+Classificação correta: tom=atencao, sentimento negativo leve (-0.2 a -0.3)
+Erro comum: classificar como ok porque o tom de cada mensagem é cortês. Volume de falhas simultâneas = tensão real, mesmo sem linguagem agressiva.
+
+---
+
 Retorne apenas o JSON array. Sem texto adicional, sem markdown, sem explicações fora do JSON.`;
 
   const conversationPayload = Array.from(conversations.entries()).map(([convId, msgs]) => ({
