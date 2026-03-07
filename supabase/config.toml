@@ -1,16 +1,15 @@
 project_id = "qyfwbmukylyfsgzgocfo"
 
-[functions.gist-proxy]
-verify_jwt = false
-
-[functions.sync-gist-contacts]
-verify_jwt = false
-
-[functions.ingest-gist-historical]
-verify_jwt = false
-
-[functions.process-jobs]
-verify_jwt = false
-
-[functions.schedule-sync]
-verify_jwt = false
+[functions]
+  [functions.auth-email-hook]
+    verify_jwt = false
+  [functions.gist-proxy]
+    verify_jwt = false
+  [functions.ingest-gist-historical]
+    verify_jwt = false
+  [functions.process-jobs]
+    verify_jwt = false
+  [functions.schedule-sync]
+    verify_jwt = false
+  [functions.sync-gist-contacts]
+    verify_jwt = false
