@@ -1,4 +1,4 @@
-# CONTEXT.md — Estado do Projeto (atualizado 2026-03-07)
+# CONTEXT.md — Estado do Projeto (v2 — 2026-03-07)
 
 > Mantido pelo Claude Code ao final de cada sessão. Lido por todos os agentes para manter contexto.
 
@@ -12,7 +12,7 @@
 | 1 | Modelo de dados CX (clients, participants, interactions, sync_jobs) | Concluído |
 | 2 | Integrações Gist (proxy, bindings, discover, confirm-mapping) | Concluído |
 | 3 | Sync Engine (enqueue + process-jobs worker) | Concluído |
-| 4 | Classificação IA (classify_batch via Gemini/Claude) | Concluído |
+| 4 | Classificação IA (classify_batch via Gemini/Claude) | Concluído — pipeline ativo, processando backlog |
 | 5 | Dashboard e KPIs | Em progresso — KPIs live do Gist funcionais |
 | 6 | Auditorias e Alertas | Placeholder |
 | 7 | Insights IA avançados | Placeholder |
@@ -30,6 +30,7 @@
 | #6 | INSERT listener deve filtrar por activeJobIds | Resolvido — guard `activeJobIds.length === 0` | Lovable |
 | #7 | INSERT listener tem lógica invertida — tracks unknown jobs | Resolvido (commit `f363d89`) | Lovable |
 | #8 | classify_batch trava e subutiliza Gemini (timeout, JSON truncado, auto-chain sem limite) | Resolvido | Lovable |
+| — | GEMINI_API_KEY era free tier, causando 429 em 85% dos batches | Resolvido — chave paga configurada, Gemini operando como primário | Operador + Lovable |
 
 ---
 
@@ -59,6 +60,7 @@
 
 ## Próximos Passos Prioritários
 
-1. **Geral:** Verificar se `GEMINI_API_KEY` está configurada nos secrets do Supabase (estava falhando)
-2. **Geral:** Rodar classify_batch até zerar backlog de interações não classificadas
-3. **Fase 5:** Avançar dashboard com dados classificados (temas, tons, sentimentos)
+1. **Em andamento:** classify_batch processando backlog (~31k interações) via `gemini-2.5-flash` — auto-chain + cron cuidam automaticamente
+2. **Fase 5:** Avançar dashboard com dados classificados (temas, tons, sentimentos)
+3. **Fase 6:** Auditorias e Alertas
+4. **Fase 7:** Insights IA avançados
