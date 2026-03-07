@@ -5,6 +5,31 @@ const corsHeaders = {
 
 const GIST_BASE = 'https://api.getgist.com';
 const MAX_PAGES_PER_RUN = 5;
+const MAX_BATCHES_PER_JOB = 50; // 50 × 20 = 1,000 interactions per job
+
+// ── JSON parse with truncation recovery ──
+
+function parseWithRecovery(text: string): any[] {
+  try {
+    return JSON.parse(text);
+  } catch (_firstErr) {
+    // Gemini sometimes truncates the JSON array — try to recover
+    const lastBrace = text.lastIndexOf('}');
+    if (lastBrace > 0) {
+      const recovered = text.substring(0, lastBrace + 1) + ']';
+      try {
+        const result = JSON.parse(recovered);
+        if (Array.isArray(result)) {
+          console.warn(`[parseWithRecovery] Recovered ${result.length} items from truncated JSON`);
+          return result;
+        }
+      } catch (_recoveryErr) {
+        // fall through
+      }
+    }
+    throw new Error(`JSON parse failed and recovery unsuccessful. First 200 chars: ${text.substring(0, 200)}`);
+  }
+}
 
 // ── Shared helpers ──
 
@@ -550,7 +575,14 @@ async function handleClassifyBatch(
     return { has_more: false, progress: { classified: (job.progress as any)?.classified ?? 0, model_used: 'none' } };
   }
 
-  console.log(`[process-jobs:classify] Processing ${rows.length} interactions`);
+  // Auto-chain limit
+  const batchesProcessed = ((job.progress as any)?.batches_processed ?? 0) + 1;
+  if (batchesProcessed > MAX_BATCHES_PER_JOB) {
+    console.log(`[process-jobs:classify] Hit MAX_BATCHES_PER_JOB (${MAX_BATCHES_PER_JOB}), letting cron create a new job.`);
+    return { has_more: false, progress: { ...(job.progress as any), batches_processed: batchesProcessed - 1 } };
+  }
+
+  console.log(`[process-jobs:classify] Processing ${rows.length} interactions (batch ${batchesProcessed}/${MAX_BATCHES_PER_JOB})`);
 
   const VALID_THEMES = [
     'integracao_erp', 'agendamento', 'permissoes', 'cobranca_followup',
@@ -583,6 +615,7 @@ Respond ONLY with the JSON array, no markdown or explanation.`;
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          signal: AbortSignal.timeout(30_000),
           body: JSON.stringify({
             contents: [{ parts: [{ text: `${systemPrompt}\n\nInteractions:\n${userPrompt}` }] }],
             generationConfig: {
@@ -631,7 +664,7 @@ Respond ONLY with the JSON array, no markdown or explanation.`;
         } else {
           const text = candidate?.content?.parts?.[0]?.text;
           if (text) {
-            classifications = JSON.parse(text);
+            classifications = parseWithRecovery(text);
             modelUsed = 'gemini-2.5-flash';
             console.log(`[process-jobs:classify] Gemini returned ${classifications?.length ?? 0} classifications`);
           } else {
@@ -652,6 +685,7 @@ Respond ONLY with the JSON array, no markdown or explanation.`;
     try {
       const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
+        signal: AbortSignal.timeout(45_000),
         headers: {
           'Content-Type': 'application/json',
           'x-api-key': claudeKey,
@@ -670,7 +704,7 @@ Respond ONLY with the JSON array, no markdown or explanation.`;
         if (text) {
           // Strip markdown fences if present
           const cleaned = text.replace(/^```json?\s*/i, '').replace(/\s*```$/i, '').trim();
-          classifications = JSON.parse(cleaned);
+          classifications = parseWithRecovery(cleaned);
           modelUsed = 'claude-sonnet-4';
         }
       } else {
@@ -738,6 +772,7 @@ Respond ONLY with the JSON array, no markdown or explanation.`;
     has_more: rows.length === CLASSIFY_BATCH_SIZE,
     progress: {
       classified: previousClassified + classifiedCount,
+      batches_processed: batchesProcessed,
       model_used: modelUsed,
     },
   };
