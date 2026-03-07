@@ -1,26 +1,18 @@
 
-# Classificação Automática (classify_batch) — IMPLEMENTADO
 
-## O que foi feito
+## Disparar backlog completo de classify_batch
 
-### 1. Handler `handleClassifyBatch` em `process-jobs/index.ts`
-- Query: `interactions WHERE classified_at IS NULL AND content IS NOT NULL AND content != '' AND occurred_at >= now() - 90 days ORDER BY occurred_at DESC LIMIT 20`
-- Fallback: Gemini 2.5 Flash → Claude Sonnet 4 (se Gemini falhar)
-- Campos atualizados: `theme`, `theme_detail`, `tone`, `tone_detail`, `sentiment`, `is_out_of_scope`, `classified_at`, `classification_model`
-- Progress acumulativo: `classified: previousClassified + classifiedCount`
-- Heartbeat chamado após UPDATE do batch
+### Passos
 
-### 2. Case no switch do main loop
-- `case 'classify_batch'` adicionado, chamando `handleClassifyBatch(supaAdmin, job, updateHeartbeat)`
+1. **Cancelar jobs ativos** — UPDATE em `sync_jobs` onde `type='classify_batch'` e `status IN ('pending','running')` → `status='cancelled', completed_at=now()`
 
-### 3. Agendamento automático
-- `classify_batch` adicionado ao array `jobTypes` em `schedule-sync/index.ts`
+2. **Limpar classificações inválidas** — Resetar `classified_at=NULL` em interactions que ainda tenham themes inválidos do run anterior (se houver)
 
-### Resiliência (coberta pelo main loop genérico)
-| Mecanismo | Cobertura |
-|-----------|-----------|
-| Auto-chain | Handler retorna `has_more: true` quando batch = 20 |
-| Heartbeat | `updateHeartbeat()` chamado após UPDATE |
-| Retry | throw → main loop incrementa retry_count |
-| Fallback | Gemini → Claude dentro do handler |
-| Órfãos | Query genérica de reset já cobre |
+3. **Criar job novo** — Usar RPC `create_job_if_none_active('classify_batch', NULL, '{}')` para inserir job pendente
+
+4. **Disparar process-jobs** — POST via `curl_edge_functions` para iniciar processamento imediato; auto-chain cuida do resto
+
+### Estimativa
+
+~29.000 interações ÷ 20 por batch = ~1.450 batches. Com ~2-3s por batch (Gemini Flash), estimativa de ~1-1.5h para completar o backlog inteiro.
+
