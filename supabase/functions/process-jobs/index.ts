@@ -514,6 +514,168 @@ async function handleIngestHistorical(
   };
 }
 
+// ── Classify Batch Handler ──
+
+const CLASSIFY_BATCH_SIZE = 20;
+
+async function handleClassifyBatch(
+  supaAdmin: any,
+  job: SyncJob,
+  updateHeartbeat: () => Promise<void>,
+): Promise<HandlerResult> {
+  const geminiKey = Deno.env.get('GEMINI_API_KEY');
+  const claudeKey = Deno.env.get('CLAUDE_API_KEY');
+
+  if (!geminiKey && !claudeKey) {
+    return { has_more: false, progress: {}, error: 'Missing GEMINI_API_KEY and CLAUDE_API_KEY' };
+  }
+
+  // Fetch unclassified interactions
+  const { data: rows, error: fetchErr } = await supaAdmin
+    .from('interactions')
+    .select('id, content, sender_side')
+    .is('classified_at', null)
+    .not('content', 'is', null)
+    .neq('content', '')
+    .gte('occurred_at', new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString())
+    .order('occurred_at', { ascending: false })
+    .limit(CLASSIFY_BATCH_SIZE);
+
+  if (fetchErr) {
+    return { has_more: false, progress: {}, error: `Fetch error: ${fetchErr.message}` };
+  }
+
+  if (!rows || rows.length === 0) {
+    console.log('[process-jobs:classify] No unclassified interactions found');
+    return { has_more: false, progress: { classified: (job.progress as any)?.classified ?? 0, model_used: 'none' } };
+  }
+
+  console.log(`[process-jobs:classify] Processing ${rows.length} interactions`);
+
+  const systemPrompt = `You are a customer interaction classifier. For each interaction, return a JSON array where each element has:
+- "id": the interaction UUID
+- "theme": one of: "onboarding", "suporte_tecnico", "financeiro", "comercial", "produto_feedback", "bug_report", "cancelamento", "renovacao", "integracao", "treinamento", "consultoria", "reclamacao", "elogio", "outros"
+- "theme_detail": a short description (max 50 chars) of the specific topic
+- "tone": one of: "ok", "atencao", "alerta", "critico"
+- "tone_detail": a short justification (max 80 chars) for the tone classification
+- "sentiment": a number from -1.0 (very negative) to 1.0 (very positive)
+- "is_out_of_scope": boolean, true if the message is automated/system/irrelevant (e.g. "joined the conversation")
+
+Respond ONLY with the JSON array, no markdown or explanation.`;
+
+  const userPrompt = JSON.stringify(rows.map((r: any) => ({ id: r.id, content: r.content, sender_side: r.sender_side })));
+
+  let classifications: any[] | null = null;
+  let modelUsed = '';
+
+  // Try Gemini first
+  if (geminiKey) {
+    try {
+      const geminiRes = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: `${systemPrompt}\n\nInteractions:\n${userPrompt}` }] }],
+            generationConfig: { responseMimeType: 'application/json' },
+          }),
+        },
+      );
+      if (geminiRes.ok) {
+        const geminiData = await geminiRes.json();
+        const text = geminiData.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (text) {
+          classifications = JSON.parse(text);
+          modelUsed = 'gemini-2.5-flash';
+        }
+      } else {
+        console.error(`[process-jobs:classify] Gemini error: ${geminiRes.status} ${await geminiRes.text()}`);
+      }
+    } catch (err) {
+      console.error(`[process-jobs:classify] Gemini exception: ${err instanceof Error ? err.message : err}`);
+    }
+  }
+
+  // Fallback to Claude
+  if (!classifications && claudeKey) {
+    try {
+      const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': claudeKey,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 4096,
+          system: systemPrompt,
+          messages: [{ role: 'user', content: userPrompt }],
+        }),
+      });
+      if (claudeRes.ok) {
+        const claudeData = await claudeRes.json();
+        const text = claudeData.content?.[0]?.text;
+        if (text) {
+          // Strip markdown fences if present
+          const cleaned = text.replace(/^```json?\s*/i, '').replace(/\s*```$/i, '').trim();
+          classifications = JSON.parse(cleaned);
+          modelUsed = 'claude-sonnet-4';
+        }
+      } else {
+        console.error(`[process-jobs:classify] Claude error: ${claudeRes.status} ${await claudeRes.text()}`);
+      }
+    } catch (err) {
+      console.error(`[process-jobs:classify] Claude exception: ${err instanceof Error ? err.message : err}`);
+    }
+  }
+
+  if (!classifications || !Array.isArray(classifications)) {
+    throw new Error('Both Gemini and Claude failed to classify interactions');
+  }
+
+  // Update each interaction
+  let classifiedCount = 0;
+  const now = new Date().toISOString();
+
+  for (const c of classifications) {
+    if (!c.id) continue;
+    const { error: updErr } = await supaAdmin
+      .from('interactions')
+      .update({
+        theme: c.theme ?? null,
+        theme_detail: c.theme_detail ?? null,
+        tone: c.tone ?? 'ok',
+        tone_detail: c.tone_detail ?? null,
+        sentiment: c.sentiment ?? null,
+        is_out_of_scope: c.is_out_of_scope ?? false,
+        classified_at: now,
+        classification_model: modelUsed,
+      })
+      .eq('id', c.id);
+    if (updErr) {
+      console.error(`[process-jobs:classify] Update error for ${c.id}: ${updErr.message}`);
+    } else {
+      classifiedCount++;
+    }
+  }
+
+  await updateHeartbeat();
+
+  const previousClassified = (job.progress as any)?.classified ?? 0;
+
+  console.log(`[process-jobs:classify] Classified ${classifiedCount}/${rows.length} using ${modelUsed} (total: ${previousClassified + classifiedCount})`);
+
+  return {
+    has_more: rows.length === CLASSIFY_BATCH_SIZE,
+    progress: {
+      classified: previousClassified + classifiedCount,
+      model_used: modelUsed,
+    },
+  };
+}
+
 // ── Main ──
 
 Deno.serve(async (req) => {
@@ -592,6 +754,9 @@ Deno.serve(async (req) => {
           break;
         case 'ingest_historical':
           result = await handleIngestHistorical(supaAdmin, apiKey, job, updateHeartbeat);
+          break;
+        case 'classify_batch':
+          result = await handleClassifyBatch(supaAdmin, job, updateHeartbeat);
           break;
         default:
           result = { has_more: false, progress: {}, error: `Unknown job type: ${job.type}` };
