@@ -1,52 +1,31 @@
 
+# Sincronização Automática Agendada — IMPLEMENTADO
 
-## Diagnóstico de Segurança — 2 Warnings Pré-existentes
+## O que foi feito
 
----
+### 1. Tabela `app_settings`
+- Criada com RLS (SELECT/UPDATE para authenticated)
+- Flag `auto_sync_enabled = true` inserida
 
-### Warning 1: RLS `app_settings` — UPDATE aberto
+### 2. RLS para jobs automáticos
+- `sync_jobs_automated_select`: jobs sem `created_by` visíveis a qualquer autenticado
+- `sync_jobs_automated_update`: qualquer autenticado pode cancelar jobs automáticos travados
 
-**Policies atuais:**
+### 3. Edge Function `schedule-sync`
+- Verifica `auto_sync_enabled` antes de criar jobs
+- Busca `since_timestamp` do último job concluído de cada tipo
+- Chama `create_job_if_none_active` com `_created_by = NULL`
+- Fire-and-forget para `process-jobs`
 
-| Policy | Command | Restrictive | Expression |
-|--------|---------|-------------|------------|
-| `app_settings_read` | SELECT | Yes | `true` (qualquer autenticado lê) |
-| `app_settings_update` | UPDATE | Yes | `true` (qualquer autenticado altera) |
+### 4. Crons (pg_cron, horários em UTC ajustados para BRT)
+| Nome | Schedule (UTC) | BRT | Função |
+|------|---------------|-----|--------|
+| `schedule-sync-bh` | `*/5 11-21 * * 1-5` | 08:00–18:55 Seg-Sex | schedule-sync |
+| `schedule-sync-eod` | `59 2 * * 2-6` | 23:59 Seg-Sex | schedule-sync |
+| `process-jobs-fallback` | `*/3 11-22 * * 1-5` | 08:00–19:00 Seg-Sex | process-jobs |
 
-**Problema:** A policy `app_settings_update` usa `USING (true)`, permitindo que qualquer usuário autenticado altere qualquer configuração do sistema (ex: `default_stale_days`, `sync_interval`).
+Cron antigo `process-jobs` (`*/2 * * * *` 24/7) removido.
 
-**Correção proposta:** Substituir a policy de UPDATE para restringir a usuários com role `admin` em `user_client_access`:
-
-```sql
-DROP POLICY "app_settings_update" ON app_settings;
-
-CREATE POLICY "app_settings_update" ON app_settings
-  FOR UPDATE TO authenticated
-  AS RESTRICTIVE
-  USING (
-    EXISTS (
-      SELECT 1 FROM user_client_access
-      WHERE user_id = auth.uid() AND role = 'admin'
-    )
-  );
-```
-
----
-
-### Warning 2: Leaked Password Protection Disabled
-
-**Não é uma senha exposta no código.** O scan detectou que a funcionalidade **Leaked Password Protection** do sistema de autenticação está **desabilitada**. Esta feature verifica se senhas usadas no signup/login aparecem em bancos de dados de senhas vazadas (HaveIBeenPwned).
-
-**Correção proposta:** Ativar via `configure_auth` tool — é uma configuração do backend de autenticação, não requer mudança de código.
-
----
-
-### Resumo
-
-| Warning | Tipo | Correção |
-|---------|------|----------|
-| `app_settings` UPDATE | Policy RLS aberta | Migration SQL — restringir a admins |
-| Leaked password | Feature de auth desabilitada | Configuração do backend auth |
-
-Nenhuma senha ou chave está exposta no código-fonte. Confirma para implementar ambas as correções?
-
+### 5. UI — Toggle na SettingsPage
+- Card "Agendamento Automático" com Switch, Badge de status, info estática
+- Lê/escreve `app_settings.auto_sync_enabled`
