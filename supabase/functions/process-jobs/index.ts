@@ -660,6 +660,15 @@ Respond ONLY with the JSON array, no markdown or explanation.`;
     throw new Error('Both Gemini and Claude failed to classify interactions');
   }
 
+  // Validate and sanitize themes — fallback invalid slugs to 'outro'
+  const validThemeSet = new Set<string>(VALID_THEMES);
+  for (const c of classifications) {
+    if (c.theme && !validThemeSet.has(c.theme)) {
+      console.warn(`[process-jobs:classify] Invalid theme "${c.theme}" for ${c.id}, falling back to "outro"`);
+      c.theme = 'outro';
+    }
+  }
+
   // Update each interaction
   let classifiedCount = 0;
   const now = new Date().toISOString();
