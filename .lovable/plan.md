@@ -1,31 +1,26 @@
 
-# Sincronização Automática Agendada — IMPLEMENTADO
+# Classificação Automática (classify_batch) — IMPLEMENTADO
 
 ## O que foi feito
 
-### 1. Tabela `app_settings`
-- Criada com RLS (SELECT/UPDATE para authenticated)
-- Flag `auto_sync_enabled = true` inserida
+### 1. Handler `handleClassifyBatch` em `process-jobs/index.ts`
+- Query: `interactions WHERE classified_at IS NULL AND content IS NOT NULL AND content != '' AND occurred_at >= now() - 90 days ORDER BY occurred_at DESC LIMIT 20`
+- Fallback: Gemini 2.5 Flash → Claude Sonnet 4 (se Gemini falhar)
+- Campos atualizados: `theme`, `theme_detail`, `tone`, `tone_detail`, `sentiment`, `is_out_of_scope`, `classified_at`, `classification_model`
+- Progress acumulativo: `classified: previousClassified + classifiedCount`
+- Heartbeat chamado após UPDATE do batch
 
-### 2. RLS para jobs automáticos
-- `sync_jobs_automated_select`: jobs sem `created_by` visíveis a qualquer autenticado
-- `sync_jobs_automated_update`: qualquer autenticado pode cancelar jobs automáticos travados
+### 2. Case no switch do main loop
+- `case 'classify_batch'` adicionado, chamando `handleClassifyBatch(supaAdmin, job, updateHeartbeat)`
 
-### 3. Edge Function `schedule-sync`
-- Verifica `auto_sync_enabled` antes de criar jobs
-- Busca `since_timestamp` do último job concluído de cada tipo
-- Chama `create_job_if_none_active` com `_created_by = NULL`
-- Fire-and-forget para `process-jobs`
+### 3. Agendamento automático
+- `classify_batch` adicionado ao array `jobTypes` em `schedule-sync/index.ts`
 
-### 4. Crons (pg_cron, horários em UTC ajustados para BRT)
-| Nome | Schedule (UTC) | BRT | Função |
-|------|---------------|-----|--------|
-| `schedule-sync-bh` | `*/5 11-21 * * 1-5` | 08:00–18:55 Seg-Sex | schedule-sync |
-| `schedule-sync-eod` | `59 2 * * 2-6` | 23:59 Seg-Sex | schedule-sync |
-| `process-jobs-fallback` | `*/3 11-22 * * 1-5` | 08:00–19:00 Seg-Sex | process-jobs |
-
-Cron antigo `process-jobs` (`*/2 * * * *` 24/7) removido.
-
-### 5. UI — Toggle na SettingsPage
-- Card "Agendamento Automático" com Switch, Badge de status, info estática
-- Lê/escreve `app_settings.auto_sync_enabled`
+### Resiliência (coberta pelo main loop genérico)
+| Mecanismo | Cobertura |
+|-----------|-----------|
+| Auto-chain | Handler retorna `has_more: true` quando batch = 20 |
+| Heartbeat | `updateHeartbeat()` chamado após UPDATE |
+| Retry | throw → main loop incrementa retry_count |
+| Fallback | Gemini → Claude dentro do handler |
+| Órfãos | Query genérica de reset já cobre |
