@@ -4,9 +4,9 @@
 > Estado do projeto em CONTEXT.md. Instrucoes do Claude Code em CLAUDE.md.
 > Playbook completo: https://umode.gitbook.io/playbook-de-engenharia
 >
-> last_updated: 2026-03-07
+> last_updated: 2026-03-08
 > last_updated_by: Claude Code
-> version: v5
+> version: v6
 
 ---
 
@@ -15,7 +15,8 @@
 | Agente | Papel | Canal |
 |--------|-------|-------|
 | **Claude Code** | Revisao e Engenharia | Terminal / CLI |
-| **Lovable** | Desenvolvimento e Deploy | Interface Lovable |
+| **Cursor** | Desenvolvimento Frontend | Cursor IDE |
+| **Lovable** | Migrations e Edge Functions | Interface Lovable |
 | **Projeto** (Claude.ai) | Auditoria e Estrategia | claude.ai |
 | **Operador** (Joao) | Orquestrador Humano | Supabase Dashboard / GitHub |
 
@@ -34,18 +35,34 @@ Restricoes:
 - Mudanca de schema ou Edge Function -> criar Issue para o Lovable
 - Nunca pedir ao Operador para intermediar dados — gerar conteudo completo
 
-### Lovable
+### Cursor
+Responsabilidades:
+- Componentes UI e paginas React
+- Hooks, utils e logica de frontend
+- Estilizacao (Tailwind CSS)
+- Refactors de frontend
+
+Restricoes:
+- Ler `CONTEXT.md` antes de iniciar qualquer sessao
+- **Nunca editar:** `src/integrations/supabase/*`, `supabase/config.toml`, `.env`, `supabase/migrations/*`
+- **Nunca editar:** `CONTEXT.md`, `AGENTS.md`, `CLAUDE.md`
+- Se precisar de mudanca no banco ou edge function -> criar Issue no GitHub e comunicar ao Operador
+- Seguir Checklist do CTO em todo codigo gerado
+- Todo codigo submetido via PR para review do Claude Code
+
+### Lovable (escopo reduzido)
 Responsabilidades:
 - Migrations de banco (via migration tool)
 - Edge Functions (codigo + deploy)
-- Componentes UI e paginas React
 - Deploy no Supabase
+- Alteracoes que exigem acesso direto ao Supabase project
 
 Restricoes:
 - Ler `CONTEXT.md` antes de iniciar qualquer sessao
 - Implementa apenas via Issues ou instrucoes diretas do Operador
 - Nao altera documentacao (`CONTEXT.md`, `AGENTS.md`, `CLAUDE.md`)
 - Seguir Checklist do CTO em todo codigo gerado
+- Frontend agora e responsabilidade do Cursor — Lovable so altera UI se envolver migration/edge function
 
 ### Projeto (Claude.ai)
 Responsabilidades:
@@ -79,8 +96,9 @@ Claude Code cria Issue no GitHub com:
   - Criterios de aceitacao
   - Itens do Checklist CTO aplicaveis
   |
-  v
-Lovable implementa (migration + edge function + UI)
+  +---> Frontend (UI, hooks, paginas) ---> Cursor implementa
+  |
+  +---> Backend (migration, edge function) ---> Lovable implementa
   |
   v
 Claude Code revisa contra Checklist do CTO
@@ -92,10 +110,12 @@ Operador testa no Supabase / Projeto audita (blind tests)
 Claude Code atualiza CONTEXT.md
 ```
 
-**Protocolo de rollback** (quando Lovable quebra algo):
-1. Operador reverte o deploy via painel do Lovable (versao anterior)
+**Protocolo de rollback** (quando um agente de desenvolvimento quebra algo):
+1. Reverter:
+   - Lovable: Operador reverte via painel do Lovable (versao anterior)
+   - Cursor: git revert no PR que introduziu o problema
 2. Claude Code abre Issue documentando o comportamento quebrado
-3. Lovable reimplementa com a correcao
+3. Agente responsavel reimplementa com a correcao
 
 **Protocolo de divergencia tecnica** (quando agentes discordam):
 1. Claude Code documenta a divergencia com evidencia (item do Checklist, anti-padrao, principio)
@@ -112,7 +132,7 @@ Formato da divergencia:
 - Contras: ...
 - Referencia: [item do Checklist/Playbook/PRD]
 
-### Posicao Lovable
+### Posicao Lovable / Cursor
 - Proposta: ...
 - Pros: ...
 - Contras: ...
@@ -279,7 +299,8 @@ mas o processo de validacao formal "ainda esta sendo pilotado" (meta: cobertura 
 
 | Camada | Tecnologia |
 |--------|-----------|
-| Frontend | Lovable (React + Tailwind) |
+| Frontend (dev) | Cursor IDE (React + Tailwind) |
+| Frontend (deploy) | Lovable |
 | Backend/DB | Supabase (PostgreSQL + Auth + Edge Functions + Realtime) |
 | IA Principal | Gemini `gemini-2.5-pro` |
 | IA Fallback | `claude-sonnet-4` |
