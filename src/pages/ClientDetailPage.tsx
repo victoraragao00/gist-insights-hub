@@ -28,7 +28,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 import { usePriorityScores } from "@/hooks/usePriorityScores";
+import { useClientToneTrend } from "@/hooks/useClientToneTrend";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { ChartContainer } from "@/components/ui/chart";
 
 // ── Types ──
 
@@ -294,6 +296,17 @@ const ClientDetailPage = () => {
     return scores.find((s) => s.client_id === client.id) ?? null;
   }, [client, scores]);
 
+  const { data: toneTrend, isLoading: toneTrendLoading } = useClientToneTrend(clientId ?? undefined);
+  const toneTrendChartData = useMemo(
+    () =>
+      toneTrend?.map((d) => ({
+        ...d,
+        day: new Date(d.day + "T00:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }),
+      })) ?? [],
+    [toneTrend]
+  );
+  const toneTrendEmpty = toneTrend && toneTrend.every((d) => d.ok === 0 && d.atencao === 0 && d.alerta === 0 && d.critico === 0);
+
   // ── Computed stats ──
 
   const stats = useMemo(() => {
@@ -554,6 +567,40 @@ const ClientDetailPage = () => {
                   </BarChart>
                 </ResponsiveContainer>
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Tone trend 7d */}
+          <Card className="border border-border rounded-xl">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base font-semibold">Evolução de tom (7 dias)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {toneTrendLoading ? (
+                <Skeleton className="h-48 w-full animate-shimmer" />
+              ) : toneTrendEmpty ? (
+                <p className="text-sm text-muted-foreground py-8 text-center">Sem interações classificadas nos últimos 7 dias</p>
+              ) : toneTrendChartData.length > 0 ? (
+                <ChartContainer
+                  config={{
+                    ok: { label: "Ok", color: "hsl(160, 84%, 39%)" },
+                    atencao: { label: "Atenção", color: "hsl(48, 96%, 53%)" },
+                    alerta: { label: "Alerta", color: "hsl(25, 95%, 53%)" },
+                    critico: { label: "Crítico", color: "hsl(0, 84%, 60%)" },
+                  }}
+                  className="h-48 w-full"
+                >
+                  <BarChart data={toneTrendChartData} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
+                    <XAxis dataKey="day" tick={{ fontSize: 10 }} />
+                    <YAxis tick={{ fontSize: 10 }} />
+                    <Tooltip />
+                    <Bar dataKey="ok" stackId="tone" fill="var(--color-ok)" radius={[0, 0, 0, 0]} />
+                    <Bar dataKey="atencao" stackId="tone" fill="var(--color-atencao)" radius={[0, 0, 0, 0]} />
+                    <Bar dataKey="alerta" stackId="tone" fill="var(--color-alerta)" radius={[0, 0, 0, 0]} />
+                    <Bar dataKey="critico" stackId="tone" fill="var(--color-critico)" radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ChartContainer>
+              ) : null}
             </CardContent>
           </Card>
 
