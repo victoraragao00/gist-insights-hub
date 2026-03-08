@@ -1183,6 +1183,19 @@ Deno.serve(async (req) => {
         completed_at: new Date().toISOString(),
         progress: result.progress,
       }).eq('id', job.id);
+
+      // Event-driven: trigger priority score recalculation after classify_batch completes
+      if (job.type === 'classify_batch') {
+        const priorityUrl = `${supabaseUrl}/functions/v1/calculate-priority-scores`;
+        fetch(priorityUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+          },
+          body: JSON.stringify({}),
+        }).catch(() => {}); // fire-and-forget — cron is the safety net
+      }
     }
 
     return new Response(JSON.stringify({ claimed: true, job_id: job.id, result }), {
