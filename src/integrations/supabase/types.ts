@@ -41,6 +41,7 @@ export type Database = {
           id: string
           message: string
           metric_value: number
+          read: boolean
           rule_id: string
           threshold: number
         }
@@ -52,6 +53,7 @@ export type Database = {
           id?: string
           message: string
           metric_value: number
+          read?: boolean
           rule_id: string
           threshold: number
         }
@@ -63,6 +65,7 @@ export type Database = {
           id?: string
           message?: string
           metric_value?: number
+          read?: boolean
           rule_id?: string
           threshold?: number
         }
@@ -526,6 +529,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      audit_alerts_summary: {
+        Args: { p_user_id: string }
+        Returns: {
+          alerts: Json
+          total_alerts_30d: number
+          unread_count: number
+        }[]
+      }
       claim_next_job: {
         Args: never
         Returns: {
