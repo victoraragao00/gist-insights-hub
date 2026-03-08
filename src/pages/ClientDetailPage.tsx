@@ -21,7 +21,8 @@ import {
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ChevronRight, Pencil, MoreHorizontal, Loader2, Upload } from "lucide-react";
+import { ChevronRight, Pencil, MoreHorizontal, Loader2, Upload, AlertCircle } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { InteractionsFeed } from "@/components/InteractionsFeed";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -179,7 +180,7 @@ const ClientDetailPage = () => {
 
   // ── Queries ──
 
-  const { data: client, isLoading: loadingClient } = useQuery<ClientDetail | null>({
+  const { data: client, isLoading: loadingClient, isError: clientError, refetch: refetchClient } = useQuery<ClientDetail | null>({
     queryKey: ["client_detail", user?.id, slug],
     enabled: !!slug && !!user?.id,
     staleTime: 5 * 60 * 1000,
@@ -417,6 +418,26 @@ const ClientDetailPage = () => {
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
           {[1, 2, 3, 4, 5, 6].map((i) => <Skeleton key={i} className="h-24 rounded-xl" />)}
         </div>
+      </div>
+    );
+  }
+
+  if (clientError) {
+    return (
+      <div className="space-y-4 p-6">
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Erro ao carregar cliente</AlertTitle>
+          <AlertDescription>
+            Não foi possível carregar os dados. Tente novamente.
+            <Button variant="outline" size="sm" className="mt-2" onClick={() => refetchClient()}>
+              Tentar novamente
+            </Button>
+          </AlertDescription>
+        </Alert>
+        <Button variant="outline" onClick={() => navigate("/clients")}>
+          Voltar para Clientes
+        </Button>
       </div>
     );
   }
