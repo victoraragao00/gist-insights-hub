@@ -1,41 +1,262 @@
+import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
+import { formatDistanceToNow } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import {
+  AlertCircle,
+  ChevronDown,
+  ChevronUp,
+  Loader2,
+  RefreshCw,
+  TrendingUp,
+} from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowRight } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { useUserRole } from "@/hooks/useUserRole";
+import { usePriorityScores, type PriorityScoreRow, type PriorityPattern } from "@/hooks/usePriorityScores";
+import { useRecalculatePriority } from "@/hooks/useRecalculatePriority";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/context/AuthContext";
+
+const PAGE_SIZE = 50;
+const TIER_CLASS: Record<string, string> = {
+  azzas: "bg-primary text-primary-foreground",
+  enterprise: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300",
+  medium: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
+  small: "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400",
+};
+const SEVERITY_CLASS: Record<string, string> = {
+  high: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300",
+  medium: "bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-300",
+  low: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
+};
+function scoreColorClass(score: number): string {
+  const s = Math.min(score, 100);
+  if (s >= 80) return "text-red-600 bg-red-500 dark:text-red-400 dark:bg-red-600";
+  if (s >= 60) return "text-orange-600 bg-orange-500 dark:text-orange-400 dark:bg-orange-600";
+  if (s >= 30) return "text-yellow-600 bg-yellow-500 dark:text-yellow-400 dark:bg-yellow-600";
+  return "text-emerald-600 bg-emerald-500 dark:text-emerald-400 dark:bg-emerald-600";
+}
+function scoreBarClass(score: number): string {
+  const s = Math.min(score, 100);
+  if (s >= 80) return "bg-red-500 dark:bg-red-600";
+  if (s >= 60) return "bg-orange-500 dark:bg-orange-600";
+  if (s >= 30) return "bg-yellow-500 dark:bg-yellow-600";
+  return "bg-emerald-500 dark:bg-emerald-600";
+}
+
+function PatternItem({ p }: { p: PriorityPattern }) {
+  const sev = (p.severity ?? "medium") as keyof typeof SEVERITY_CLASS;
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted/30 px-3 py-2 text-sm">
+      {p.theme && <span className="font-medium text-foreground">{p.theme}</span>}
+      <Badge className={SEVERITY_CLASS[sev] ?? SEVERITY_CLASS.medium} variant="outline">
+        {sev}
+      </Badge>
+      {p.user_count != null && (
+        <span className="text-muted-foreground">{p.user_count} usuários</span>
+      )}
+      {p.description && (
+        <span className="w-full text-muted-foreground md:w-auto">{p.description}</span>
+      )}
+    </div>
+  );
+}
 
 const Index = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const { isAdmin, isLoading: roleLoading } = useUserRole();
+  const { data: scores, isLoading: scoresLoading, isError, refetch } = usePriorityScores();
+  const recalc = useRecalculatePriority();
+
+  const { data: clientsWithoutConfigCount = 0 } = useQuery({
+    queryKey: ["clients-without-priority-config", user?.id],
+    queryFn: async () => {
+      const { data: clients, error: e1 } = await supabase.from("clients").select("id");
+      if (e1) throw e1;
+      const { data: configs, error: e2 } = await supabase
+        .from("client_priority_config")
+        .select("client_id");
+      if (e2) throw e2;
+      const configIds = new Set((configs ?? []).map((c) => c.client_id));
+      return (clients ?? []).filter((c) => !configIds.has(c.id)).length;
+    },
+    enabled: !!user?.id && isAdmin,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const list = (scores ?? []) as PriorityScoreRow[];
+  const displayList = list.slice(0, PAGE_SIZE);
+
+  if (roleLoading) {
+    return (
+      <div className="space-y-6 p-4 md:p-6">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-4 w-72" />
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <Skeleton key={i} className="h-32 rounded-xl animate-shimmer" />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground">
-          Visão geral e prioridades (em breve).
-        </p>
-      </div>
-
-      <Card className="border-0 shadow-sm">
-        <CardHeader>
-          <CardTitle className="text-lg">Próximos passos</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
+    <div className="space-y-6 p-4 md:p-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Dashboard de Prioridade</h1>
           <p className="text-muted-foreground">
-            Acesse clientes, auditorias e configurações.
+            Clientes ordenados por score de prioridade (últimos 30 dias).
           </p>
-          <div className="flex gap-2 flex-wrap">
-            <Button variant="outline" onClick={() => navigate("/clients")}>
-              Clientes <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-            <Button variant="outline" onClick={() => navigate("/audits")}>
-              Auditorias <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-            <Button onClick={() => navigate("/settings")}>
-              Configurações <ArrowRight className="ml-2 h-4 w-4" />
+        </div>
+        {isAdmin && (
+          <div className="flex flex-wrap items-center gap-2">
+            {clientsWithoutConfigCount > 0 && (
+              <p className="text-sm text-muted-foreground">
+                {clientsWithoutConfigCount} cliente(s) sem configuração de prioridade
+              </p>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => recalc.mutate(undefined)}
+              disabled={recalc.isPending}
+            >
+              {recalc.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <RefreshCw className="h-4 w-4 mr-2" />
+              )}
+              Atualizar agora
             </Button>
           </div>
-        </CardContent>
-      </Card>
+        )}
+      </div>
+
+      {isError && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Erro ao carregar scores</AlertTitle>
+          <AlertDescription>
+            Não foi possível carregar os dados. Tente novamente.
+            <Button variant="outline" size="sm" className="mt-2" onClick={() => refetch()}>
+              Tentar novamente
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {!isError && scoresLoading && (
+        <div className="space-y-3">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <Skeleton key={i} className="h-20 w-full rounded-xl animate-shimmer" />
+          ))}
+        </div>
+      )}
+
+      {!isError && !scoresLoading && list.length === 0 && (
+        <Card className="border-border">
+          <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+            <TrendingUp className="h-12 w-12 text-muted-foreground mb-4" />
+            <p className="text-lg font-medium text-foreground">Nenhum score calculado ainda</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              Os scores são atualizados após a classificação. Configure prioridades nos clientes.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {!isError && !scoresLoading && list.length > 0 && (
+        <div className="space-y-3">
+          {displayList.map((row, i) => {
+            const displayScore = Math.min(row.score, 100);
+            const scorePct = Math.min((row.score / 100) * 100, 100);
+            const isCritical = displayScore >= 80;
+            return (
+              <Collapsible key={row.id}>
+                <Card
+                  className={`border-border transition-shadow duration-200 hover:shadow-md ${isCritical ? "animate-pulse-subtle" : ""}`}
+                >
+                  <CardHeader className="pb-2">
+                    <div
+                      className="flex flex-wrap items-center gap-3 animate-fade-in-up"
+                      style={{ animationDelay: `${Math.min(i, 9) * 50}ms` }}
+                    >
+                      <div
+                        className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-lg tabular-nums text-lg font-bold ${scoreColorClass(row.score)} animate-score-pop`}
+                      >
+                        {displayScore}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <CardTitle className="text-base font-semibold">
+                          <button
+                            type="button"
+                            className="text-left hover:underline focus:outline-none"
+                            onClick={() => navigate(`/clients/${row.client_slug}`)}
+                          >
+                            {row.client_name}
+                          </button>
+                        </CardTitle>
+                        <div className="mt-1 flex flex-wrap items-center gap-2">
+                          <Badge className={TIER_CLASS[row.tier] ?? TIER_CLASS.medium}>
+                            {row.tier}
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">
+                            Atualizado {formatDistanceToNow(new Date(row.calculated_at), { locale: ptBR, addSuffix: true })}
+                          </span>
+                        </div>
+                      </div>
+                      <CollapsibleTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 group">
+                          <ChevronDown className="h-4 w-4 group-data-[state=open]:hidden" />
+                          <ChevronUp className="h-4 w-4 hidden group-data-[state=open]:block" />
+                        </Button>
+                      </CollapsibleTrigger>
+                    </div>
+                    <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-muted">
+                      <div
+                        className={`h-full rounded-full ${scoreBarClass(row.score)} animate-progress-fill`}
+                        style={{ ["--progress-width" as string]: `${scorePct}%` }}
+                      />
+                    </div>
+                  </CardHeader>
+                  <CollapsibleContent>
+                    <CardContent className="pt-0">
+                      {row.patterns.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">Nenhum padrão detectado.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          <p className="text-xs font-medium text-muted-foreground">Padrões</p>
+                          {row.patterns.map((p, idx) => (
+                            <PatternItem key={`${p.theme ?? "p"}-${p.severity ?? "s"}-${idx}`} p={p} />
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </CollapsibleContent>
+                </Card>
+              </Collapsible>
+            );
+          })}
+        </div>
+      )}
+
+      {!isError && !scoresLoading && list.length > PAGE_SIZE && (
+        <p className="text-center text-sm text-muted-foreground">
+          Exibindo os {PAGE_SIZE} primeiros de {list.length} clientes.
+        </p>
+      )}
     </div>
   );
 };
