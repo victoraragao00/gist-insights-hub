@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -168,8 +168,6 @@ const ClientDetailPage = () => {
   const queryClient = useQueryClient();
 
   const [scopeText, setScopeText] = useState<string | null>(null);
-  const [savingScope, setSavingScope] = useState(false);
-  const [deactivating, setDeactivating] = useState(false);
 
   const thirtyDaysAgo = useMemo(
     () => new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(), []
@@ -346,42 +344,40 @@ const ClientDetailPage = () => {
 
   // ── Actions ──
 
-  const handleSaveScope = async () => {
-    if (!client) return;
-    setSavingScope(true);
-    try {
-      const existing = (client.metadata ?? {}) as Record<string, unknown>;
+  const saveScopeMutation = useMutation({
+    mutationFn: async (payload: { client: ClientDetail; scopeText: string | null }) => {
+      const existing = (payload.client.metadata ?? {}) as Record<string, unknown>;
       const { error } = await supabase
         .from("clients")
-        .update({ metadata: { ...existing, scope: scopeText } })
-        .eq("id", client.id);
+        .update({ metadata: { ...existing, scope: payload.scopeText } })
+        .eq("id", payload.client.id);
       if (error) throw error;
+    },
+    onSuccess: () => {
       toast.success("Escopo salvo!");
       queryClient.invalidateQueries({ queryKey: ["client_detail", user?.id, slug] });
-    } catch (err) {
+    },
+    onError: (err) => {
       toast.error("Erro ao salvar: " + (err instanceof Error ? err.message : "Erro"));
-    } finally {
-      setSavingScope(false);
-    }
-  };
+    },
+  });
 
-  const handleDeactivate = async () => {
-    if (!client) return;
-    setDeactivating(true);
-    try {
+  const deactivateMutation = useMutation({
+    mutationFn: async (clientToDeactivate: ClientDetail) => {
       const { error } = await supabase
         .from("clients")
         .update({ active: false })
-        .eq("id", client.id);
+        .eq("id", clientToDeactivate.id);
       if (error) throw error;
+    },
+    onSuccess: () => {
       toast.success("Cliente desativado");
       navigate("/clients");
-    } catch (err) {
+    },
+    onError: (err) => {
       toast.error("Erro: " + (err instanceof Error ? err.message : "Erro"));
-    } finally {
-      setDeactivating(false);
-    }
-  };
+    },
+  });
 
   const handleToggleRule = async (ruleId: string, active: boolean) => {
     const { error } = await supabase
@@ -750,8 +746,12 @@ const ClientDetailPage = () => {
                 value={scopeText ?? ""}
                 onChange={(e) => setScopeText(e.target.value)}
               />
-              <Button size="sm" onClick={handleSaveScope} disabled={savingScope}>
-                {savingScope && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
+              <Button
+                size="sm"
+                onClick={() => client && saveScopeMutation.mutate({ client, scopeText })}
+                disabled={saveScopeMutation.isPending}
+              >
+                {saveScopeMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
                 Salvar Escopo
               </Button>
             </CardContent>
@@ -885,11 +885,11 @@ const ClientDetailPage = () => {
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancelar</AlertDialogCancel>
                     <AlertDialogAction
-                      onClick={handleDeactivate}
-                      disabled={deactivating}
+                      onClick={() => client && deactivateMutation.mutate(client)}
+                      disabled={deactivateMutation.isPending}
                       className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                     >
-                      {deactivating && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
+                      {deactivateMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
                       Confirmar desativação
                     </AlertDialogAction>
                   </AlertDialogFooter>
