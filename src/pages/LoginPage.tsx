@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useId } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -21,6 +21,8 @@ type LoginForm = z.infer<typeof loginSchema>;
 const LoginPage = () => {
   const navigate = useNavigate();
   const [submitting, setSubmitting] = useState(false);
+  const emailId = useId();
+  const passwordId = useId();
 
   const {
     register,
@@ -58,9 +60,9 @@ const LoginPage = () => {
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor={emailId}>Email</Label>
               <Input
-                id="email"
+                id={emailId}
                 type="email"
                 placeholder="seu@email.com"
                 {...register("email")}
@@ -70,9 +72,9 @@ const LoginPage = () => {
               )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Senha</Label>
+              <Label htmlFor={passwordId}>Senha</Label>
               <Input
-                id="password"
+                id={passwordId}
                 type="password"
                 placeholder="••••••"
                 {...register("password")}

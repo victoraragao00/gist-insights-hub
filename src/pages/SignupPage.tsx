@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useId } from "react";
 import { Link } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -27,6 +27,9 @@ type SignupForm = z.infer<typeof signupSchema>;
 const SignupPage = () => {
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
+  const emailId = useId();
+  const passwordId = useId();
+  const confirmPasswordId = useId();
 
   const {
     register,
@@ -83,18 +86,18 @@ const SignupPage = () => {
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" placeholder="seu@email.com" {...register("email")} />
+              <Label htmlFor={emailId}>Email</Label>
+              <Input id={emailId} type="email" placeholder="seu@email.com" {...register("email")} />
               {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Senha</Label>
-              <Input id="password" type="password" placeholder="••••••" {...register("password")} />
+              <Label htmlFor={passwordId}>Senha</Label>
+              <Input id={passwordId} type="password" placeholder="••••••" {...register("password")} />
               {errors.password && <p className="text-xs text-destructive">{errors.password.message}</p>}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirmar Senha</Label>
-              <Input id="confirmPassword" type="password" placeholder="••••••" {...register("confirmPassword")} />
+              <Label htmlFor={confirmPasswordId}>Confirmar Senha</Label>
+              <Input id={confirmPasswordId} type="password" placeholder="••••••" {...register("confirmPassword")} />
               {errors.confirmPassword && <p className="text-xs text-destructive">{errors.confirmPassword.message}</p>}
             </div>
             <Button type="submit" className="w-full" disabled={submitting}>
