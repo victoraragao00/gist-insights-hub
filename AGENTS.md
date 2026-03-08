@@ -6,7 +6,7 @@
 >
 > last_updated: 2026-03-08
 > last_updated_by: Claude Code
-> version: v6
+> version: v7
 
 ---
 
@@ -44,6 +44,8 @@ Responsabilidades:
 
 Restricoes:
 - Ler `CONTEXT.md` antes de iniciar qualquer sessao
+- Ler `docs/DESIGN_SYSTEM.md` para todas as decisoes visuais (cores, motion, componentes)
+- Seguir `.cursor/rules` (carregado automaticamente pelo Cursor IDE)
 - **Nunca editar:** `src/integrations/supabase/*`, `supabase/config.toml`, `.env`, `supabase/migrations/*`
 - **Nunca editar:** `CONTEXT.md`, `AGENTS.md`, `CLAUDE.md`
 - Se precisar de mudanca no banco ou edge function -> criar Issue no GitHub e comunicar ao Operador
@@ -163,8 +165,10 @@ m13: Testes em caminhos criticos (hooks, auth, fluxo de ingestao)
 **Caminhos criticos do CX Hub (m13):**
 - `process-jobs` Edge Function
 - `classify-batch` Edge Function
+- `calculate-priority-scores` Edge Function (`calculateScore` e `detectPatterns` em `logic.ts`)
 - `ClientContext.tsx` — loop de sync, nunca mover para componente
 - Qualquer listagem de `interactions`
+- `useUserRole` hook — determina permissoes de admin vs viewer
 
 ---
 
@@ -301,6 +305,7 @@ mas o processo de validacao formal "ainda esta sendo pilotado" (meta: cobertura 
 |--------|-----------|
 | Frontend (dev) | Cursor IDE (React + Tailwind) |
 | Frontend (deploy) | Lovable |
+| Design System | `docs/DESIGN_SYSTEM.md` + `.cursor/rules` |
 | Backend/DB | Supabase (PostgreSQL + Auth + Edge Functions + Realtime) |
 | IA Principal | Gemini `gemini-2.5-pro` |
 | IA Fallback | `claude-sonnet-4` |

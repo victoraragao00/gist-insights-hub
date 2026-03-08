@@ -73,6 +73,15 @@ Lista completa em AGENTS.md secoes 5 e 6.
 
 ---
 
+## DESIGN SYSTEM
+
+- Fonte unica de verdade: `docs/DESIGN_SYSTEM.md`
+- Regras do Cursor: `.cursor/rules` (carregado automaticamente)
+- Animacoes custom: registradas no `tailwind.config.ts` (pulse-subtle, fade-in-up, shimmer, progress-fill, score-pop)
+- Revisar aderencia ao Design System em todo PR do Cursor
+
+---
+
 ## WORKFLOW
 
 ```
@@ -81,7 +90,7 @@ Lista completa em AGENTS.md secoes 5 e 6.
 3. Se frontend (UI, hooks, paginas) -> Issue para Cursor (com checklist CTO aplicavel)
 4. Se banco/edge function -> Issue para Lovable (com checklist CTO aplicavel)
 5. Se refactor/script/doc -> implementar diretamente
-6. Revisar codigo do Cursor e Lovable contra Checklist do CTO + Anti-padroes
+6. Revisar codigo do Cursor e Lovable contra Checklist do CTO + Design System + Anti-padroes
 7. Verificar Checklist Pre-Entrega (AGENTS.md secao 7)
 8. Atualizar CONTEXT.md ao final da sessao
 ```
