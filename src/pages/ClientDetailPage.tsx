@@ -28,6 +28,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 import { usePriorityScores } from "@/hooks/usePriorityScores";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 
 // ── Types ──
 
@@ -540,17 +541,18 @@ const ClientDetailPage = () => {
               <CardTitle className="text-base font-semibold">Volume de interações (últimos 14 dias)</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex items-end gap-1 h-24">
-                {volumeData.entries.map(([day, count]) => (
-                  <div key={day} className="flex-1 flex flex-col items-center gap-1">
-                    <div
-                      className="w-full bg-primary/70 rounded-sm min-h-px transition-all"
-                      style={{ height: `${(count / volumeData.max) * 80}px` }}
-                      title={`${day}: ${count}`}
+              <div className="h-[120px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={volumeData.entries.map(([day, count]) => ({ day: day.slice(5), count }))}>
+                    <XAxis dataKey="day" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
+                    <YAxis hide />
+                    <Tooltip
+                      contentStyle={{ fontSize: 12, borderRadius: 8 }}
+                      labelFormatter={(v) => `Dia ${v}`}
                     />
-                    <span className="text-[10px] text-muted-foreground">{day.slice(8)}</span>
-                  </div>
-                ))}
+                    <Bar dataKey="count" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
               </div>
             </CardContent>
           </Card>
