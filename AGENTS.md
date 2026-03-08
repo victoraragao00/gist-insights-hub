@@ -29,6 +29,7 @@ Responsabilidades:
 - Manutencao de `CONTEXT.md`, `AGENTS.md` e `CLAUDE.md`
 - Conteudo self-contained para copy-paste entre agentes
 - Monitoramento de jobs (trigger, diagnostico, re-trigger)
+- **Auditoria obrigatoria de toda entrega do Lovable:** apos o Operador reportar conclusao, Claude Code DEVE puxar o diff real (`git diff`) e auditar SQL/codigo contra Checklist do CTO e SQL Patterns antes de confirmar como "concluido". Nunca aceitar relato verbal como prova de qualidade.
 
 Restricoes:
 - **Nunca editar:** `src/integrations/supabase/*`, `supabase/config.toml`, `.env`, `supabase/migrations/*`
@@ -66,6 +67,23 @@ Restricoes:
 - Seguir Checklist do CTO em todo codigo gerado
 - Frontend agora e responsabilidade do Cursor — Lovable so altera UI se envolver migration/edge function
 - **Frontend Contract obrigatorio:** toda Issue/PR do Lovable que desbloqueia trabalho do Cursor DEVE incluir secao "Frontend Contract" com: return type (campos e tipos), queryKey sugerido, staleTime recomendado, enabled condition e edge cases. O Contract vive na Issue/PR (nunca como codigo UI) — Cursor consome o Contract para criar hooks e componentes.
+- **Zero autonomia em decisoes tecnicas:** se uma instrucao do prompt parece errada, o Lovable DEVE reportar ao Operador ANTES de alterar. Nunca adaptar, "melhorar" ou omitir instrucoes marcadas como OBRIGATORIO.
+- **SQL Patterns obrigatorios** (verificados pelo Claude Code em toda entrega):
+  - `user_accessible_client_ids()` retorna `uuid[]` — SEMPRE usar `unnest()` em CTEs: `SELECT unnest(user_accessible_client_ids(p_user_id)) AS cid`
+  - Date ranges index-friendly: `occurred_at >= d.day AND occurred_at < d.day + interval '1 day'` — NUNCA `occurred_at::date`
+  - Colunas de interactions: `sender_raw` e `sender_side` (NAO sender_name/sender_type)
+  - Full-text search: `search_vector @@ plainto_tsquery('portuguese', p_query)` com `ts_rank` — NUNCA ILIKE
+
+### Formato obrigatorio de prompts para o Lovable
+
+Todo prompt gerado pelo Claude Code para o Lovable DEVE conter, nesta ordem:
+1. **Cabecalho:** Repositorio (link publico), Prioridade, Dependencias
+2. **OBRIGATORIO:** lista numerada do que DEVE ser feito (copiar SQL literal, usar unnest, etc.)
+3. **PROIBIDO:** lista numerada do que NAO pode ser feito (alterar tabelas, decisoes autonomas, etc.)
+4. **Problema:** descricao tecnica do que esta errado
+5. **SQL/Codigo:** bloco completo para copiar na integra
+6. **Verificacao:** queries de teste pos-deploy
+7. **Frontend Contract** (se aplicavel)
 
 ### Projeto (Claude.ai)
 Responsabilidades:
