@@ -1,4 +1,4 @@
-# CONTEXT.md — Estado do Projeto (v11 — 2026-03-08)
+# CONTEXT.md — Estado do Projeto (v12 — 2026-03-08)
 
 > Mantido pelo Claude Code ao final de cada sessao. Lido por todos os agentes para manter contexto.
 >
@@ -16,7 +16,7 @@
 | 2 | Integracoes Gist (proxy, bindings, discover, confirm-mapping) | Concluido |
 | 3 | Sync Engine (enqueue + process-jobs worker) | Concluido |
 | 4 | Classificacao IA (classify_batch via Gemini/Claude) | Concluido — Gemini Pro + prompt Mega Agente v6 |
-| 5 | Priority Score Engine + Dashboard | Backend concluido (Issue #32), Frontend em andamento (Issue #33) |
+| 5 | Priority Score Engine + Dashboard | Concluido — Backend (Issue #32) + Frontend (Issue #33, PRs #34 e #35) |
 | 6 | Auditorias e Alertas | Placeholder |
 | 7 | Insights IA avancados | Placeholder |
 
@@ -36,13 +36,16 @@
 - **Correcoes aplicadas:** bug severity (worst_tone preservado), YAGNI force removido, testes adicionados
 - **types.ts:** regenerado com `client_priority_config`, `priority_scores`, `client_tier`
 
-### Frontend (Issue #33 — Cursor — Em andamento)
+### Frontend (Issue #33 — Cursor — Concluido)
 
-- **PR1 (UX fixes):** pode iniciar imediatamente — remover 17 "Em breve", fix saude invertida, "Hub Central" -> "CX Hub", deletar useGistKPIs.ts
-- **PR2 (Dashboard):** aguarda confirmacao de types.ts — hooks (useUserRole, usePriorityScores, useRecalculatePriority), Dashboard com ranking, tier badges, patterns, score visual (cap 100), admin features
+- **PR #34 (UX fixes):** 17 "Em breve" removidos, getHealthColor corrigido (Design System 1.5), "Hub Central" -> "CX Hub", useGistKPIs.ts deletado, DropdownMenu vazio corrigido
+- **PR #35 (Dashboard):** Priority Dashboard com ranking por score, tier badges, patterns expandiveis, score cap visual 100, admin features (recalcular, clientes sem config), viewer read-only, empty/loading/error states, dark mode, mobile responsive
+- **Hooks criados:** useUserRole (role/isAdmin), usePriorityScores (two queries + merge), useRecalculatePriority (useMutation)
+- **Testes:** 5 testes (score cap + role logic)
+- **Animacoes usadas:** fade-in-up (stagger), score-pop, progress-fill, pulse-subtle (score>=80), shimmer
 - **Design System:** `docs/DESIGN_SYSTEM.md` criado como fonte unica de verdade para cores, motion, componentes
 - **Cursor Rules:** `.cursor/rules` atualizado com Design System, proibicoes explicitas, stack completa
-- **Animacoes:** 5 keyframes custom registrados no `tailwind.config.ts` (pulse-subtle, fade-in-up, shimmer, progress-fill, score-pop)
+- **Keyframes custom:** 5 registrados no `tailwind.config.ts` (pulse-subtle, fade-in-up, shimmer, progress-fill, score-pop)
 
 ### Env vars declaradas no Supabase
 
@@ -91,7 +94,7 @@ PRIORITY_BATCH_SIZE=20
 | #29 | m9: handleToggleRule sem useMutation | Resolvido (PR #31) | Cursor |
 | #30 | UX: NotFound em ingles | Resolvido (PR #31) | Cursor |
 | #32 | Fase 5: Priority Score Engine backend | Concluido | Lovable |
-| #33 | Fase 5: Priority Dashboard + UX cleanup | Em andamento | Cursor |
+| #33 | Fase 5: Priority Dashboard + UX cleanup | Concluido (PR #34 + PR #35) | Cursor |
 
 ---
 
@@ -111,11 +114,11 @@ PRIORITY_BATCH_SIZE=20
 
 ## Problemas de UX identificados
 
-- ~~Dashboard mostra KPIs do Gist mas nao reflete dados de classificacao IA~~ — Issue #33 PR2
-- ~~Excesso de botoes "Em breve" — transmite produto inacabado~~ — Issue #33 PR1
+- ~~Dashboard mostra KPIs do Gist mas nao reflete dados de classificacao IA~~ — Resolvido (PR #35)
+- ~~Excesso de botoes "Em breve" — transmite produto inacabado~~ — Resolvido (PR #34)
 - Pagina Auditorias e placeholder sem funcionalidade
-- ~~Coluna "Saude" com semantica invertida~~ — Issue #33 PR1
-- ~~Marca inconsistente (Login diz "Hub Central", sidebar diz "uMode")~~ — Issue #33 PR1
+- ~~Coluna "Saude" com semantica invertida~~ — Resolvido (PR #34)
+- ~~Marca inconsistente (Login diz "Hub Central", sidebar diz "uMode")~~ — Resolvido (PR #34)
 - ~~404 em ingles, app em PT-BR~~ — Resolvido (PR #31)
 
 ---
@@ -205,7 +208,7 @@ Papeis, restricoes, fluxos e checklist completos em AGENTS.md (v7).
 1. **Concluido:** Reclassificacao do backlog (100% da janela 365d, 6 jobs, ~$2.22)
 2. **Concluido:** Divida tecnica do Checklist CTO (m1, m3, m4, m5, m6, m9, m12) — 8 PRs mergeados
 3. **Concluido:** Fase 5 backend — Priority Score Engine (Issue #32, Lovable)
-4. **Em andamento:** Fase 5 frontend — Priority Dashboard + UX cleanup (Issue #33, Cursor)
+4. **Concluido:** Fase 5 frontend — Priority Dashboard + UX cleanup (Issue #33, Cursor, PRs #34 e #35)
 5. **Proximo:** Limpar pagina Auditorias (placeholder)
 6. **Fase 6:** Auditorias e Alertas
 7. **Fase 7:** Insights IA avancados
