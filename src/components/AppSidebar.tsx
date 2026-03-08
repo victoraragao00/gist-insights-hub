@@ -1,4 +1,4 @@
-import { LayoutDashboard, ShieldAlert, Settings, Users } from "lucide-react";
+import { LayoutDashboard, Search, ShieldAlert, Settings, Users } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import umodeLogo from "@/assets/umode-logo-full.png";
 import umodeIcon from "@/assets/umode-icon.png";
@@ -20,6 +20,7 @@ import {
 const modules = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
   { title: "Clientes", url: "/clients", icon: Users },
+  { title: "Busca", url: "/search", icon: Search },
   { title: "Auditorias", url: "/audits", icon: ShieldAlert },
 ];
 
