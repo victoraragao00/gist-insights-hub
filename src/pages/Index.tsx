@@ -202,7 +202,7 @@ const Index = () => {
                         <CardTitle className="text-base font-semibold">
                           <button
                             type="button"
-                            className="text-left hover:underline focus:outline-none"
+                            className="text-left hover:underline focus:outline-none transition-transform active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded"
                             onClick={() => navigate(`/clients/${row.client_slug}`)}
                           >
                             {row.client_name}
@@ -218,7 +218,7 @@ const Index = () => {
                         </div>
                       </div>
                       <CollapsibleTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 group">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 group focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" aria-label="Expandir ou recolher padrões">
                           <ChevronDown className="h-4 w-4 group-data-[state=open]:hidden" />
                           <ChevronUp className="h-4 w-4 hidden group-data-[state=open]:block" />
                         </Button>

@@ -706,7 +706,7 @@ const ClientDetailPage = () => {
                     <Badge className="bg-emerald-50 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400 border-0 text-xs">Ativo</Badge>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" aria-label="Menu do canal">
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>

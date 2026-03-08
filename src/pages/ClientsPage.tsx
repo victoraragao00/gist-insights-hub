@@ -99,9 +99,12 @@ function SortButton({ label, col, current, dir, onClick, className = "" }: {
 }) {
   const active = current === col;
   const Icon = active ? (dir === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown;
+  const sortDesc = active ? (dir === "asc" ? " (ascendente)" : " (descendente)") : "";
   return (
     <button
-      className={`inline-flex items-center gap-1 hover:text-foreground transition-colors ${className}`}
+      type="button"
+      aria-label={`Ordenar por ${label}${sortDesc}`}
+      className={`inline-flex items-center gap-1 hover:text-foreground transition-colors transition-transform active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded ${className}`}
       onClick={(e) => { e.stopPropagation(); onClick(col); }}
     >
       {label}
@@ -286,8 +289,16 @@ const ClientsPage = () => {
                 return (
                   <TableRow
                     key={client.id}
-                    className="cursor-pointer hover:bg-muted/30"
+                    role="button"
+                    tabIndex={0}
+                    className="cursor-pointer hover:bg-muted/30 transition-transform active:scale-[0.995] focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
                     onClick={() => navigate(`/clients/${client.slug}`)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        navigate(`/clients/${client.slug}`);
+                      }
+                    }}
                   >
                     <TableCell>
                       <div>
@@ -334,7 +345,7 @@ const ClientsPage = () => {
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <Button variant="ghost" size="icon" className="h-8 w-8 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" aria-label="Abrir menu de ações do cliente">
                             <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
