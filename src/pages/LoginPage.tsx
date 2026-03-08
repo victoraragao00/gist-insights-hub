@@ -1,8 +1,9 @@
-import { useState, useId } from "react";
+import { useId } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -20,7 +21,6 @@ type LoginForm = z.infer<typeof loginSchema>;
 
 const LoginPage = () => {
   const navigate = useNavigate();
-  const [submitting, setSubmitting] = useState(false);
   const emailId = useId();
   const passwordId = useId();
 
@@ -30,22 +30,19 @@ const LoginPage = () => {
     formState: { errors },
   } = useForm<LoginForm>({ resolver: zodResolver(loginSchema) });
 
-  const onSubmit = async (values: LoginForm) => {
-    setSubmitting(true);
-    try {
+  const loginMutation = useMutation({
+    mutationFn: async (values: LoginForm) => {
       const { error } = await supabase.auth.signInWithPassword({
         email: values.email,
         password: values.password,
       });
       if (error) throw error;
-      navigate("/");
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Erro ao fazer login";
-      toast.error(msg);
-    } finally {
-      setSubmitting(false);
-    }
-  };
+    },
+    onSuccess: () => navigate("/"),
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Erro ao fazer login"),
+  });
+
+  const onSubmit = (values: LoginForm) => loginMutation.mutate(values);
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-background px-4">
@@ -83,8 +80,8 @@ const LoginPage = () => {
                 <p className="text-xs text-destructive">{errors.password.message}</p>
               )}
             </div>
-            <Button type="submit" className="w-full" disabled={submitting}>
-              {submitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+            <Button type="submit" className="w-full" disabled={loginMutation.isPending}>
+              {loginMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
               Entrar
             </Button>
           </form>
