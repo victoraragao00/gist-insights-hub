@@ -106,10 +106,10 @@ interface AuditRule {
 // ── Helpers ──
 
 const TONE_CONFIG: Record<string, { label: string; className: string }> = {
-  ok: { label: "✓ Ok", className: "bg-green-100 text-green-700" },
-  atencao: { label: "⚠ Atenção", className: "bg-yellow-100 text-yellow-700" },
-  alerta: { label: "🔶 Alerta", className: "bg-orange-100 text-orange-700" },
-  critico: { label: "🔴 Crítico", className: "bg-red-100 text-red-700" },
+  ok: { label: "✓ Ok", className: "bg-emerald-50 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400" },
+  atencao: { label: "⚠ Atenção", className: "bg-yellow-50 text-yellow-600 dark:bg-yellow-950 dark:text-yellow-400" },
+  alerta: { label: "🔶 Alerta", className: "bg-orange-50 text-orange-600 dark:bg-orange-950 dark:text-orange-400" },
+  critico: { label: "🔴 Crítico", className: "bg-red-50 text-red-600 dark:bg-red-950 dark:text-red-400" },
 };
 
 const CHANNEL_ICONS: Record<string, string> = {
@@ -413,10 +413,10 @@ const ClientDetailPage = () => {
   if (loadingClient) {
     return (
       <div className="space-y-6 p-6">
-        <Skeleton className="h-8 w-64" />
-        <Skeleton className="h-4 w-40" />
+        <Skeleton className="h-8 w-64 animate-shimmer" />
+        <Skeleton className="h-4 w-40 animate-shimmer" />
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1, 2, 3, 4, 5, 6].map((i) => <Skeleton key={i} className="h-24 rounded-xl" />)}
+          {[1, 2, 3, 4, 5, 6].map((i) => <Skeleton key={i} className="h-24 rounded-xl animate-shimmer" />)}
         </div>
       </div>
     );
@@ -654,8 +654,8 @@ const ClientDetailPage = () => {
 
         {/* ── TAB 2: Participantes ── */}
         <TabsContent value="participants" className="space-y-6">
-          <ParticipantSection title="Time do cliente" participants={clientTeam} badgeColor="bg-orange-100 text-orange-700" />
-          <ParticipantSection title="Time uMode" participants={umodeTeam} badgeColor="bg-blue-100 text-blue-700" />
+          <ParticipantSection title="Time do cliente" participants={clientTeam} badgeColor="bg-orange-50 text-orange-600 dark:bg-orange-950 dark:text-orange-400" />
+          <ParticipantSection title="Time uMode" participants={umodeTeam} badgeColor="bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400" />
           {participantsTotalCount > PAGE_SIZE && (
             <div className="flex items-center justify-between mt-4">
               <span className="text-sm text-muted-foreground">
@@ -703,7 +703,7 @@ const ClientDetailPage = () => {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Badge className="bg-green-100 text-green-700 border-0 text-xs">Ativo</Badge>
+                    <Badge className="bg-emerald-50 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400 border-0 text-xs">Ativo</Badge>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon" className="h-8 w-8">
