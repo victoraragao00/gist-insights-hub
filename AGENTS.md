@@ -65,6 +65,7 @@ Restricoes:
 - Nao altera documentacao (`CONTEXT.md`, `AGENTS.md`, `CLAUDE.md`)
 - Seguir Checklist do CTO em todo codigo gerado
 - Frontend agora e responsabilidade do Cursor — Lovable so altera UI se envolver migration/edge function
+- **Frontend Contract obrigatorio:** toda Issue/PR do Lovable que desbloqueia trabalho do Cursor DEVE incluir secao "Frontend Contract" com: return type (campos e tipos), queryKey sugerido, staleTime recomendado, enabled condition e edge cases. O Contract vive na Issue/PR (nunca como codigo UI) — Cursor consome o Contract para criar hooks e componentes.
 
 ### Projeto (Claude.ai)
 Responsabilidades:
