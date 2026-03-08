@@ -17,7 +17,7 @@
 | 3 | Sync Engine (enqueue + process-jobs worker) | Concluido |
 | 4 | Classificacao IA (classify_batch via Gemini/Claude) | Concluido — Gemini Pro + prompt Mega Agente v6 |
 | 5 | Priority Score Engine + Dashboard | Concluido — Backend (Issue #32) + Frontend (Issue #33, PRs #34 e #35) |
-| 6 | Auditorias e Alertas | Backend concluido (Issues #37 e #38) — Frontend pendente |
+| 6 | Auditorias e Alertas | Backend completo (Issues #37-#38 + Lovable S1-S5) — Frontend pendente |
 | 7 | Insights IA avancados | Placeholder |
 
 ---
@@ -201,7 +201,35 @@ AUDIT_BATCH_SIZE=20
 - **Env vars:** 9 variaveis `PRIORITY_*` configuradas no Supabase Dashboard
 - **Chain:** apos completar (!hasMore), dispara `evaluate-audit-rules` (fire-and-forget)
 
-### Auditorias e Alertas (Fase 6 — backend concluido)
+### Auditorias e Alertas (Fase 6 — backend completo)
+
+#### RLS Policies (Lovable S1)
+- **audit_rules:** SELECT para todos com acesso, INSERT/UPDATE/DELETE apenas admin
+- **audit_alerts:** SELECT only (INSERT via service_role na Edge Function)
+- Ambas usam `unnest(user_accessible_client_ids(auth.uid()))`
+
+#### Seed + Realtime + pg_cron (Lovable S2)
+- **Seed:** 39 regras (3 metricas x 13 clientes ativos): score_prioridade>=80, tom_critico_pct>=15, volume_periodo>=50
+- **Unique constraint:** `audit_rules_client_metric_unique` (client_id, metric)
+- **Realtime:** `audit_alerts` adicionado ao `supabase_realtime` publication
+- **pg_cron:** `evaluate-audit-rules` a cada 2h (minuto :15)
+
+#### DB Function: `audit_alerts_summary` (Lovable S3)
+- **Retorna:** total_alerts_30d, unread_count, alerts (jsonb array, top 50)
+- **Coluna `read`:** adicionada a `audit_alerts` (bool, default false)
+- **Joins:** audit_alerts + audit_rules + clients (para nomes)
+- **Desbloqueia:** Auditorias UI real (Cursor)
+
+#### DB Function: `search_interactions` (Lovable S4)
+- **Full-text search:** `search_vector @@ plainto_tsquery('portuguese', p_query)` com `ts_rank`
+- **Filtros opcionais:** p_client_id, p_tone
+- **Paginacao:** `COUNT(*) OVER()`, p_limit=20, p_offset=0
+- **Desbloqueia:** Pagina de busca global (Cursor)
+
+#### DB Function: `client_tone_trend_7d` (Lovable S5)
+- **Retorna:** 7 rows (1 por dia), colunas ok/atencao/alerta/critico
+- **Index-friendly:** `occurred_at >= d.day AND occurred_at < d.day + interval '1 day'`
+- **Desbloqueia:** Grafico de tendencia na ClientDetailPage (Cursor)
 
 #### DB Function: `global_stats_30d` (Issue #37)
 - **Retorna:** total_interactions_30d, pct_critico, pct_alerta, total_clients_monitored, monthly_tone_evolution (6 meses), top_themes (top 5)
@@ -285,11 +313,12 @@ Papeis, restricoes, fluxos e checklist completos em AGENTS.md (v7).
    - LOTE 4: PR-G (#46), PR-H1 (#47), PR-I (#48)
    - LOTE 5: PR-J (#49), PR-H2 (#50)
    - Frontend Contracts: regra adicionada ao AGENTS.md — Lovable inclui contratos tipados em Issues que desbloqueiam Cursor
-7. **Pendente:** Lovable Marathon — 6 sessoes planejadas para completar backend da Fase 6+
-   - Sessao 1: RLS policies para audit_rules e audit_alerts (L2) — CRITICA
-   - Sessao 2: Seed audit_rules + Realtime audit_alerts + pg_cron evaluate-audit-rules (L3 + L5)
-   - Sessao 3: DB function audit_alerts_summary (M2)
-   - Sessao 4: DB function search_interactions (L4)
-   - Sessao 5: DB function client_tone_trend_7d (M4)
-   - Sessao 6: Edge function deliver-audit-alerts (L1) — BAIXA, futuro
+7. **Concluido:** Lovable Marathon — 5 sessoes executadas com sucesso
+   - Sessao 1: RLS policies audit_rules (SELECT all, INSERT/UPDATE/DELETE admin) + audit_alerts (SELECT only)
+   - Sessao 2: 39 regras seedadas (3x13 clientes), unique constraint, realtime audit_alerts, pg_cron */2h
+   - Sessao 3: DB function audit_alerts_summary(p_user_id) + coluna read em audit_alerts
+   - Sessao 4: DB function search_interactions(p_user_id, p_query, ...) com full-text search + paginacao
+   - Sessao 5: DB function client_tone_trend_7d(p_user_id, p_client_id) — 7 dias com LEFT JOIN
+   - Sessao 6: Edge function deliver-audit-alerts (L1) — adiada, baixa prioridade
+   - Frontend Contracts documentados em docs/prompts/LOVABLE_S1-S5
 8. **Fase 7:** Insights IA avancados
