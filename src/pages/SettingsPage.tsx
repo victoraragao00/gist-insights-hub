@@ -470,9 +470,7 @@ const SettingsPage = () => {
                               Desconectar
                             </DropdownMenuItem>
                           </>
-                        ) : (
-                          <DropdownMenuItem disabled>Em breve...</DropdownMenuItem>
-                        )}
+                        ) : null}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>

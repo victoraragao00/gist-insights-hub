@@ -9,10 +9,9 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
-  DropdownMenuSeparator, DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Plus, MoreHorizontal, Search, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
+import { MoreHorizontal, Search, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
@@ -84,9 +83,9 @@ function formatLastContact(dateStr: string | null): string {
 }
 
 function getHealthColor(pct: number): string {
-  if (pct < 20) return "bg-green-500";
-  if (pct < 40) return "bg-yellow-500";
-  if (pct < 70) return "bg-orange-500";
+  if (pct >= 80) return "bg-emerald-500";
+  if (pct >= 60) return "bg-yellow-500";
+  if (pct >= 40) return "bg-orange-500";
   return "bg-red-500";
 }
 
@@ -222,9 +221,6 @@ const ClientsPage = () => {
               className="pl-9 w-64 h-9"
             />
           </div>
-          <Button onClick={() => toast.info("Em breve")}>
-            <Plus className="h-4 w-4 mr-1" /> Novo Cliente
-          </Button>
         </div>
       </div>
 
@@ -331,16 +327,6 @@ const ClientsPage = () => {
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onClick={(e) => { e.stopPropagation(); navigate(`/clients/${client.slug}`); }}>
                             Ver detalhes
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); toast.info("Em breve"); }}>
-                            Importar Contatos
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            className="text-destructive"
-                            onClick={(e) => { e.stopPropagation(); toast.info("Em breve"); }}
-                          >
-                            Desativar
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>

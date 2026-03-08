@@ -81,7 +81,7 @@ const SignupPage = () => {
             H
           </div>
           <CardTitle className="text-xl">Criar Conta</CardTitle>
-          <CardDescription>Registre-se no Hub Central</CardDescription>
+          <CardDescription>Registre-se no CX Hub</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
