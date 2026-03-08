@@ -1,4 +1,4 @@
-# CONTEXT.md — Estado do Projeto (v7 — 2026-03-08)
+# CONTEXT.md — Estado do Projeto (v8 — 2026-03-08)
 
 > Mantido pelo Claude Code ao final de cada sessao. Lido por todos os agentes para manter contexto.
 >
@@ -24,11 +24,11 @@
 
 ## Reclassificacao do Backlog
 
-- **Status:** Em andamento (~45% concluido)
-- **Classificadas:** ~14.870 de ~33.091 msgs
-- **Conversas pendentes:** ~887
-- **Jobs executados:** 4 classify_batch (Gemini Pro + v6)
-- **Modelo:** gemini-2.5-pro, 3 timeouts de Gemini (normal)
+- **Status:** Em andamento (~64% concluido)
+- **Classificadas:** ~21.262 de ~33.091 msgs
+- **Conversas pendentes:** ~546
+- **Jobs executados:** 6 classify_batch (Gemini Pro + v6)
+- **Modelo:** gemini-2.5-pro, 4 timeouts de Gemini (normal)
 - **Previsao:** mais 1-2 jobs para finalizar
 
 ---
@@ -44,22 +44,28 @@
 | #14 | Calibracao de tom + filtro 365d | Resolvido | Lovable |
 | #15 | Prompt Mega Agente v3 | Resolvido | Lovable |
 | #16 | Gemini Pro definitivo + prompt v6 com few-shot examples | Resolvido | Lovable |
+| #17 | m3: Remove unused toast files | Resolvido (PR #23) | Cursor |
+| #18 | m1: Replace `any` types in non-UI code | Resolvido (PR #26) | Cursor |
+| #19 | m4+m5: Fix staleTime and queryKey | Resolvido (PR #24) | Cursor |
+| #20 | m9: Replace useState with useMutation | Resolvido (PR #27) | Cursor |
+| #21 | m12: Add real pagination | Resolvido (PR #28) | Cursor |
+| #22 | m6: Replace static DOM IDs with useId | Resolvido (PR #25) | Cursor |
 
 ---
 
 ## Divida Tecnica (auditoria Cursor — 2026-03-08)
 
-Violacoes do Checklist do CTO encontradas no codigo atual:
+**Status: Resolvida** — Todas as 7 violacoes corrigidas pelo Cursor e revisadas pelo Claude Code.
 
-| Item | Problema | Onde | Severidade |
-|------|----------|------|-----------|
-| m1 | `any` em codigo nao-UI | InteractionsFeed, ClientContext, SettingsPage | Alta |
-| m3 | `use-toast.ts` e `ui/toaster.tsx` existem (nao usados, bomba relogio) | src/components/ui/ | Media |
-| m4 | staleTime ausente em 6 queries | ClientDetailPage | Alta |
-| m5 | invalidateQueries sem `user?.id` na key | ClientDetailPage | Media |
-| m9 | useState manual em vez de useMutation (3 handlers) | ClientDetailPage, SettingsPage | Alta |
-| m12 | Sem paginacao real (limit 100/200 hardcoded) | ClientsPage, ClientDetailPage | Alta |
-| m6 | DOM IDs estaticos em inputs | LoginPage, SignupPage | Baixa |
+| Item | Problema | Status |
+|------|----------|--------|
+| m1 | `any` em codigo nao-UI | Resolvido — PR #26 |
+| m3 | toast files nao usados | Resolvido — PR #23 |
+| m4 | staleTime ausente em 6 queries | Resolvido — PR #24 |
+| m5 | invalidateQueries sem `user?.id` | Resolvido — PR #24 |
+| m6 | DOM IDs estaticos | Resolvido — PR #25 |
+| m9 | useState manual para escrita | Resolvido — PR #27 |
+| m12 | Sem paginacao real | Resolvido — PR #28 |
 
 ## Problemas de UX identificados
 
@@ -105,7 +111,7 @@ Violacoes do Checklist do CTO encontradas no codigo atual:
 **Conclusao:** Gemini Pro + Mega Agente v6 e a versao definitiva. Nota 9.0/10, primeiro acima de 9. Claude performou pior com o mesmo prompt (8.6). Custo mensal ~$0.16.
 
 ### Volume e Custos
-- **Backlog:** ~33k msgs em ~1.680 conversas (~45% ja classificado)
+- **Backlog:** ~33k msgs em ~1.680 conversas (~64% ja classificado)
 - **Volume mensal:** ~117 conversas/mes (media ultimos 6 meses, tendencia crescente)
 - **Custo Gemini Pro:** ~$2.22 backlog + ~$0.16/mes recorrente (~$2/ano)
 
@@ -140,9 +146,9 @@ Papeis, restricoes, fluxos e checklist completos em AGENTS.md (v6).
 
 ## Proximos Passos
 
-1. **Em andamento:** Reclassificacao do backlog (~55% pendente, mais 1-2 jobs)
-2. **Proximo:** Corrigir divida tecnica do Checklist CTO (m1, m3, m4, m5, m9, m12)
-3. **Fase 5:** Dashboard com dados classificados (tom, tema, tendencias)
-4. **Fase 5:** Limpar "Em breve", alinhar marca, corrigir UX
+1. **Em andamento:** Reclassificacao do backlog (~36% pendente, mais 1-2 jobs)
+2. **Concluido:** Divida tecnica do Checklist CTO (m1, m3, m4, m5, m6, m9, m12) — 6 PRs mergeados
+3. **Proximo:** Dashboard com dados classificados (tom, tema, tendencias)
+4. **Proximo:** Limpar "Em breve", alinhar marca, corrigir UX
 5. **Fase 6:** Auditorias e Alertas
 6. **Fase 7:** Insights IA avancados
