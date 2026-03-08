@@ -41,6 +41,7 @@ export type Database = {
           id: string
           message: string
           metric_value: number
+          read: boolean
           rule_id: string
           threshold: number
         }
@@ -52,6 +53,7 @@ export type Database = {
           id?: string
           message: string
           metric_value: number
+          read?: boolean
           rule_id: string
           threshold: number
         }
@@ -63,6 +65,7 @@ export type Database = {
           id?: string
           message?: string
           metric_value?: number
+          read?: boolean
           rule_id?: string
           threshold?: number
         }
@@ -526,6 +529,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      audit_alerts_summary: {
+        Args: { p_user_id: string }
+        Returns: {
+          alerts: Json
+          total_alerts_30d: number
+          unread_count: number
+        }[]
+      }
       claim_next_job: {
         Args: never
         Returns: {
@@ -560,6 +571,16 @@ export type Database = {
           total_30d: number
         }[]
       }
+      client_tone_trend_7d: {
+        Args: { p_client_id: string; p_user_id: string }
+        Returns: {
+          alerta: number
+          atencao: number
+          critico: number
+          day: string
+          ok: number
+        }[]
+      }
       create_job_if_none_active: {
         Args: {
           _created_by: string
@@ -582,6 +603,27 @@ export type Database = {
           top_themes: Json
           total_clients_monitored: number
           total_interactions_30d: number
+        }[]
+      }
+      search_interactions: {
+        Args: {
+          p_client_id?: string
+          p_limit?: number
+          p_offset?: number
+          p_query: string
+          p_tone?: string
+          p_user_id: string
+        }
+        Returns: {
+          body: string
+          client_name: string
+          id: string
+          occurred_at: string
+          sender_raw: string
+          sender_side: string
+          theme: string
+          tone: string
+          total_count: number
         }[]
       }
       user_accessible_client_ids: {
