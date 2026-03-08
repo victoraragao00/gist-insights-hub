@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
+import { useDebounce } from "@/hooks/useDebounce";
 import { usePriorityScores } from "@/hooks/usePriorityScores";
 
 // ── Types ──
@@ -135,6 +136,10 @@ const ClientsPage = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounce(search.trim(), 300);
+  useEffect(() => {
+    setPage(0);
+  }, [debouncedSearch]);
   const [page, setPage] = useState(0);
   const [includeInactive, setIncludeInactive] = useState(false);
   const [sortKey, setSortKey] = useState<SortCol>("last_contact");
@@ -157,9 +162,9 @@ const ClientsPage = () => {
   }, [sortKey]);
 
   const { data: clientsData, isLoading: loadingClients, isError: clientsError, refetch: refetchClients } = useQuery<{ list: ClientRow[]; totalCount: number }>({
-    queryKey: ["clients_list", user?.id, page, includeInactive],
+    queryKey: ["clients_list", user?.id, page, includeInactive, debouncedSearch],
     enabled: !!user?.id,
-    staleTime: 5 * 60 * 1000,
+    staleTime: debouncedSearch.length >= 3 ? 30_000 : 5 * 60 * 1000,
     queryFn: async () => {
       const from = page * PAGE_SIZE;
       const to = (page + 1) * PAGE_SIZE - 1;
@@ -168,6 +173,9 @@ const ClientsPage = () => {
         .select("id, name, slug, active, status, channel_bindings(channel, label, active)", { count: "exact" });
       if (!includeInactive) {
         query = query.in("status", ["ativo", "trial"]);
+      }
+      if (debouncedSearch.length >= 3) {
+        query = query.ilike("name", `%${debouncedSearch}%`);
       }
       const { data, error, count } = await query.order("name").range(from, to);
       if (error) throw error;
@@ -202,10 +210,7 @@ const ClientsPage = () => {
   const TONE_RANK: Record<string, number> = { ok: 0, atencao: 1, alerta: 2, critico: 3 };
 
   const clientsWithStats = useMemo(() => {
-    const q = search.toLowerCase().trim();
-    const list = clients
-      .map((c) => ({ ...c, stats: statsMap[c.id] ?? DEFAULT_STATS }))
-      .filter((c) => !q || c.name.toLowerCase().includes(q) || c.slug.toLowerCase().includes(q));
+    const list = clients.map((c) => ({ ...c, stats: statsMap[c.id] ?? DEFAULT_STATS }));
 
     list.sort((a, b) => {
       let cmp = 0;
@@ -239,7 +244,7 @@ const ClientsPage = () => {
     });
 
     return list;
-  }, [clients, statsMap, scoreMap, search, sortKey, sortDir]);
+  }, [clients, statsMap, scoreMap, sortKey, sortDir]);
 
   return (
     <div className="space-y-6">
@@ -293,7 +298,11 @@ const ClientsPage = () => {
           </div>
         ) : !clientsError && clientsWithStats.length === 0 ? (
           <div className="py-20 text-center text-muted-foreground text-sm">
-            Nenhum cliente encontrado. {includeInactive ? "Adicione um cliente para começar." : "Ative \"Incluir inativos\" para ver todos."}
+            {debouncedSearch.length >= 3
+              ? `Nenhum cliente encontrado para "${debouncedSearch}"`
+              : includeInactive
+                ? "Adicione um cliente para começar."
+                : "Nenhum cliente encontrado. Ative \"Incluir inativos\" para ver todos."}
           </div>
         ) : (
           <>
