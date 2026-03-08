@@ -24,12 +24,12 @@
 
 ## Reclassificacao do Backlog
 
-- **Status:** Em andamento (~64% concluido)
-- **Classificadas:** ~21.262 de ~33.091 msgs
-- **Conversas pendentes:** ~546
+- **Status:** Concluido (100% da janela de 365 dias)
+- **Classificadas:** 21.262 msgs (todas dentro da janela de 365d)
+- **Nao classificadas:** 11.829 msgs (historicas com occurred_at > 1 ano, fora do escopo)
 - **Jobs executados:** 6 classify_batch (Gemini Pro + v6)
 - **Modelo:** gemini-2.5-pro, 4 timeouts de Gemini (normal)
-- **Previsao:** mais 1-2 jobs para finalizar
+- **Custo total backlog:** ~$2.22
 
 ---
 
@@ -50,6 +50,8 @@
 | #20 | m9: Replace useState with useMutation | Resolvido (PR #27) | Cursor |
 | #21 | m12: Add real pagination | Resolvido (PR #28) | Cursor |
 | #22 | m6: Replace static DOM IDs with useId | Resolvido (PR #25) | Cursor |
+| #29 | m9: handleToggleRule sem useMutation | Aberto | Cursor |
+| #30 | UX: NotFound em ingles | Aberto | Cursor |
 
 ---
 
@@ -111,7 +113,7 @@
 **Conclusao:** Gemini Pro + Mega Agente v6 e a versao definitiva. Nota 9.0/10, primeiro acima de 9. Claude performou pior com o mesmo prompt (8.6). Custo mensal ~$0.16.
 
 ### Volume e Custos
-- **Backlog:** ~33k msgs em ~1.680 conversas (~64% ja classificado)
+- **Backlog:** ~33k msgs em ~1.680 conversas (100% classificado dentro da janela de 365d)
 - **Volume mensal:** ~117 conversas/mes (media ultimos 6 meses, tendencia crescente)
 - **Custo Gemini Pro:** ~$2.22 backlog + ~$0.16/mes recorrente (~$2/ano)
 
@@ -146,9 +148,10 @@ Papeis, restricoes, fluxos e checklist completos em AGENTS.md (v6).
 
 ## Proximos Passos
 
-1. **Em andamento:** Reclassificacao do backlog (~36% pendente, mais 1-2 jobs)
+1. **Concluido:** Reclassificacao do backlog (100% da janela 365d, 6 jobs, ~$2.22)
 2. **Concluido:** Divida tecnica do Checklist CTO (m1, m3, m4, m5, m6, m9, m12) — 6 PRs mergeados
-3. **Proximo:** Dashboard com dados classificados (tom, tema, tendencias)
-4. **Proximo:** Limpar "Em breve", alinhar marca, corrigir UX
-5. **Fase 6:** Auditorias e Alertas
-6. **Fase 7:** Insights IA avancados
+3. **Em andamento:** Pendencias residuais (handleToggleRule #29, NotFound PT-BR #30)
+4. **Proximo:** Dashboard com dados classificados (tom, tema, tendencias)
+5. **Proximo:** Limpar "Em breve", alinhar marca, corrigir UX
+6. **Fase 6:** Auditorias e Alertas
+7. **Fase 7:** Insights IA avancados
