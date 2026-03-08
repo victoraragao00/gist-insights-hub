@@ -1,4 +1,4 @@
-# CONTEXT.md — Estado do Projeto (v16 — 2026-03-08)
+# CONTEXT.md — Estado do Projeto (v17 — 2026-03-08)
 
 > Mantido pelo Claude Code ao final de cada sessao. Lido por todos os agentes para manter contexto.
 >
@@ -19,6 +19,7 @@
 | 5 | Priority Score Engine + Dashboard | Concluido — Backend (Issue #32) + Frontend (Issue #33, PRs #34 e #35) |
 | 6 | Auditorias e Alertas | Concluido — Backend (Issues #37-#38 + Lovable S1-S5) + Frontend (PRs #51-#53) |
 | 6.5 | Campo status em clients (controle manual) | Concluido — Backend (Issue #54, Lovable S7) + Frontend (PRs #57-#58) |
+| 6.6 | Sprint P1+P3+P4 (edicao cliente + CRUD rules + busca server-side) | Concluido — PRs #61, #62, #64 |
 | 7 | Insights IA avancados | Placeholder |
 
 ---
@@ -151,6 +152,9 @@ AUDIT_BATCH_SIZE=20
 | #54 | feat(db): adicionar coluna status em clients | Concluido | Lovable |
 | #55 | feat(ui): filtro de status e badge na ClientsPage | Mergeado (PR #57) | Cursor |
 | #56 | feat(ui): badge de status no ClientDetailPage | Mergeado (PR #58) | Cursor |
+| #59 | feat(ui): edicao de cliente na tab Configuracoes | Mergeado (PR #61) | Cursor |
+| #60 | feat(ui): CRUD de audit_rules na pagina Auditorias | Mergeado (PR #62) | Cursor |
+| #63 | fix: busca server-side em ClientsPage, SearchPage e Dashboard | Mergeado (PR #64) | Cursor |
 
 ---
 
@@ -273,6 +277,29 @@ AUDIT_BATCH_SIZE=20
 - **Arquivos alterados:** ClientsPage, SearchPage, SettingsPage, GistContactWizard, ClientDetailPage
 - **Populacao inicial:** active=true→ativo (104), active=false→inativo (130)
 
+### Sprint P1: Edicao de cliente (Issue #59, PR #61)
+- **Tab Configuracoes** em ClientDetailPage: formulario com nome, status, scope, tier
+- **Admin:** campos editaveis + botao Salvar. **Viewer:** read-only
+- **saveClientMutation:** atualiza `clients` (name, status, metadata.scope) + upsert `client_priority_config` (tier)
+- **Scope movido** da tab "Regras de Negocio" para "Configuracoes"
+- **Invalida:** client_detail, clients_list, client_priority_config, priority-scores
+
+### Sprint P3: CRUD de audit_rules (Issue #60, PR #62)
+- **Tabs** em Audits.tsx: "Alertas" (conteudo existente) + "Regras" (novo)
+- **Hook:** `useAuditRules` — paginado (PAGE_SIZE=20), join `clients(name)`, staleTime 30s
+- **4 operacoes:** create, update, delete (AlertDialog), toggle active (Switch)
+- **Dialog** com 10 campos incluindo destinatarios dinamicos (adicionar/remover)
+- **METRIC_CONFIG:** 11 metricas com labels legiveis em pt-BR
+- **Constraint duplicata:** tratada com toast amigavel
+- **Admin:** todas as acoes. **Viewer:** tabela read-only
+
+### Sprint P4: Busca server-side (Issue #63, PR #64)
+- **Hook:** `useDebounce<T>(value, delay)` — novo, compartilhado entre 3 telas
+- **ClientsPage:** `.ilike("name")` server-side, queryKey com termo, reset page=0, staleTime dinamico
+- **SearchPage:** debounce inline substituido por hook + secao "Clientes" (max 5, com Link e badge status) acima de "Interacoes"
+- **Dashboard:** debounce 300ms no filtro existente (client-side mantido para ~13 registros)
+- **Regra:** minimo 3 chars para disparar busca, debounce 300ms em todas as telas
+
 ### Design System (docs/DESIGN_SYSTEM.md)
 - **Paleta semantica:** tom (emerald/yellow/orange/red), tier (primary/blue/slate/gray), score (emerald/yellow/orange/red), severity (red/yellow/emerald), saude (emerald/yellow/orange/red)
 - **Motion patterns:** 5 keyframes custom no tailwind.config.ts + tailwindcss-animate ja instalado
@@ -356,6 +383,10 @@ Papeis, restricoes, fluxos e checklist completos em AGENTS.md (v8).
    - Cursor PR #57: filtro `.in("status", ["ativo","trial"])` em 4 arquivos, toggle "Incluir inativos", badge STATUS_CONFIG (Issue #55)
    - Cursor PR #58: badge + banner informativo em ClientDetailPage (Issue #56)
 10. **Concluido:** Checklist E2E v2 — 67 testes manuais cobrindo 8 rotas, 8 hooks, 5 RPCs, 2 perfis
-11. **Pendente:** Lovable S6 — Edge function deliver-audit-alerts (baixa prioridade, depende de decisao sobre canal)
-12. **Aberto:** PR #36 (docs: Auditoria UX/UI) — pode ser fechado (auditoria concluida)
-13. **Fase 7:** Insights IA avancados
+11. **Concluido:** Sprint P1 — Edicao de cliente na tab Configuracoes (Issue #59, PR #61)
+12. **Concluido:** Sprint P3 — CRUD de audit_rules na pagina Auditorias (Issue #60, PR #62)
+13. **Concluido:** Sprint P4 — Busca server-side em 3 telas (Issue #63, PR #64)
+14. **Pendente:** Lovable S6 — Edge function deliver-audit-alerts (baixa prioridade, depende de decisao sobre canal)
+15. **Fechado:** PR #36 (docs: Auditoria UX/UI) — auditoria concluida
+16. **Fechado:** Issue #13 — Banner reclassificacao (won't-fix, cenario ja passou)
+17. **Fase 7:** Insights IA avancados

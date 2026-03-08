@@ -1,8 +1,8 @@
 # Checklist de Testes E2E — CX Hub uMode
 
-> **Versao:** v2 | **Data:** 2026-03-08
+> **Versao:** v3 | **Data:** 2026-03-08
 > **Ultima atualizacao:** 2026-03-08
-> **Total de testes:** 67
+> **Total de testes:** 84
 > **Criterio de aprovacao:** 100% pass (zero falhas)
 
 ---
@@ -127,6 +127,7 @@ O testador deve verificar se as cores correspondem ao contexto:
 | 2.8 | Dark mode | Alternar para dark mode | Cards com fundo escuro, textos legiveis, graficos com cores visiveis, badges com variantes dark corretas | [ ] |
 | 2.9 | Verificar RPC (tecnico) | No DevTools > Network, observar chamadas ao carregar | Deve haver POST para `global_stats_30d` com `p_user_id` = UUID do usuario logado (nao hardcoded) | [ ] |
 | 2.10 | Erro de rede | Desconectar internet e recarregar a pagina | Mensagem de erro amigavel ou toast. NUNCA tela branca | [ ] |
+| 2.11 | Debounce no filtro | Digitar rapidamente no filtro de clientes do Dashboard | Nao dispara multiplas re-renderizacoes. Filtro aplica apos ~300ms de pausa na digitacao | [ ] |
 
 ---
 
@@ -142,6 +143,12 @@ O testador deve verificar se as cores correspondem ao contexto:
 | 3.4 | Loading state | Recarregar a pagina e observar | Skeletons aparecem enquanto dados carregam | [ ] |
 | 3.5 | Empty state | Logar com usuario sem clientes associados (se disponivel) | Mensagem amigavel tipo "Nenhum cliente encontrado", nao erro | [ ] |
 | 3.6 | Dark mode | Alternar para dark mode | Cards e badges com cores corretas no tema escuro | [ ] |
+| 3.7 | Filtro por status | Selecionar filtro de status (Ativo/Trial/Inativo) | Lista mostra apenas clientes com o status selecionado. Badge de status correto em cada card | [ ] |
+| 3.8 | Badge de status nos cards | Verificar cada card de cliente | Badge colorido visivel: Ativo=verde, Trial=azul, Inativo=cinza | [ ] |
+| 3.9 | Busca server-side | Digitar 3+ caracteres no campo de busca | No DevTools > Network, verificar que a chamada Supabase inclui `.ilike("name", "%termo%")`. Nao filtra client-side | [ ] |
+| 3.10 | Debounce na busca | Digitar rapidamente "abc" no campo de busca | Apenas 1 chamada ao banco (nao 3). Atraso de ~300ms antes de disparar | [ ] |
+| 3.11 | Busca com menos de 3 chars | Digitar 1 ou 2 caracteres | Nenhuma chamada de busca disparada. Lista mostra todos os clientes | [ ] |
+| 3.12 | Reset paginacao ao buscar | Estar na pagina 2 da lista, digitar uma busca | Paginacao volta para pagina 1 ao iniciar nova busca | [ ] |
 
 ---
 
@@ -161,6 +168,12 @@ O testador deve verificar se as cores correspondem ao contexto:
 | 4.8 | Formato de datas | Verificar eixo X do grafico de tom | Datas no formato DD/MM (ex: "08/03"), nao formato americano | [ ] |
 | 4.9 | Slug invalido | Digitar na barra de endereco `/clients/cliente-que-nao-existe` | Pagina 404 ou mensagem "Cliente nao encontrado" | [ ] |
 | 4.10 | Dark mode | Alternar para dark mode | Graficos, badges e cards com cores corretas no tema escuro | [ ] |
+| 4.11 | Badge de status | Verificar ao lado do nome do cliente no cabecalho | Badge colorido: Ativo=verde, Trial=azul, Inativo=cinza. Texto legivel | [ ] |
+| 4.12 | Banner inativo | Acessar detalhe de um cliente com status "inativo" | Banner informativo cinza abaixo do cabecalho: "Este cliente esta inativo. Interacoes continuam sendo processadas normalmente." | [ ] |
+| 4.13 | Admin edita nome | Logado como admin, ir a tab Configuracoes, alterar o nome do cliente e clicar "Salvar" | Toast "Dados do cliente atualizados". Nome atualiza no cabecalho e na lista de clientes | [ ] |
+| 4.14 | Admin edita status | Na tab Configuracoes, alterar status via seletor (ex: ativo→trial) e salvar | Badge de status muda imediatamente. Toast de sucesso | [ ] |
+| 4.15 | Admin edita tier | Na tab Configuracoes, alterar tier via seletor e salvar | Tier atualiza. Score de prioridade reflete novo tier no Dashboard | [ ] |
+| 4.16 | Viewer modo read-only | Logado como viewer, ir a tab Configuracoes | Campos exibidos como texto (nao editaveis). Botao "Salvar" NAO aparece | [ ] |
 
 ---
 
@@ -182,6 +195,8 @@ O testador deve verificar se as cores correspondem ao contexto:
 | 5.10 | Loading | Buscar e observar durante o carregamento | Skeletons shimmer na area da tabela | [ ] |
 | 5.11 | Verificar RPC (tecnico) | No DevTools > Network ao buscar | POST para `search_interactions` com p_user_id (UUID real), p_query, p_limit=20, p_offset correto | [ ] |
 | 5.12 | Dark mode | Alternar para dark mode | Badges, tabela e filtros com cores corretas | [ ] |
+| 5.13 | Busca por cliente | Na secao de busca por cliente (acima das interacoes), digitar nome de um cliente | Cards de clientes correspondentes aparecem. Clicar leva ao detalhe do cliente | [ ] |
+| 5.14 | Busca cliente sem match | Digitar nome inexistente na busca de clientes | Mensagem "Nenhum cliente encontrado" ou secao vazia sem erro | [ ] |
 
 ---
 
@@ -200,6 +215,13 @@ O testador deve verificar se as cores correspondem ao contexto:
 | 6.7 | Erro de rede | Desconectar internet e recarregar | Mensagem de erro com botao "Tentar novamente" | [ ] |
 | 6.8 | Verificar RPC (tecnico) | No DevTools > Network | POST para `audit_alerts_summary` com p_user_id = UUID real | [ ] |
 | 6.9 | Dark mode | Alternar para dark mode | Cards, tabela e badges com cores escuras corretas | [ ] |
+| 6.10 | Tab Regras | Clicar na aba "Regras" na pagina de Auditorias | Tabela com colunas: nome, cliente, metrica, operador, threshold, ativo/inativo. Paginacao com 20 por pagina | [ ] |
+| 6.11 | Nova regra (admin) | Clicar "Nova Regra", preencher todos os campos e salvar | Dialog fecha. Toast "Regra criada com sucesso". Regra aparece na tabela | [ ] |
+| 6.12 | Editar regra (admin) | Clicar botao editar em uma regra existente | Dialog abre com campos preenchidos. Alterar valor e salvar. Toast de sucesso. Valor atualizado na tabela | [ ] |
+| 6.13 | Toggle ativo/inativo | Clicar toggle de ativo/inativo em uma regra | Status muda imediatamente. Toast de confirmacao. Sem modal (acao reversivel) | [ ] |
+| 6.14 | Deletar regra | Clicar botao deletar em uma regra | AlertDialog de confirmacao aparece. Confirmar: regra removida, toast de sucesso. Cancelar: nada acontece | [ ] |
+| 6.15 | Viewer sem acoes | Logado como viewer, acessar tab Regras | Tabela visivel em modo read-only. Botoes "Nova Regra", editar, deletar e toggle NAO aparecem | [ ] |
+| 6.16 | Formulario — campos obrigatorios | Abrir dialog "Nova Regra" e tentar salvar sem preencher nome ou metrica | Validacao impede submit. Campos obrigatorios destacados | [ ] |
 
 ---
 
@@ -290,6 +312,7 @@ O testador deve verificar se as cores correspondem ao contexto:
 |--------|------|------------|
 | v1 | 2026-03-08 | Versao inicial — 67 testes cobrindo 8 rotas, 8 hooks, 5 RPCs |
 | v2 | 2026-03-08 | Documento oficial com contexto completo para o testador, glossario, cores de referencia, passos detalhados |
+| v3 | 2026-03-08 | +17 testes: P1 (edicao cliente 4.11-4.16), P3 (CRUD regras 6.10-6.16), P4 (busca server-side 2.11, 3.7-3.12, 5.13-5.14) |
 
 ---
 
