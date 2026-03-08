@@ -1,4 +1,4 @@
-# CONTEXT.md — Estado do Projeto (v12 — 2026-03-08)
+# CONTEXT.md — Estado do Projeto (v14 — 2026-03-08)
 
 > Mantido pelo Claude Code ao final de cada sessao. Lido por todos os agentes para manter contexto.
 >
@@ -17,7 +17,7 @@
 | 3 | Sync Engine (enqueue + process-jobs worker) | Concluido |
 | 4 | Classificacao IA (classify_batch via Gemini/Claude) | Concluido — Gemini Pro + prompt Mega Agente v6 |
 | 5 | Priority Score Engine + Dashboard | Concluido — Backend (Issue #32) + Frontend (Issue #33, PRs #34 e #35) |
-| 6 | Auditorias e Alertas | Placeholder |
+| 6 | Auditorias e Alertas | Backend concluido (Issues #37 e #38) — Frontend pendente |
 | 7 | Insights IA avancados | Placeholder |
 
 ---
@@ -47,6 +47,31 @@
 - **Cursor Rules:** `.cursor/rules` atualizado com Design System, proibicoes explicitas, stack completa
 - **Keyframes custom:** 5 registrados no `tailwind.config.ts` (pulse-subtle, fade-in-up, shimmer, progress-fill, score-pop)
 
+### Auditoria UX/UI — 12 PRs do Cursor (todos mergeados)
+
+| PR | Titulo | LOTE | Arquivos |
+|----|--------|------|----------|
+| #39 | fix: error states in ClientsPage and ClientDetailPage | 1 | ClientsPage, ClientDetailPage |
+| #40 | fix: replace manual submitting state with useMutation in auth pages | 1 | LoginPage, SignupPage |
+| #41 | fix: honest empty state for Audits page | 1 | Audits |
+| #42 | fix: use React Router Link in NotFound page | 1 | NotFound |
+| #43 | feat: Settings priorities tab + jobStatusBadge dark mode | 1 | SettingsPage, useClientPriorityConfig (novo) |
+| #44 | fix: dark mode tone/status colors, shimmer skeletons, layout padding | 2 | ClientsPage, ClientDetailPage, DashboardLayout |
+| #45 | fix: accessibility aria-labels, focus-visible, active:scale | 3 | ClientsPage, ClientDetailPage |
+| #46 | feat: score column in ClientsPage | 4 | ClientsPage |
+| #47 | feat: Dashboard search by name and filter by tier | 4 | Index |
+| #48 | feat: ClientDetail score card and remove Tasks tab | 4 | ClientDetailPage |
+| #49 | feat: recharts volume chart in ClientDetail | 5 | ClientDetailPage |
+| #50 | feat: Dashboard global KPIs and trend charts | 5 | Index, useGlobalStats (novo) |
+
+**Hooks adicionados nesta auditoria:**
+- `useClientPriorityConfig` — config de prioridades para aba Settings (PR #43)
+- `useGlobalStats` — chama `global_stats_30d` RPC para KPI cards e graficos (PR #50)
+
+**Componentes de graficos adicionados (PR #49 e #50):**
+- ClientDetailPage: recharts BarChart para volume 14 dias (substituiu divs manuais)
+- Index: 4 KPI cards (global_stats_30d), stacked BarChart (evolucao tom), horizontal BarChart (top temas), BarChart (distribuicao score), PieChart donut (clientes por tier)
+
 ### Env vars declaradas no Supabase
 
 ```
@@ -59,6 +84,7 @@ PRIORITY_RECENCY_RECENT_MULTIPLIER=2.0
 PRIORITY_RECENCY_MEDIUM_MULTIPLIER=1.5
 PRIORITY_RECENCY_BASE_MULTIPLIER=1.0
 PRIORITY_BATCH_SIZE=20
+AUDIT_BATCH_SIZE=20
 ```
 
 ---
@@ -95,6 +121,20 @@ PRIORITY_BATCH_SIZE=20
 | #30 | UX: NotFound em ingles | Resolvido (PR #31) | Cursor |
 | #32 | Fase 5: Priority Score Engine backend | Concluido | Lovable |
 | #33 | Fase 5: Priority Dashboard + UX cleanup | Concluido (PR #34 + PR #35) | Cursor |
+| #37 | DB function global_stats_30d para Dashboard KPIs | Concluido (commits 345c497 + 4d977d7) | Lovable |
+| #38 | Edge function evaluate-audit-rules — alertas automaticos | Concluido (commits e44bd75 + 30c2775 + 7dbc62c) | Lovable |
+| #39 | fix: error states in ClientsPage and ClientDetailPage | Mergeado | Cursor |
+| #40 | fix: auth useMutation | Mergeado | Cursor |
+| #41 | fix: Audits empty state honesto | Mergeado | Cursor |
+| #42 | fix: NotFound React Router Link | Mergeado | Cursor |
+| #43 | feat: Settings priorities tab + jobStatusBadge dark mode | Mergeado | Cursor |
+| #44 | fix: dark mode tone/status colors, shimmer, layout padding | Mergeado | Cursor |
+| #45 | fix: accessibility aria-labels, focus-visible | Mergeado | Cursor |
+| #46 | feat: score column in ClientsPage | Mergeado | Cursor |
+| #47 | feat: Dashboard search + tier filter | Mergeado | Cursor |
+| #48 | feat: ClientDetail score card, remove Tasks tab | Mergeado | Cursor |
+| #49 | feat: recharts volume chart in ClientDetail | Mergeado | Cursor |
+| #50 | feat: Dashboard global KPIs and trend charts | Mergeado | Cursor |
 
 ---
 
@@ -114,12 +154,21 @@ PRIORITY_BATCH_SIZE=20
 
 ## Problemas de UX identificados
 
-- ~~Dashboard mostra KPIs do Gist mas nao reflete dados de classificacao IA~~ — Resolvido (PR #35)
+- ~~Dashboard mostra KPIs do Gist mas nao reflete dados de classificacao IA~~ — Resolvido (PR #35 + PR #50)
 - ~~Excesso de botoes "Em breve" — transmite produto inacabado~~ — Resolvido (PR #34)
-- Pagina Auditorias e placeholder sem funcionalidade
+- ~~Pagina Auditorias e placeholder sem funcionalidade~~ — Empty state honesto (PR #41), frontend real pendente apos Lovable entregar backend
 - ~~Coluna "Saude" com semantica invertida~~ — Resolvido (PR #34)
 - ~~Marca inconsistente (Login diz "Hub Central", sidebar diz "uMode")~~ — Resolvido (PR #34)
 - ~~404 em ingles, app em PT-BR~~ — Resolvido (PR #31)
+- ~~Dark mode incompleto (TONE_CONFIG, badges, jobStatusBadge)~~ — Resolvido (PR #44 + PR #43)
+- ~~Skeletons sem shimmer~~ — Resolvido (PR #44)
+- ~~Layout padding fixo (sem responsivo)~~ — Resolvido (PR #44)
+- ~~Acessibilidade (aria-labels, focus-visible, keyboard nav)~~ — Resolvido (PR #45)
+- ~~Score nao visivel em ClientsPage~~ — Resolvido (PR #46)
+- ~~Dashboard sem busca/filtro~~ — Resolvido (PR #47)
+- ~~ClientDetail sem score card, com aba Tasks morta~~ — Resolvido (PR #48)
+- ~~Grafico de volume em divs manuais~~ — Resolvido com recharts (PR #49)
+- ~~Dashboard sem KPIs globais e graficos de tendencia~~ — Resolvido (PR #50)
 
 ---
 
@@ -150,6 +199,25 @@ PRIORITY_BATCH_SIZE=20
 - **Triggers:** manual (POST com JWT admin), pg_cron (2h), event-driven (apos classify_batch)
 - **Testes:** 9 unitarios para calculateScore e detectPatterns
 - **Env vars:** 9 variaveis `PRIORITY_*` configuradas no Supabase Dashboard
+- **Chain:** apos completar (!hasMore), dispara `evaluate-audit-rules` (fire-and-forget)
+
+### Auditorias e Alertas (Fase 6 — backend concluido)
+
+#### DB Function: `global_stats_30d` (Issue #37)
+- **Retorna:** total_interactions_30d, pct_critico, pct_alerta, total_clients_monitored, monthly_tone_evolution (6 meses), top_themes (top 5)
+- **SQL puro** (LANGUAGE sql, STABLE, SECURITY DEFINER)
+- **RLS:** filtra via `user_accessible_client_ids(p_user_id)`
+- **Janelas:** 30 dias para totais, 6 meses para evolucao
+- **Desbloqueia:** PR-H2 (Dashboard KPI cards + graficos) — Cursor
+
+#### Edge Function: `evaluate-audit-rules` (Issue #38)
+- **Estrutura modular:** index.ts (handler), logic.ts (funcoes puras), index.test.ts (9 testes), README.md
+- **Metricas:** score_prioridade, tom_critico_pct, tom_alerta_pct, volume_periodo
+- **Fluxo:** fetchActiveRules → calculateMetric → evaluateRule → checkCooldown → insertAlert
+- **Batch + auto-chain:** AUDIT_BATCH_SIZE=20, fire-and-forget
+- **Trigger:** encadeado apos calculate-priority-scores (!hasMore)
+- **Auth:** service_role_key only
+- **Desbloqueia:** Auditorias UI real (Cursor, futuro)
 
 ### Design System (docs/DESIGN_SYSTEM.md)
 - **Paleta semantica:** tom (emerald/yellow/orange/red), tier (primary/blue/slate/gray), score (emerald/yellow/orange/red), severity (red/yellow/emerald), saude (emerald/yellow/orange/red)
@@ -209,6 +277,19 @@ Papeis, restricoes, fluxos e checklist completos em AGENTS.md (v7).
 2. **Concluido:** Divida tecnica do Checklist CTO (m1, m3, m4, m5, m6, m9, m12) — 8 PRs mergeados
 3. **Concluido:** Fase 5 backend — Priority Score Engine (Issue #32, Lovable)
 4. **Concluido:** Fase 5 frontend — Priority Dashboard + UX cleanup (Issue #33, Cursor, PRs #34 e #35)
-5. **Proximo:** Limpar pagina Auditorias (placeholder)
-6. **Fase 6:** Auditorias e Alertas
-7. **Fase 7:** Insights IA avancados
+5. **Concluido:** Fase 6 backend — global_stats_30d (Issue #37) + evaluate-audit-rules (Issue #38), Lovable
+6. **Concluido:** Auditoria UX/UI — 12 PRs do Cursor mergeados (#39-#50), organizados em 5 LOTEs
+   - LOTE 1: PR-A1 (#39), PR-C (#40), PR-D (#41), PR-E (#42), PR-F (#43)
+   - LOTE 2: PR-A2 (#44)
+   - LOTE 3: PR-B (#45)
+   - LOTE 4: PR-G (#46), PR-H1 (#47), PR-I (#48)
+   - LOTE 5: PR-J (#49), PR-H2 (#50)
+   - Frontend Contracts: regra adicionada ao AGENTS.md — Lovable inclui contratos tipados em Issues que desbloqueiam Cursor
+7. **Pendente:** Lovable Marathon — 6 sessoes planejadas para completar backend da Fase 6+
+   - Sessao 1: RLS policies para audit_rules e audit_alerts (L2) — CRITICA
+   - Sessao 2: Seed audit_rules + Realtime audit_alerts + pg_cron evaluate-audit-rules (L3 + L5)
+   - Sessao 3: DB function audit_alerts_summary (M2)
+   - Sessao 4: DB function search_interactions (L4)
+   - Sessao 5: DB function client_tone_trend_7d (M4)
+   - Sessao 6: Edge function deliver-audit-alerts (L1) — BAIXA, futuro
+8. **Fase 7:** Insights IA avancados
