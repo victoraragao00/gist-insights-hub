@@ -232,6 +232,7 @@ export type Database = {
           metadata: Json | null
           name: string
           slug: string
+          status: string
         }
         Insert: {
           active?: boolean | null
@@ -240,6 +241,7 @@ export type Database = {
           metadata?: Json | null
           name: string
           slug: string
+          status?: string
         }
         Update: {
           active?: boolean | null
@@ -248,6 +250,7 @@ export type Database = {
           metadata?: Json | null
           name?: string
           slug?: string
+          status?: string
         }
         Relationships: []
       }
