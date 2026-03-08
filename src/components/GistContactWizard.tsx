@@ -103,7 +103,7 @@ export function GistContactWizard({ open, onClose, mode, clientId }: GistContact
       const { data, error } = await supabase
         .from("clients")
         .select("id, name")
-        .eq("active", true)
+        .in("status", ["ativo", "trial"])
         .order("name")
         .limit(100);
       if (error) {

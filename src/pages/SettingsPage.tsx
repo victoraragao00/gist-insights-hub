@@ -113,7 +113,7 @@ function SettingsPrioritiesTab() {
       const { data, error } = await supabase
         .from("clients")
         .select("id, name, slug")
-        .eq("active", true)
+        .in("status", ["ativo", "trial"])
         .order("name");
       if (error) throw error;
       return (data ?? []) as { id: string; name: string; slug: string }[];
@@ -402,7 +402,7 @@ const SettingsPage = () => {
       const { data, error } = await supabase
         .from("clients")
         .select("id, name")
-        .eq("active", true)
+        .in("status", ["ativo", "trial"])
         .order("name")
         .limit(100);
       if (error) throw error;
