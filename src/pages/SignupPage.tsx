@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -25,7 +26,6 @@ const signupSchema = z
 type SignupForm = z.infer<typeof signupSchema>;
 
 const SignupPage = () => {
-  const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const emailId = useId();
   const passwordId = useId();
@@ -37,22 +37,19 @@ const SignupPage = () => {
     formState: { errors },
   } = useForm<SignupForm>({ resolver: zodResolver(signupSchema) });
 
-  const onSubmit = async (values: SignupForm) => {
-    setSubmitting(true);
-    try {
+  const signupMutation = useMutation({
+    mutationFn: async (values: SignupForm) => {
       const { error } = await supabase.auth.signUp({
         email: values.email,
         password: values.password,
       });
       if (error) throw error;
-      setSuccess(true);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Erro ao criar conta";
-      toast.error(msg);
-    } finally {
-      setSubmitting(false);
-    }
-  };
+    },
+    onSuccess: () => setSuccess(true),
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Erro ao criar conta"),
+  });
+
+  const onSubmit = (values: SignupForm) => signupMutation.mutate(values);
 
   if (success) {
     return (
@@ -100,8 +97,8 @@ const SignupPage = () => {
               <Input id={confirmPasswordId} type="password" placeholder="••••••" {...register("confirmPassword")} />
               {errors.confirmPassword && <p className="text-xs text-destructive">{errors.confirmPassword.message}</p>}
             </div>
-            <Button type="submit" className="w-full" disabled={submitting}>
-              {submitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+            <Button type="submit" className="w-full" disabled={signupMutation.isPending}>
+              {signupMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
               Criar Conta
             </Button>
           </form>
