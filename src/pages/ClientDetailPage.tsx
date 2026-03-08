@@ -178,8 +178,9 @@ const ClientDetailPage = () => {
   // ── Queries ──
 
   const { data: client, isLoading: loadingClient } = useQuery<ClientDetail | null>({
-    queryKey: ["client_detail", slug, user?.id],
+    queryKey: ["client_detail", user?.id, slug],
     enabled: !!slug && !!user?.id,
+    staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("clients")
@@ -196,8 +197,9 @@ const ClientDetailPage = () => {
   const meta = (client?.metadata ?? {}) as ClientMetadata;
 
   const { data: participants = [] } = useQuery<Participant[]>({
-    queryKey: ["detail_participants", clientId, user?.id],
+    queryKey: ["detail_participants", user?.id, clientId],
     enabled: !!clientId && !!user?.id,
+    staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("participants")
@@ -211,8 +213,9 @@ const ClientDetailPage = () => {
   });
 
   const { data: bindings = [] } = useQuery<ChannelBinding[]>({
-    queryKey: ["detail_bindings", clientId, user?.id],
+    queryKey: ["detail_bindings", user?.id, clientId],
     enabled: !!clientId && !!user?.id,
+    staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("channel_bindings")
@@ -225,8 +228,9 @@ const ClientDetailPage = () => {
   });
 
   const { data: interactions = [] } = useQuery<Interaction[]>({
-    queryKey: ["detail_interactions_30d", clientId, user?.id, thirtyDaysAgo],
+    queryKey: ["detail_interactions_30d", user?.id, clientId, thirtyDaysAgo],
     enabled: !!clientId && !!user?.id,
+    staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("interactions")
@@ -241,8 +245,9 @@ const ClientDetailPage = () => {
   });
 
   const { data: auditRules = [] } = useQuery<AuditRule[]>({
-    queryKey: ["detail_audit_rules", clientId, user?.id],
+    queryKey: ["detail_audit_rules", user?.id, clientId],
     enabled: !!clientId && !!user?.id,
+    staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("audit_rules")
@@ -255,8 +260,9 @@ const ClientDetailPage = () => {
   });
 
   const { data: totalInteractionsCount = 0 } = useQuery<number>({
-    queryKey: ["detail_total_interactions", clientId, user?.id],
+    queryKey: ["detail_total_interactions", user?.id, clientId],
     enabled: !!clientId && !!user?.id,
+    staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       const { count, error } = await supabase
         .from("interactions")
@@ -351,7 +357,7 @@ const ClientDetailPage = () => {
         .eq("id", client.id);
       if (error) throw error;
       toast.success("Escopo salvo!");
-      queryClient.invalidateQueries({ queryKey: ["client_detail", slug] });
+      queryClient.invalidateQueries({ queryKey: ["client_detail", user?.id, slug] });
     } catch (err) {
       toast.error("Erro ao salvar: " + (err instanceof Error ? err.message : "Erro"));
     } finally {
@@ -386,7 +392,7 @@ const ClientDetailPage = () => {
       toast.error("Erro ao atualizar regra");
       return;
     }
-    queryClient.invalidateQueries({ queryKey: ["detail_audit_rules", clientId] });
+    queryClient.invalidateQueries({ queryKey: ["detail_audit_rules", user?.id, clientId] });
   };
 
   // ── Loading / Not found ──
