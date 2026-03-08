@@ -1,4 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { detectPatterns, calculateScore } from './logic.ts';
+import type { Pattern, InteractionRow, SeverityWeights, RecencyConfig } from './logic.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -7,17 +9,20 @@ const corsHeaders = {
 
 // ── Environment-driven constants (zero hardcoded business values) ──
 
-const SEVERITY_WEIGHTS: Record<string, number> = {
+const SEVERITY_WEIGHTS: SeverityWeights = {
   critico: Number(Deno.env.get('PRIORITY_SEVERITY_CRITICO') || '10'),
   alerta: Number(Deno.env.get('PRIORITY_SEVERITY_ALERTA') || '5'),
   atencao: Number(Deno.env.get('PRIORITY_SEVERITY_ATENCAO') || '2'),
 };
 
-const RECENCY_RECENT_DAYS = Number(Deno.env.get('PRIORITY_RECENCY_RECENT_DAYS') || '3');
-const RECENCY_MEDIUM_DAYS = Number(Deno.env.get('PRIORITY_RECENCY_MEDIUM_DAYS') || '7');
-const RECENCY_RECENT_MULTIPLIER = Number(Deno.env.get('PRIORITY_RECENCY_RECENT_MULTIPLIER') || '2.0');
-const RECENCY_MEDIUM_MULTIPLIER = Number(Deno.env.get('PRIORITY_RECENCY_MEDIUM_MULTIPLIER') || '1.5');
-const RECENCY_BASE_MULTIPLIER = Number(Deno.env.get('PRIORITY_RECENCY_BASE_MULTIPLIER') || '1.0');
+const RECENCY_CONFIG: RecencyConfig = {
+  recentDays: Number(Deno.env.get('PRIORITY_RECENCY_RECENT_DAYS') || '3'),
+  mediumDays: Number(Deno.env.get('PRIORITY_RECENCY_MEDIUM_DAYS') || '7'),
+  recentMultiplier: Number(Deno.env.get('PRIORITY_RECENCY_RECENT_MULTIPLIER') || '2.0'),
+  mediumMultiplier: Number(Deno.env.get('PRIORITY_RECENCY_MEDIUM_MULTIPLIER') || '1.5'),
+  baseMultiplier: Number(Deno.env.get('PRIORITY_RECENCY_BASE_MULTIPLIER') || '1.0'),
+};
+
 const BATCH_SIZE = Number(Deno.env.get('PRIORITY_BATCH_SIZE') || '20');
 
 // ── Types ──
@@ -31,23 +36,7 @@ interface PriorityConfig {
   recurrence_threshold_users: number;
 }
 
-interface Pattern {
-  type: 'recurrence';
-  theme: string;
-  user_count: number;
-  window_days: number;
-  severity: 'high' | 'medium' | 'low';
-  description: string;
-}
-
-interface InteractionRow {
-  theme: string | null;
-  tone: string | null;
-  sender_raw: string | null;
-  occurred_at: string;
-}
-
-// ── Pure logic functions (single responsibility each) ──
+// ── I/O functions (single responsibility each) ──
 
 async function fetchClientConfigs(
   supaAdmin: ReturnType<typeof createClient>,
@@ -87,89 +76,6 @@ async function fetchClientInteractions(
 
   if (error) throw new Error(`fetchClientInteractions failed: ${error.message}`);
   return (data || []) as InteractionRow[];
-}
-
-function detectPatterns(
-  interactions: InteractionRow[],
-  thresholdUsers: number,
-  windowDays: number
-): Pattern[] {
-  // Group by theme, count distinct sender_raw per theme
-  const themeGroups = new Map<string, { senders: Set<string>; worstTone: string }>();
-
-  for (const ix of interactions) {
-    if (!ix.theme) continue;
-    const group = themeGroups.get(ix.theme) || { senders: new Set<string>(), worstTone: 'atencao' };
-    if (ix.sender_raw) group.senders.add(ix.sender_raw);
-
-    // Track worst tone: critico > alerta > atencao
-    const toneRank: Record<string, number> = { critico: 3, alerta: 2, atencao: 1 };
-    if (ix.tone && (toneRank[ix.tone] || 0) > (toneRank[group.worstTone] || 0)) {
-      group.worstTone = ix.tone;
-    }
-    themeGroups.set(ix.theme, group);
-  }
-
-  const patterns: Pattern[] = [];
-  for (const [theme, group] of themeGroups) {
-    const userCount = group.senders.size;
-    if (userCount < thresholdUsers) continue;
-
-    // Severity based on worst tone: critico/alerta → high, atencao → medium
-    const severity: Pattern['severity'] =
-      group.worstTone === 'critico' || group.worstTone === 'alerta' ? 'high' : 'medium';
-
-    patterns.push({
-      type: 'recurrence',
-      theme,
-      user_count: userCount,
-      window_days: windowDays,
-      severity,
-      description: `${userCount} usuários · ${theme} · ${windowDays} dias`,
-    });
-  }
-
-  return patterns;
-}
-
-function calculateScore(
-  patterns: Pattern[],
-  interactions: InteractionRow[],
-  weightMultiplier: number
-): number {
-  if (patterns.length === 0) return 0;
-
-  const now = Date.now();
-  const recentMs = RECENCY_RECENT_DAYS * 86400000;
-  const mediumMs = RECENCY_MEDIUM_DAYS * 86400000;
-
-  // Compute average recency multiplier per theme from interactions
-  const themeRecency = new Map<string, number>();
-  for (const ix of interactions) {
-    if (!ix.theme) continue;
-    const ageMs = now - new Date(ix.occurred_at).getTime();
-    let recencyWeight = RECENCY_BASE_MULTIPLIER;
-    if (ageMs <= recentMs) recencyWeight = RECENCY_RECENT_MULTIPLIER;
-    else if (ageMs <= mediumMs) recencyWeight = RECENCY_MEDIUM_MULTIPLIER;
-
-    const current = themeRecency.get(ix.theme) || recencyWeight;
-    // Keep the highest recency weight for the theme
-    if (recencyWeight > current) themeRecency.set(ix.theme, recencyWeight);
-    else if (!themeRecency.has(ix.theme)) themeRecency.set(ix.theme, recencyWeight);
-  }
-
-  let scoreBruto = 0;
-  for (const pattern of patterns) {
-    const severityWeight = pattern.severity === 'high'
-      ? SEVERITY_WEIGHTS.critico
-      : pattern.severity === 'medium'
-        ? SEVERITY_WEIGHTS.atencao
-        : SEVERITY_WEIGHTS.atencao;
-    const recencyWeight = themeRecency.get(pattern.theme) || RECENCY_BASE_MULTIPLIER;
-    scoreBruto += pattern.user_count * severityWeight * recencyWeight;
-  }
-
-  return scoreBruto * weightMultiplier;
 }
 
 async function upsertScore(
@@ -221,6 +127,20 @@ async function checkAdminRole(
   return (data || []).length > 0;
 }
 
+// ── Process a single client ──
+
+async function processClient(
+  supaAdmin: ReturnType<typeof createClient>,
+  config: PriorityConfig
+): Promise<{ score: number; patterns: Pattern[] }> {
+  const interactions = await fetchClientInteractions(supaAdmin, config.client_id, config.recurrence_window_days);
+  const patterns = detectPatterns(interactions, config.recurrence_threshold_users, config.recurrence_window_days);
+  const score = calculateScore(patterns, interactions, config.weight_multiplier, SEVERITY_WEIGHTS, RECENCY_CONFIG);
+  await upsertScore(supaAdmin, config.client_id, score, patterns);
+  console.log(`[calculate-priority] client=${config.client_id} score=${score} patterns=${patterns.length}`);
+  return { score, patterns };
+}
+
 // ── Main handler ──
 
 Deno.serve(async (req) => {
@@ -236,8 +156,7 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json().catch(() => ({}));
-    const { force, client_id: singleClientId, _offset } = body as {
-      force?: boolean;
+    const { client_id: singleClientId, _offset } = body as {
       client_id?: string;
       _offset?: number;
     };
@@ -285,13 +204,7 @@ Deno.serve(async (req) => {
         });
       }
 
-      const config = configData as PriorityConfig;
-      const interactions = await fetchClientInteractions(supaAdmin, config.client_id, config.recurrence_window_days);
-      const patterns = detectPatterns(interactions, config.recurrence_threshold_users, config.recurrence_window_days);
-      const score = calculateScore(patterns, interactions, config.weight_multiplier);
-      await upsertScore(supaAdmin, config.client_id, score, patterns);
-
-      console.log(`[calculate-priority] client=${config.client_id} score=${score} patterns=${patterns.length}`);
+      await processClient(supaAdmin, configData as PriorityConfig);
 
       return new Response(JSON.stringify({
         processed: 1,
@@ -309,12 +222,8 @@ Deno.serve(async (req) => {
 
     let processed = 0;
     for (const config of configs) {
-      const interactions = await fetchClientInteractions(supaAdmin, config.client_id, config.recurrence_window_days);
-      const patterns = detectPatterns(interactions, config.recurrence_threshold_users, config.recurrence_window_days);
-      const score = calculateScore(patterns, interactions, config.weight_multiplier);
-      await upsertScore(supaAdmin, config.client_id, score, patterns);
+      await processClient(supaAdmin, config);
       processed++;
-      console.log(`[calculate-priority] client=${config.client_id} score=${score} patterns=${patterns.length}`);
     }
 
     // Auto-chain if more clients to process
