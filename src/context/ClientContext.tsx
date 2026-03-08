@@ -5,6 +5,10 @@ import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
 
 // ── Types ──
+// job_status matches Database["public"]["Enums"]["job_status"] (types.ts); local alias to avoid editing generated file
+type JobStatus = "pending" | "running" | "completed" | "failed" | "cancelled";
+
+const ACTIVE_JOB_STATUSES: JobStatus[] = ["pending", "running"];
 
 interface Client {
   id: string;
@@ -117,7 +121,7 @@ export function ClientProvider({ children }: { children: ReactNode }) {
   const [jobs, setJobs] = useState<SyncJobRecord[]>([]);
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const fallbackRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const channelRef = useRef<any>(null);
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   const { data: clients = [], isLoading } = useQuery<Client[]>({
     queryKey: ["clients", user?.id],
@@ -146,21 +150,22 @@ export function ClientProvider({ children }: { children: ReactNode }) {
       const { data } = await supabase
         .from('sync_jobs')
         .select('*')
-        .in('status', ['pending', 'running'] as any)
+        .in('status', ACTIVE_JOB_STATUSES)
         .order('created_at', { ascending: true });
-      if (data && data.length > 0) {
-        const ids = data.map((j: any) => j.id);
+      const rows = (data ?? []) as SyncJobRecord[];
+      if (rows.length > 0) {
+        const ids = rows.map((j) => j.id);
         setActiveJobIds(prev => {
           const merged = new Set([...prev, ...ids]);
           return Array.from(merged);
         });
         setJobs(prev => {
           const existingIds = new Set(prev.map(j => j.id));
-          const newJobs = (data as SyncJobRecord[]).filter(j => !existingIds.has(j.id));
+          const newJobs = rows.filter(j => !existingIds.has(j.id));
           return newJobs.length > 0 ? [...prev, ...newJobs] : prev;
         });
         if (!startedAt) {
-          const earliest = data.find((j: any) => j.started_at);
+          const earliest = rows.find((j) => j.started_at);
           setStartedAt(earliest?.started_at ? new Date(earliest.started_at).getTime() : Date.now());
         }
       }
@@ -260,10 +265,10 @@ export function ClientProvider({ children }: { children: ReactNode }) {
       const hasCancelled = jobs.some(j => j.status === 'cancelled');
       const totalContacts = jobs
         .filter(j => j.type === 'sync_contacts')
-        .reduce((s, j) => s + ((j.progress as any)?.contacts_processed || 0), 0);
+        .reduce((s, j) => s + (Number((j.progress as Record<string, unknown> | null)?.contacts_processed) || 0), 0);
       const totalMessages = jobs
         .filter(j => j.type === 'ingest_historical')
-        .reduce((s, j) => s + ((j.progress as any)?.messages_inserted || 0), 0);
+        .reduce((s, j) => s + (Number((j.progress as Record<string, unknown> | null)?.messages_inserted) || 0), 0);
 
       if (hasCancelled) {
         toast.info("Sincronização cancelada pelo usuário.");
@@ -334,9 +339,9 @@ export function ClientProvider({ children }: { children: ReactNode }) {
     for (const jobId of activeJobIds) {
       await supabase
         .from('sync_jobs')
-        .update({ status: 'cancelled' as any, completed_at: new Date().toISOString() })
+        .update({ status: 'cancelled' as JobStatus, completed_at: new Date().toISOString() })
         .eq('id', jobId)
-        .in('status', ['pending', 'running'] as any);
+        .in('status', ACTIVE_JOB_STATUSES);
     }
   }, [activeJobIds]);
 
