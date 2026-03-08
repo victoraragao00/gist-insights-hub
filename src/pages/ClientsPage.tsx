@@ -59,10 +59,10 @@ const CHANNEL_ICONS: Record<string, string> = {
 };
 
 const TONE_CONFIG: Record<string, { label: string; className: string }> = {
-  ok: { label: "✓ Ok", className: "bg-green-100 text-green-700" },
-  atencao: { label: "⚠ Atenção", className: "bg-yellow-100 text-yellow-700" },
-  alerta: { label: "🔶 Alerta", className: "bg-orange-100 text-orange-700" },
-  critico: { label: "🔴 Crítico", className: "bg-red-100 text-red-700" },
+  ok: { label: "✓ Ok", className: "bg-emerald-50 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400" },
+  atencao: { label: "⚠ Atenção", className: "bg-yellow-50 text-yellow-600 dark:bg-yellow-950 dark:text-yellow-400" },
+  alerta: { label: "🔶 Alerta", className: "bg-orange-50 text-orange-600 dark:bg-orange-950 dark:text-orange-400" },
+  critico: { label: "🔴 Crítico", className: "bg-red-50 text-red-600 dark:bg-red-950 dark:text-red-400" },
 };
 
 function formatLastContact(dateStr: string | null): string {
@@ -244,12 +244,12 @@ const ClientsPage = () => {
           <div className="p-6 space-y-4">
             {[1, 2, 3].map((i) => (
               <div key={i} className="flex items-center gap-4">
-                <Skeleton className="h-5 w-40" />
-                <Skeleton className="h-5 w-20" />
-                <Skeleton className="h-5 w-16" />
-                <Skeleton className="h-5 w-20" />
-                <Skeleton className="h-2 w-16" />
-                <Skeleton className="h-5 w-28" />
+                <Skeleton className="h-5 w-40 animate-shimmer" />
+                <Skeleton className="h-5 w-20 animate-shimmer" />
+                <Skeleton className="h-5 w-16 animate-shimmer" />
+                <Skeleton className="h-5 w-20 animate-shimmer" />
+                <Skeleton className="h-2 w-16 animate-shimmer" />
+                <Skeleton className="h-5 w-28 animate-shimmer" />
               </div>
             ))}
           </div>
