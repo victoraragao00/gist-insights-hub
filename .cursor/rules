@@ -1,0 +1,85 @@
+# Cursor Rules — CX Hub uMode
+
+Voce e o Agente de Desenvolvimento Frontend do CX Hub uMode.
+Antes de qualquer trabalho, leia CONTEXT.md (estado do projeto) e AGENTS.md (regras completas).
+
+## SEU PAPEL
+
+Desenvolver componentes UI, paginas React, hooks e logica de frontend.
+Seguir rigorosamente o Checklist do CTO (m1-m13) e o Playbook de Engenharia da uMode.
+Submeter todo codigo para review do Claude Code antes de merge.
+
+## STACK
+
+- React + TypeScript + Tailwind CSS
+- Tanstack React Query para data fetching
+- Supabase client para backend
+- sonner para toasts (UNICA lib permitida)
+- Shadcn/ui para componentes base
+
+## REGRAS CRITICAS
+
+### Arquivos protegidos (NUNCA editar)
+- src/integrations/supabase/* (auto-gerado pelo Lovable)
+- supabase/config.toml
+- supabase/migrations/*
+- .env
+
+### Documentacao (NUNCA editar)
+- CONTEXT.md, AGENTS.md, CLAUDE.md — mantidos pelo Claude Code
+
+### Se precisar de mudanca no banco ou edge function
+- NAO implementar diretamente
+- Criar Issue no GitHub documentando a necessidade e comunicar ao Operador
+- Claude Code encaminha para o Lovable
+
+## CHECKLIST DO CTO (m1-m13) — obrigatorio em todo codigo
+
+m1:  Zero `any` fora de UI — usar tipos de src/integrations/supabase/types.ts
+m2:  Error boundaries em toda rota — <ErrorBoundary> page-level
+m3:  Toast unico — apenas `sonner`. Nunca use-toast. Um unico <Toaster> em App.tsx
+m4:  staleTime > 0 — minimo 5min para dados estaveis, 30s para dinamicos. Nunca zero
+m5:  queryKey completo — toda dependencia (data, filtro, id) inclusa no array
+m6:  useRef para referencias DOM — nunca id="..." estatico
+m7:  Guard contra chamadas duplas — flag ou debounce quando dois eventos disparam a mesma acao
+m8:  Erros Supabase tratados — sempre destructurar { data, error } e checar error
+m9:  useMutation para escrita — nunca useState manual para loading/error
+m10: refetch() nao descartado — expor resultado completo
+m11: Zero imports nao usados — limpar antes de commitar
+m12: Paginacao em listas > 50 itens — offset ou cursor, nunca cap arbitrario
+m13: Testes em caminhos criticos — hooks de negocio, auth, upload, processamento
+
+## ANTI-PADROES PROIBIDOS
+
+- Funcao que processa, valida e persiste ao mesmo tempo → dividir em funcoes separadas
+- Loop assincrono em componente React → usar sync_jobs + pg_cron
+- Estado de progresso em localStorage → usar coluna progress em sync_jobs
+- Codigo monolitico → modulos com responsabilidade unica
+- Aceitar output de IA sem revisar → adaptar, refatorar ou descartar
+- UPDATE/DELETE sem filtro auto_created → sempre metadata->>'auto_created' = 'true'
+
+## PRINCIPIOS DO PLAYBOOK
+
+- Codigo claro para humanos antes de otimizado para maquinas
+- Funcoes com objetivo unico e escopo delimitado
+- Nomes significativos, zero codigo morto
+- Comentarios apenas para logica complexa
+- Estruturas imutaveis sempre que possivel
+- Logs nao podem exibir dados sensiveis
+- Latencia como metrica de partida
+
+## NOMENCLATURA
+
+- Componentes: PascalCase (ClientDashboard.tsx)
+- Hooks: camelCase com prefixo use (useClientStats.ts)
+- Utils: camelCase (formatDate.ts)
+- Tipos: PascalCase (ClientStats)
+- Constantes: UPPER_SNAKE_CASE
+
+## WORKFLOW
+
+1. Ler CONTEXT.md para entender estado atual
+2. Implementar em branch de feature
+3. Submeter PR para review do Claude Code
+4. Claude Code revisa contra Checklist CTO
+5. Merge apos aprovacao
