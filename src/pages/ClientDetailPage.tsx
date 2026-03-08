@@ -68,6 +68,7 @@ interface ClientDetail {
   name: string;
   slug: string;
   active: boolean;
+  status: string;
   metadata: ClientMetadata | null;
   created_at: string;
 }
@@ -114,6 +115,12 @@ const TONE_CONFIG: Record<string, { label: string; className: string }> = {
   atencao: { label: "⚠ Atenção", className: "bg-yellow-50 text-yellow-600 dark:bg-yellow-950 dark:text-yellow-400" },
   alerta: { label: "🔶 Alerta", className: "bg-orange-50 text-orange-600 dark:bg-orange-950 dark:text-orange-400" },
   critico: { label: "🔴 Crítico", className: "bg-red-50 text-red-600 dark:bg-red-950 dark:text-red-400" },
+};
+
+const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
+  ativo: { label: "Ativo", className: "bg-emerald-50 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400" },
+  trial: { label: "Trial", className: "bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400" },
+  inativo: { label: "Inativo", className: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400" },
 };
 
 const CHANNEL_ICONS: Record<string, string> = {
@@ -191,7 +198,7 @@ const ClientDetailPage = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("clients")
-        .select("id, name, slug, active, metadata, created_at")
+        .select("id, name, slug, active, status, metadata, created_at")
         .eq("slug", slug!)
         .limit(1)
         .maybeSingle();
@@ -499,11 +506,18 @@ const ClientDetailPage = () => {
         <div className="space-y-1">
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold text-foreground">{client.name}</h1>
-            <Badge className={`border-0 text-xs ${client.active ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>{client.active ? "Ativo" : "Inativo"}</Badge>
+            <span className={`inline-flex items-center rounded-sm px-2 py-0.5 text-xs font-medium ${STATUS_CONFIG[client.status]?.className ?? ""}`}>
+              {STATUS_CONFIG[client.status]?.label ?? client.status}
+            </span>
             <Badge variant="outline" className={`text-xs border-0 ${dominantTone.className}`}>
               {dominantTone.label}
             </Badge>
           </div>
+          {client.status === "inativo" && (
+            <div className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
+              Este cliente está inativo. Interações continuam sendo processadas normalmente.
+            </div>
+          )}
           <p className="text-sm text-muted-foreground">
             slug: {client.slug} · {bindings.length} canais · Última msg {stats.last_contact ? formatDate(stats.last_contact) : "—"}{" "}
             <span className="inline-flex items-center gap-1 ml-2 text-muted-foreground/70">
