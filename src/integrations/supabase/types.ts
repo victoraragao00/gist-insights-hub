@@ -180,6 +180,47 @@ export type Database = {
           },
         ]
       }
+      client_priority_config: {
+        Row: {
+          active: boolean
+          client_id: string
+          id: string
+          recurrence_threshold_users: number
+          recurrence_window_days: number
+          tier: Database["public"]["Enums"]["client_tier"]
+          updated_at: string
+          weight_multiplier: number
+        }
+        Insert: {
+          active?: boolean
+          client_id: string
+          id?: string
+          recurrence_threshold_users?: number
+          recurrence_window_days?: number
+          tier: Database["public"]["Enums"]["client_tier"]
+          updated_at?: string
+          weight_multiplier?: number
+        }
+        Update: {
+          active?: boolean
+          client_id?: string
+          id?: string
+          recurrence_threshold_users?: number
+          recurrence_window_days?: number
+          tier?: Database["public"]["Enums"]["client_tier"]
+          updated_at?: string
+          weight_multiplier?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_priority_config_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clients: {
         Row: {
           active: boolean | null
@@ -360,6 +401,38 @@ export type Database = {
           },
         ]
       }
+      priority_scores: {
+        Row: {
+          calculated_at: string
+          client_id: string
+          id: string
+          patterns: Json
+          score: number
+        }
+        Insert: {
+          calculated_at?: string
+          client_id: string
+          id?: string
+          patterns?: Json
+          score?: number
+        }
+        Update: {
+          calculated_at?: string
+          client_id?: string
+          id?: string
+          patterns?: Json
+          score?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "priority_scores_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sync_jobs: {
         Row: {
           client_id: string | null
@@ -514,6 +587,7 @@ export type Database = {
         | "transcription_gemini"
         | "transcription_tactiq"
         | "manual"
+      client_tier: "azzas" | "enterprise" | "medium" | "small"
       interaction_type: "text" | "audio" | "image" | "file" | "system"
       job_status: "pending" | "running" | "completed" | "failed" | "cancelled"
       job_type:
@@ -659,6 +733,7 @@ export const Constants = {
         "transcription_tactiq",
         "manual",
       ],
+      client_tier: ["azzas", "enterprise", "medium", "small"],
       interaction_type: ["text", "audio", "image", "file", "system"],
       job_status: ["pending", "running", "completed", "failed", "cancelled"],
       job_type: [
