@@ -230,6 +230,18 @@ Deno.serve(async (req) => {
     if (hasMore) {
       const selfUrl = `${supabaseUrl}/functions/v1/calculate-priority-scores`;
       handleAutoChain(selfUrl, serviceRoleKey, offset + BATCH_SIZE);
+    } else {
+      // Trigger audit rules evaluation after all priority scores are calculated
+      const auditUrl = `${supabaseUrl}/functions/v1/evaluate-audit-rules`;
+      fetch(auditUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${serviceRoleKey}`,
+        },
+        body: JSON.stringify({}),
+      }).catch(() => {}); // fire-and-forget
+      console.log('[calculate-priority] Triggered evaluate-audit-rules');
     }
 
     return new Response(JSON.stringify({
