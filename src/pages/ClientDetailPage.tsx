@@ -27,6 +27,7 @@ import { InteractionsFeed } from "@/components/InteractionsFeed";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
+import { usePriorityScores } from "@/hooks/usePriorityScores";
 
 // ── Types ──
 
@@ -286,6 +287,12 @@ const ClientDetailPage = () => {
     },
   });
 
+  const { data: scores } = usePriorityScores();
+  const clientScore = useMemo(() => {
+    if (!client || !scores) return null;
+    return scores.find((s) => s.client_id === client.id) ?? null;
+  }, [client, scores]);
+
   // ── Computed stats ──
 
   const stats = useMemo(() => {
@@ -503,14 +510,6 @@ const ClientDetailPage = () => {
           <TabsTrigger value="documents">Documentos ({documents.length})</TabsTrigger>
           <TabsTrigger value="rules">Regras de Negócio</TabsTrigger>
           <TabsTrigger value="settings">Configurações</TabsTrigger>
-          <TabsTrigger
-            value="tasks"
-            disabled
-            className="opacity-50 cursor-not-allowed"
-            onClick={() => toast.info("Gestão de tarefas em breve no CX Hub")}
-          >
-            Tasks 🔒
-          </TabsTrigger>
         </TabsList>
 
         {/* ── TAB 1: Visão Geral ── */}
@@ -526,7 +525,13 @@ const ClientDetailPage = () => {
               value={meta.last_seen_at ? formatDate(meta.last_seen_at) : "Não disponível"}
               sub={meta.last_seen_at ? `atualizado ${formatRelativeTime(meta.last_seen_at)}` : "sem dados"}
             />
-            <KPICard label="Tempo médio resposta" value="--" sub="funcionalidade futura" />
+            <div className={clientScore && clientScore.score >= 80 ? "animate-pulse-subtle" : ""}>
+              <KPICard
+                label="Score de Prioridade"
+                value={clientScore ? String(Math.min(clientScore.score, 100)) : "—"}
+                sub={clientScore ? `Tier: ${clientScore.tier}` : "sem config"}
+              />
+            </div>
           </div>
 
           {/* Volume Chart */}
