@@ -1,3 +1,4 @@
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
@@ -8,12 +9,21 @@ import {
   ChevronUp,
   Loader2,
   RefreshCw,
+  Search,
   TrendingUp,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Collapsible,
@@ -74,6 +84,8 @@ function PatternItem({ p }: { p: PriorityPattern }) {
 const Index = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const [search, setSearch] = useState("");
+  const [tierFilter, setTierFilter] = useState<string>("all");
   const { isAdmin, isLoading: roleLoading } = useUserRole();
   const { data: scores, isLoading: scoresLoading, isError, refetch } = usePriorityScores();
   const recalc = useRecalculatePriority();
@@ -95,7 +107,17 @@ const Index = () => {
   });
 
   const list = (scores ?? []) as PriorityScoreRow[];
-  const displayList = list.slice(0, PAGE_SIZE);
+  const filteredList = useMemo(() => {
+    let result = list;
+    if (search.trim()) {
+      const q = search.toLowerCase().trim();
+      result = result.filter((r) => r.client_name.toLowerCase().includes(q));
+    }
+    if (tierFilter !== "all") {
+      result = result.filter((r) => r.tier === tierFilter);
+    }
+    return result.slice(0, PAGE_SIZE);
+  }, [list, search, tierFilter]);
 
   if (roleLoading) {
     return (
@@ -178,8 +200,35 @@ const Index = () => {
       )}
 
       {!isError && !scoresLoading && list.length > 0 && (
-        <div className="space-y-3">
-          {displayList.map((row, i) => {
+        <>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar cliente..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <Select value={tierFilter} onValueChange={setTierFilter}>
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="Todos os tiers" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="azzas">azzas</SelectItem>
+                <SelectItem value="enterprise">enterprise</SelectItem>
+                <SelectItem value="medium">medium</SelectItem>
+                <SelectItem value="small">small</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            {filteredList.length} de {list.length} clientes
+          </p>
+          <div className="space-y-3">
+          {filteredList.map((row, i) => {
             const displayScore = Math.min(row.score, 100);
             const scorePct = Math.min((row.score / 100) * 100, 100);
             const isCritical = displayScore >= 80;
@@ -249,10 +298,11 @@ const Index = () => {
               </Collapsible>
             );
           })}
-        </div>
+          </div>
+        </>
       )}
 
-      {!isError && !scoresLoading && list.length > PAGE_SIZE && (
+      {!isError && !scoresLoading && list.length > PAGE_SIZE && !search.trim() && tierFilter === "all" && (
         <p className="text-center text-sm text-muted-foreground">
           Exibindo os {PAGE_SIZE} primeiros de {list.length} clientes.
         </p>
