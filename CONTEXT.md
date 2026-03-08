@@ -1,4 +1,4 @@
-# CONTEXT.md — Estado do Projeto (v15 — 2026-03-08)
+# CONTEXT.md — Estado do Projeto (v16 — 2026-03-08)
 
 > Mantido pelo Claude Code ao final de cada sessao. Lido por todos os agentes para manter contexto.
 >
@@ -18,6 +18,7 @@
 | 4 | Classificacao IA (classify_batch via Gemini/Claude) | Concluido — Gemini Pro + prompt Mega Agente v6 |
 | 5 | Priority Score Engine + Dashboard | Concluido — Backend (Issue #32) + Frontend (Issue #33, PRs #34 e #35) |
 | 6 | Auditorias e Alertas | Concluido — Backend (Issues #37-#38 + Lovable S1-S5) + Frontend (PRs #51-#53) |
+| 6.5 | Campo status em clients (controle manual) | Concluido — Backend (Issue #54, Lovable S7) + Frontend (PRs #57-#58) |
 | 7 | Insights IA avancados | Placeholder |
 
 ---
@@ -147,6 +148,9 @@ AUDIT_BATCH_SIZE=20
 | #51 | feat: Audits page with real alerts from audit_alerts_summary | Mergeado | Cursor |
 | #52 | feat: global search page with search_interactions | Mergeado | Cursor |
 | #53 | feat: tone trend 7d chart in ClientDetailPage | Mergeado | Cursor |
+| #54 | feat(db): adicionar coluna status em clients | Concluido | Lovable |
+| #55 | feat(ui): filtro de status e badge na ClientsPage | Mergeado (PR #57) | Cursor |
+| #56 | feat(ui): badge de status no ClientDetailPage | Mergeado (PR #58) | Cursor |
 
 ---
 
@@ -259,6 +263,16 @@ AUDIT_BATCH_SIZE=20
 - **Auth:** service_role_key only
 - **Desbloqueia:** Auditorias UI real (Cursor, futuro)
 
+### Campo `status` em `clients` (Fase 6.5 — Sessao 7)
+- **Coluna:** `status TEXT NOT NULL DEFAULT 'ativo'` com CHECK `('ativo','inativo','trial')`
+- **Controle:** 100% manual (Operador). Nunca alterado por sync, edge function ou cron
+- **Independente de `active`:** `active` continua para uso interno do sync (process-jobs L343 seta `active=false` apos 90d stale em `auto_created`)
+- **Frontend:** filtro default `.in("status", ["ativo", "trial"])` com toggle "Incluir inativos"
+- **Badge:** ativo=emerald, trial=blue, inativo=slate (com dark mode pairs)
+- **Banner:** clientes inativos mostram "Este cliente esta inativo. Interacoes continuam sendo processadas normalmente."
+- **Arquivos alterados:** ClientsPage, SearchPage, SettingsPage, GistContactWizard, ClientDetailPage
+- **Populacao inicial:** active=true→ativo (104), active=false→inativo (130)
+
 ### Design System (docs/DESIGN_SYSTEM.md)
 - **Paleta semantica:** tom (emerald/yellow/orange/red), tier (primary/blue/slate/gray), score (emerald/yellow/orange/red), severity (red/yellow/emerald), saude (emerald/yellow/orange/red)
 - **Motion patterns:** 5 keyframes custom no tailwind.config.ts + tailwindcss-animate ja instalado
@@ -337,6 +351,11 @@ Papeis, restricoes, fluxos e checklist completos em AGENTS.md (v8).
    - PR #51: Audits UI real (KPIs, tabela alertas, empty/loading/error states)
    - PR #52: SearchPage (busca global full-text, filtros, paginacao, rota /search, sidebar)
    - PR #53: Tone trend 7d chart em ClientDetailPage (stacked BarChart)
-9. **Pendente:** Lovable S6 — Edge function deliver-audit-alerts (baixa prioridade, depende de decisao sobre canal)
-10. **Aberto:** PR #36 (docs: Auditoria UX/UI) — pode ser fechado (auditoria concluida)
-11. **Fase 7:** Insights IA avancados
+9. **Concluido:** Sessao 7 — Campo `status` em `clients`
+   - Lovable S7: migration com coluna status + CHECK + populacao (Issue #54)
+   - Cursor PR #57: filtro `.in("status", ["ativo","trial"])` em 4 arquivos, toggle "Incluir inativos", badge STATUS_CONFIG (Issue #55)
+   - Cursor PR #58: badge + banner informativo em ClientDetailPage (Issue #56)
+10. **Concluido:** Checklist E2E v2 — 67 testes manuais cobrindo 8 rotas, 8 hooks, 5 RPCs, 2 perfis
+11. **Pendente:** Lovable S6 — Edge function deliver-audit-alerts (baixa prioridade, depende de decisao sobre canal)
+12. **Aberto:** PR #36 (docs: Auditoria UX/UI) — pode ser fechado (auditoria concluida)
+13. **Fase 7:** Insights IA avancados
