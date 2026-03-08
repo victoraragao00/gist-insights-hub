@@ -16,6 +16,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
+import { usePriorityScores } from "@/hooks/usePriorityScores";
 
 // ── Types ──
 
@@ -90,9 +91,16 @@ function getHealthColor(pct: number): string {
   return "bg-red-500";
 }
 
+function scoreColorClass(score: number): string {
+  if (score >= 80) return "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400";
+  if (score >= 60) return "bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-400";
+  if (score >= 40) return "bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-400";
+  return "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400";
+}
+
 // ── Sort Button ──
 
-type SortCol = "name" | "total" | "tone" | "health" | "last_contact";
+type SortCol = "name" | "total" | "tone" | "health" | "score" | "last_contact";
 
 function SortButton({ label, col, current, dir, onClick, className = "" }: {
   label: string; col: SortCol; current: SortCol; dir: "asc" | "desc"; onClick: (col: SortCol) => void; className?: string;
@@ -120,10 +128,17 @@ const ClientsPage = () => {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
-  const [sortKey, setSortKey] = useState<"name" | "total" | "tone" | "health" | "last_contact">("last_contact");
+  const [sortKey, setSortKey] = useState<SortCol>("last_contact");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
-  const toggleSort = useCallback((key: typeof sortKey) => {
+  const { data: scores } = usePriorityScores();
+  const scoreMap = useMemo(() => {
+    const m = new Map<string, number>();
+    (scores ?? []).forEach((r) => m.set(r.client_id, r.score));
+    return m;
+  }, [scores]);
+
+  const toggleSort = useCallback((key: SortCol) => {
     if (sortKey === key) {
       setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     } else {
@@ -197,6 +212,15 @@ const ClientsPage = () => {
         case "health":
           cmp = a.stats.health_pct - b.stats.health_pct;
           break;
+        case "score": {
+          const sa = scoreMap.get(a.id) ?? null;
+          const sb = scoreMap.get(b.id) ?? null;
+          if (sa === null && sb === null) cmp = 0;
+          else if (sa === null) cmp = 1;
+          else if (sb === null) cmp = -1;
+          else cmp = sa - sb;
+          break;
+        }
         case "last_contact":
           cmp = (a.stats.last_contact ?? "").localeCompare(b.stats.last_contact ?? "");
           break;
@@ -205,7 +229,7 @@ const ClientsPage = () => {
     });
 
     return list;
-  }, [clients, statsMap, search, sortKey, sortDir]);
+  }, [clients, statsMap, scoreMap, search, sortKey, sortDir]);
 
   return (
     <div className="space-y-6">
@@ -252,6 +276,7 @@ const ClientsPage = () => {
                 <Skeleton className="h-5 w-16 animate-shimmer" />
                 <Skeleton className="h-5 w-20 animate-shimmer" />
                 <Skeleton className="h-2 w-16 animate-shimmer" />
+                <Skeleton className="h-7 w-12 animate-shimmer" />
                 <Skeleton className="h-5 w-28 animate-shimmer" />
               </div>
             ))}
@@ -276,6 +301,9 @@ const ClientsPage = () => {
                 </TableHead>
                 <TableHead>
                   <SortButton label="Saúde" col="health" current={sortKey} dir={sortDir} onClick={toggleSort} />
+                </TableHead>
+                <TableHead>
+                  <SortButton label="Score" col="score" current={sortKey} dir={sortDir} onClick={toggleSort} />
                 </TableHead>
                 <TableHead>
                   <SortButton label="Último contato" col="last_contact" current={sortKey} dir={sortDir} onClick={toggleSort} />
@@ -338,6 +366,18 @@ const ClientsPage = () => {
                         </div>
                         <span className="text-xs text-muted-foreground">{client.stats.health_pct}%</span>
                       </div>
+                    </TableCell>
+                    <TableCell>
+                      {(() => {
+                        const score = scoreMap.get(client.id);
+                        return score != null ? (
+                          <span className={`inline-flex items-center justify-center h-7 w-12 rounded text-xs font-bold tabular-nums ${scoreColorClass(score)}`}>
+                            {Math.min(score, 100)}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        );
+                      })()}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {formatLastContact(client.stats.last_contact)}
