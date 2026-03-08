@@ -6,7 +6,7 @@
 >
 > last_updated: 2026-03-08
 > last_updated_by: Claude Code
-> version: v7
+> version: v8
 
 ---
 

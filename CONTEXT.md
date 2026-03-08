@@ -1,4 +1,4 @@
-# CONTEXT.md — Estado do Projeto (v14 — 2026-03-08)
+# CONTEXT.md — Estado do Projeto (v15 — 2026-03-08)
 
 > Mantido pelo Claude Code ao final de cada sessao. Lido por todos os agentes para manter contexto.
 >
@@ -17,7 +17,7 @@
 | 3 | Sync Engine (enqueue + process-jobs worker) | Concluido |
 | 4 | Classificacao IA (classify_batch via Gemini/Claude) | Concluido — Gemini Pro + prompt Mega Agente v6 |
 | 5 | Priority Score Engine + Dashboard | Concluido — Backend (Issue #32) + Frontend (Issue #33, PRs #34 e #35) |
-| 6 | Auditorias e Alertas | Backend completo (Issues #37-#38 + Lovable S1-S5) — Frontend pendente |
+| 6 | Auditorias e Alertas | Concluido — Backend (Issues #37-#38 + Lovable S1-S5) + Frontend (PRs #51-#53) |
 | 7 | Insights IA avancados | Placeholder |
 
 ---
@@ -63,14 +63,23 @@
 | #48 | feat: ClientDetail score card and remove Tasks tab | 4 | ClientDetailPage |
 | #49 | feat: recharts volume chart in ClientDetail | 5 | ClientDetailPage |
 | #50 | feat: Dashboard global KPIs and trend charts | 5 | Index, useGlobalStats (novo) |
+| #51 | feat: Audits page with real alerts | 6-FE | Audits, useAuditAlerts (novo) |
+| #52 | feat: global search page | 6-FE | SearchPage (novo), useSearchInteractions (novo), App, AppSidebar |
+| #53 | feat: tone trend 7d chart | 6-FE | ClientDetailPage, useClientToneTrend (novo) |
 
-**Hooks adicionados nesta auditoria:**
+**Hooks adicionados (auditoria UX + Fase 6 frontend):**
 - `useClientPriorityConfig` — config de prioridades para aba Settings (PR #43)
 - `useGlobalStats` — chama `global_stats_30d` RPC para KPI cards e graficos (PR #50)
+- `useAuditAlerts` — chama `audit_alerts_summary` para pagina Auditorias (PR #51)
+- `useSearchInteractions` — chama `search_interactions` para busca global (PR #52)
+- `useClientToneTrend` — chama `client_tone_trend_7d` para grafico de tendencia (PR #53)
 
-**Componentes de graficos adicionados (PR #49 e #50):**
-- ClientDetailPage: recharts BarChart para volume 14 dias (substituiu divs manuais)
-- Index: 4 KPI cards (global_stats_30d), stacked BarChart (evolucao tom), horizontal BarChart (top temas), BarChart (distribuicao score), PieChart donut (clientes por tier)
+**Paginas e componentes adicionados:**
+- `SearchPage.tsx` — busca full-text com debounce, filtros por cliente/tom, paginacao real (PR #52)
+- `Audits.tsx` — reescrito: KPI cards, tabela de alertas, empty/loading/error states (PR #51)
+- ClientDetailPage: recharts BarChart volume 14d (PR #49), stacked BarChart tom 7d (PR #53)
+- Index: 4 KPI cards, stacked BarChart evolucao tom, horizontal BarChart top temas, BarChart score, PieChart tier (PR #50)
+- Rota `/search` registrada em App.tsx, item "Busca" no AppSidebar (PR #52)
 
 ### Env vars declaradas no Supabase
 
@@ -135,6 +144,9 @@ AUDIT_BATCH_SIZE=20
 | #48 | feat: ClientDetail score card, remove Tasks tab | Mergeado | Cursor |
 | #49 | feat: recharts volume chart in ClientDetail | Mergeado | Cursor |
 | #50 | feat: Dashboard global KPIs and trend charts | Mergeado | Cursor |
+| #51 | feat: Audits page with real alerts from audit_alerts_summary | Mergeado | Cursor |
+| #52 | feat: global search page with search_interactions | Mergeado | Cursor |
+| #53 | feat: tone trend 7d chart in ClientDetailPage | Mergeado | Cursor |
 
 ---
 
@@ -156,7 +168,7 @@ AUDIT_BATCH_SIZE=20
 
 - ~~Dashboard mostra KPIs do Gist mas nao reflete dados de classificacao IA~~ — Resolvido (PR #35 + PR #50)
 - ~~Excesso de botoes "Em breve" — transmite produto inacabado~~ — Resolvido (PR #34)
-- ~~Pagina Auditorias e placeholder sem funcionalidade~~ — Empty state honesto (PR #41), frontend real pendente apos Lovable entregar backend
+- ~~Pagina Auditorias e placeholder sem funcionalidade~~ — Resolvido: empty state (PR #41) + UI real com alertas (PR #51)
 - ~~Coluna "Saude" com semantica invertida~~ — Resolvido (PR #34)
 - ~~Marca inconsistente (Login diz "Hub Central", sidebar diz "uMode")~~ — Resolvido (PR #34)
 - ~~404 em ingles, app em PT-BR~~ — Resolvido (PR #31)
@@ -206,7 +218,7 @@ AUDIT_BATCH_SIZE=20
 #### RLS Policies (Lovable S1)
 - **audit_rules:** SELECT para todos com acesso, INSERT/UPDATE/DELETE apenas admin
 - **audit_alerts:** SELECT only (INSERT via service_role na Edge Function)
-- Ambas usam `unnest(user_accessible_client_ids(auth.uid()))`
+- `user_accessible_client_ids()` retorna `SETOF uuid` — nao requer `unnest()`
 
 #### Seed + Realtime + pg_cron (Lovable S2)
 - **Seed:** 39 regras (3 metricas x 13 clientes ativos): score_prioridade>=80, tom_critico_pct>=15, volume_periodo>=50
@@ -274,7 +286,7 @@ AUDIT_BATCH_SIZE=20
 
 ## Colaboracao
 
-Papeis, restricoes, fluxos e checklist completos em AGENTS.md (v7).
+Papeis, restricoes, fluxos e checklist completos em AGENTS.md (v8).
 
 | Agente | Papel | Canal |
 |--------|-------|-------|
@@ -313,12 +325,18 @@ Papeis, restricoes, fluxos e checklist completos em AGENTS.md (v7).
    - LOTE 4: PR-G (#46), PR-H1 (#47), PR-I (#48)
    - LOTE 5: PR-J (#49), PR-H2 (#50)
    - Frontend Contracts: regra adicionada ao AGENTS.md — Lovable inclui contratos tipados em Issues que desbloqueiam Cursor
-7. **Concluido:** Lovable Marathon — 5 sessoes executadas com sucesso
-   - Sessao 1: RLS policies audit_rules (SELECT all, INSERT/UPDATE/DELETE admin) + audit_alerts (SELECT only)
-   - Sessao 2: 39 regras seedadas (3x13 clientes), unique constraint, realtime audit_alerts, pg_cron */2h
-   - Sessao 3: DB function audit_alerts_summary(p_user_id) + coluna read em audit_alerts
-   - Sessao 4: DB function search_interactions(p_user_id, p_query, ...) com full-text search + paginacao
-   - Sessao 5: DB function client_tone_trend_7d(p_user_id, p_client_id) — 7 dias com LEFT JOIN
-   - Sessao 6: Edge function deliver-audit-alerts (L1) — adiada, baixa prioridade
-   - Frontend Contracts documentados em docs/prompts/LOVABLE_S1-S5
-8. **Fase 7:** Insights IA avancados
+7. **Concluido:** Lovable Marathon — 5 sessoes executadas com sucesso (S1-S5)
+   - Sessao 1: RLS policies audit_rules + audit_alerts
+   - Sessao 2: 39 regras seedadas, unique constraint, realtime, pg_cron */2h
+   - Sessao 3: DB function audit_alerts_summary + coluna read
+   - Sessao 4: DB function search_interactions (full-text + paginacao)
+   - Sessao 5: DB function client_tone_trend_7d (7 dias, LEFT JOIN)
+   - Sessao 6: Edge function deliver-audit-alerts — adiada, baixa prioridade
+   - Nota tecnica: `user_accessible_client_ids()` retorna `SETOF uuid`, nao `uuid[]`
+8. **Concluido:** Fase 6 frontend — 3 PRs do Cursor mergeados (#51-#53)
+   - PR #51: Audits UI real (KPIs, tabela alertas, empty/loading/error states)
+   - PR #52: SearchPage (busca global full-text, filtros, paginacao, rota /search, sidebar)
+   - PR #53: Tone trend 7d chart em ClientDetailPage (stacked BarChart)
+9. **Pendente:** Lovable S6 — Edge function deliver-audit-alerts (baixa prioridade, depende de decisao sobre canal)
+10. **Aberto:** PR #36 (docs: Auditoria UX/UI) — pode ser fechado (auditoria concluida)
+11. **Fase 7:** Insights IA avancados
