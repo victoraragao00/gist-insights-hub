@@ -23,7 +23,9 @@ Antes de qualquer trabalho, leia CONTEXT.md (estado atual) e AGENTS.md (regras c
 - `supabase/migrations/*`
 - `.env`
 
-Se precisar de mudancas no banco ou edge functions, criar Issue para o Lovable.
+Se precisar de mudancas:
+- Frontend (UI, hooks, paginas) -> Issue para o Cursor
+- Banco ou edge functions -> Issue para o Lovable
 
 ### Modelos de IA
 - Primario: `gemini-2.5-pro` via `GEMINI_API_KEY`
@@ -76,11 +78,12 @@ Lista completa em AGENTS.md secoes 5 e 6.
 ```
 1. Ler CONTEXT.md + AGENTS.md
 2. Analisar necessidade
-3. Se banco/edge function -> Issue para Lovable (com checklist CTO aplicavel)
-4. Se refactor/script/doc -> implementar diretamente
-5. Revisar codigo do Lovable contra Checklist do CTO + Anti-padroes
-6. Verificar Checklist Pre-Entrega (AGENTS.md secao 7)
-7. Atualizar CONTEXT.md ao final da sessao
+3. Se frontend (UI, hooks, paginas) -> Issue para Cursor (com checklist CTO aplicavel)
+4. Se banco/edge function -> Issue para Lovable (com checklist CTO aplicavel)
+5. Se refactor/script/doc -> implementar diretamente
+6. Revisar codigo do Cursor e Lovable contra Checklist do CTO + Anti-padroes
+7. Verificar Checklist Pre-Entrega (AGENTS.md secao 7)
+8. Atualizar CONTEXT.md ao final da sessao
 ```
 
 ---
