@@ -239,7 +239,7 @@ const Index = () => {
                         <div className="space-y-2">
                           <p className="text-xs font-medium text-muted-foreground">Padrões</p>
                           {row.patterns.map((p, idx) => (
-                            <PatternItem key={idx} p={p} />
+                            <PatternItem key={`${p.theme ?? "p"}-${p.severity ?? "s"}-${idx}`} p={p} />
                           ))}
                         </div>
                       )}
