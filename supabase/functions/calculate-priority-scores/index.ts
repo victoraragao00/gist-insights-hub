@@ -37,6 +37,7 @@ interface Pattern {
   user_count: number;
   window_days: number;
   severity: 'high' | 'medium' | 'low';
+  worst_tone: string;
   description: string;
 }
 
@@ -125,6 +126,7 @@ function detectPatterns(
       user_count: userCount,
       window_days: windowDays,
       severity,
+      worst_tone: group.worstTone,
       description: `${userCount} usuários · ${theme} · ${windowDays} dias`,
     });
   }
@@ -160,11 +162,8 @@ function calculateScore(
 
   let scoreBruto = 0;
   for (const pattern of patterns) {
-    const severityWeight = pattern.severity === 'high'
-      ? SEVERITY_WEIGHTS.critico
-      : pattern.severity === 'medium'
-        ? SEVERITY_WEIGHTS.atencao
-        : SEVERITY_WEIGHTS.atencao;
+    // Use worst_tone directly to pick the correct severity weight
+    const severityWeight = SEVERITY_WEIGHTS[pattern.worst_tone] || SEVERITY_WEIGHTS.atencao;
     const recencyWeight = themeRecency.get(pattern.theme) || RECENCY_BASE_MULTIPLIER;
     scoreBruto += pattern.user_count * severityWeight * recencyWeight;
   }
@@ -236,8 +235,7 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json().catch(() => ({}));
-    const { force, client_id: singleClientId, _offset } = body as {
-      force?: boolean;
+    const { client_id: singleClientId, _offset } = body as {
       client_id?: string;
       _offset?: number;
     };
