@@ -4,15 +4,21 @@ import { useNavigate } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
+  Activity,
   AlertCircle,
+  AlertTriangle,
   ChevronDown,
   ChevronUp,
   Loader2,
   RefreshCw,
   Search,
   TrendingUp,
+  Users,
 } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, PieChart, Pie, Cell } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ChartContainer } from "@/components/ui/chart";
+import { KPICard } from "@/components/KPICard";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -33,6 +39,7 @@ import {
 import { useUserRole } from "@/hooks/useUserRole";
 import { usePriorityScores, type PriorityScoreRow, type PriorityPattern } from "@/hooks/usePriorityScores";
 import { useRecalculatePriority } from "@/hooks/useRecalculatePriority";
+import { useGlobalStats } from "@/hooks/useGlobalStats";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 
@@ -88,6 +95,7 @@ const Index = () => {
   const [tierFilter, setTierFilter] = useState<string>("all");
   const { isAdmin, isLoading: roleLoading } = useUserRole();
   const { data: scores, isLoading: scoresLoading, isError, refetch } = usePriorityScores();
+  const { data: globalStats, isLoading: globalStatsLoading } = useGlobalStats();
   const recalc = useRecalculatePriority();
 
   const { data: clientsWithoutConfigCount = 0 } = useQuery({
@@ -107,6 +115,34 @@ const Index = () => {
   });
 
   const list = (scores ?? []) as PriorityScoreRow[];
+  const scoreBuckets = useMemo(() => {
+    const buckets = { ok: 0, atencao: 0, alerta: 0, critico: 0 };
+    list.forEach((r) => {
+      const s = Math.min(r.score, 100);
+      if (s >= 80) buckets.critico++;
+      else if (s >= 60) buckets.alerta++;
+      else if (s >= 40) buckets.atencao++;
+      else buckets.ok++;
+    });
+    return [
+      { name: "0-39", value: buckets.ok, fill: "hsl(160, 84%, 39%)" },
+      { name: "40-59", value: buckets.atencao, fill: "hsl(48, 96%, 53%)" },
+      { name: "60-79", value: buckets.alerta, fill: "hsl(25, 95%, 53%)" },
+      { name: "80+", value: buckets.critico, fill: "hsl(0, 84%, 60%)" },
+    ];
+  }, [list]);
+  const tierCounts = useMemo(() => {
+    const counts: Record<string, number> = { azzas: 0, enterprise: 0, medium: 0, small: 0 };
+    list.forEach((r) => {
+      counts[r.tier] = (counts[r.tier] ?? 0) + 1;
+    });
+    return [
+      { name: "azzas", value: counts.azzas, fill: "hsl(var(--primary))" },
+      { name: "enterprise", value: counts.enterprise, fill: "hsl(221, 83%, 53%)" },
+      { name: "medium", value: counts.medium, fill: "hsl(215, 14%, 34%)" },
+      { name: "small", value: counts.small, fill: "hsl(220, 9%, 46%)" },
+    ].filter((d) => d.value > 0);
+  }, [list]);
   const filteredList = useMemo(() => {
     let result = list;
     if (search.trim()) {
@@ -201,6 +237,112 @@ const Index = () => {
 
       {!isError && !scoresLoading && list.length > 0 && (
         <>
+          {/* Global KPIs */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {globalStatsLoading ? (
+              <>
+                {[1, 2, 3, 4].map((i) => (
+                  <Card key={i} className="border-border">
+                    <CardHeader className="pb-2"><Skeleton className="h-4 w-24" /></CardHeader>
+                    <CardContent><Skeleton className="h-8 w-16 animate-shimmer" /><Skeleton className="h-3 w-20 mt-1" /></CardContent>
+                  </Card>
+                ))}
+              </>
+            ) : (
+              <>
+                <KPICard title="Interações 30d" value={String(globalStats?.total_interactions_30d ?? 0)} subtitle="classificadas" icon={Activity} />
+                <KPICard title="% Crítico" value={`${(globalStats?.pct_critico ?? 0).toFixed(1)}%`} subtitle="últimos 30 dias" icon={AlertCircle} />
+                <KPICard title="% Alerta" value={`${(globalStats?.pct_alerta ?? 0).toFixed(1)}%`} subtitle="últimos 30 dias" icon={AlertTriangle} />
+                <KPICard title="Clientes monitorados" value={String(globalStats?.total_clients_monitored ?? 0)} subtitle="com interações" icon={Users} />
+              </>
+            )}
+          </div>
+
+          {/* Charts row */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Evolução de tom */}
+            {globalStats?.monthly_tone_evolution?.length ? (
+              <Card className="border-border">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base font-semibold">Evolução de tom (últimos 6 meses)</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ChartContainer config={{ ok: { label: "Ok", color: "hsl(160, 84%, 39%)" }, atencao: { label: "Atenção", color: "hsl(48, 96%, 53%)" }, alerta: { label: "Alerta", color: "hsl(25, 95%, 53%)" }, critico: { label: "Crítico", color: "hsl(0, 84%, 60%)" } }} className="h-64 w-full">
+                    <BarChart data={globalStats.monthly_tone_evolution} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
+                      <XAxis dataKey="mes" tick={{ fontSize: 10 }} />
+                      <YAxis tick={{ fontSize: 10 }} />
+                      <Tooltip />
+                      <Bar dataKey="ok" stackId="tone" fill="var(--color-ok)" radius={[0, 0, 0, 0]} />
+                      <Bar dataKey="atencao" stackId="tone" fill="var(--color-atencao)" radius={[0, 0, 0, 0]} />
+                      <Bar dataKey="alerta" stackId="tone" fill="var(--color-alerta)" radius={[0, 0, 0, 0]} />
+                      <Bar dataKey="critico" stackId="tone" fill="var(--color-critico)" radius={[0, 4, 4, 0]} />
+                    </BarChart>
+                  </ChartContainer>
+                </CardContent>
+              </Card>
+            ) : null}
+            {/* Top 5 temas */}
+            {globalStats?.top_themes?.length ? (
+              <Card className="border-border">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base font-semibold">Temas mais frequentes (30d)</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ChartContainer config={{ count: { label: "Ocorrências", color: "hsl(var(--primary))" } }} className="h-48 w-full">
+                    <BarChart layout="vertical" data={globalStats.top_themes.slice(0, 5)} margin={{ left: 60, right: 8, top: 8, bottom: 8 }}>
+                      <XAxis type="number" tick={{ fontSize: 10 }} />
+                      <YAxis type="category" dataKey="theme" width={55} tick={{ fontSize: 10 }} tickFormatter={(v) => (v.length > 12 ? v.slice(0, 12) + "…" : v)} />
+                      <Tooltip />
+                      <Bar dataKey="count" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
+                    </BarChart>
+                  </ChartContainer>
+                </CardContent>
+              </Card>
+            ) : null}
+            {/* Distribuição de score */}
+            <Card className="border-border">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base font-semibold">Distribuição de score</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ChartContainer config={{ value: { label: "Clientes" } }} className="h-64 w-full">
+                  <BarChart data={scoreBuckets} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
+                    <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                    <YAxis tick={{ fontSize: 10 }} />
+                    <Tooltip />
+                    <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                      {scoreBuckets.map((_, i) => (
+                        <Cell key={i} fill={scoreBuckets[i].fill} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ChartContainer>
+              </CardContent>
+            </Card>
+            {/* Clientes por tier */}
+            <Card className="border-border">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base font-semibold">Clientes por tier</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {tierCounts.length > 0 ? (
+                  <ChartContainer config={{}} className="h-64 w-full">
+                    <PieChart>
+                      <Pie data={tierCounts} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={2}>
+                        {tierCounts.map((_, i) => (
+                          <Cell key={i} fill={tierCounts[i].fill} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ChartContainer>
+                ) : (
+                  <p className="text-sm text-muted-foreground py-8 text-center">Nenhum dado</p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
