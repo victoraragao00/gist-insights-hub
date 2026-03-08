@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { useDebounce } from "@/hooks/useDebounce";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
@@ -92,6 +93,7 @@ const Index = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounce(search.trim(), 300);
   const [tierFilter, setTierFilter] = useState<string>("all");
   const { isAdmin, isLoading: roleLoading } = useUserRole();
   const { data: scores, isLoading: scoresLoading, isError, refetch } = usePriorityScores();
@@ -145,15 +147,15 @@ const Index = () => {
   }, [list]);
   const filteredList = useMemo(() => {
     let result = list;
-    if (search.trim()) {
-      const q = search.toLowerCase().trim();
+    if (debouncedSearch.length >= 3) {
+      const q = debouncedSearch.toLowerCase();
       result = result.filter((r) => r.client_name.toLowerCase().includes(q));
     }
     if (tierFilter !== "all") {
       result = result.filter((r) => r.tier === tierFilter);
     }
     return result.slice(0, PAGE_SIZE);
-  }, [list, search, tierFilter]);
+  }, [list, debouncedSearch, tierFilter]);
 
   if (roleLoading) {
     return (
@@ -444,7 +446,7 @@ const Index = () => {
         </>
       )}
 
-      {!isError && !scoresLoading && list.length > PAGE_SIZE && !search.trim() && tierFilter === "all" && (
+      {!isError && !scoresLoading && list.length > PAGE_SIZE && debouncedSearch.length === 0 && tierFilter === "all" && (
         <p className="text-center text-sm text-muted-foreground">
           Exibindo os {PAGE_SIZE} primeiros de {list.length} clientes.
         </p>

@@ -1,5 +1,6 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Search as SearchIcon, AlertCircle } from "lucide-react";
@@ -23,12 +24,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useDebounce } from "@/hooks/useDebounce";
 import { useSearchInteractions } from "@/hooks/useSearchInteractions";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 
 const PAGE_SIZE = 20;
-const DEBOUNCE_MS = 300;
 
 const TONE_CONFIG: Record<string, { label: string; className: string }> = {
   ok: { label: "✓ Ok", className: "bg-emerald-50 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400" },
@@ -45,22 +47,18 @@ interface ClientOption {
 const SearchPage = () => {
   const { user } = useAuth();
   const [inputValue, setInputValue] = useState("");
-  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const debouncedQuery = useDebounce(inputValue.trim(), 300);
   const [clientId, setClientId] = useState<string>("all");
   const [tone, setTone] = useState<string>("all");
   const [page, setPage] = useState(0);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      setDebouncedQuery(inputValue.trim());
-      setPage(0);
-    }, DEBOUNCE_MS);
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, [inputValue]);
+    setPage(0);
+  }, [debouncedQuery]);
+
+  useEffect(() => {
+    if (clientSearchError) toast.error("Erro ao buscar clientes");
+  }, [clientSearchError]);
 
   const { data: results = [], isLoading, isError, refetch } = useSearchInteractions({
     query: debouncedQuery,
@@ -82,6 +80,25 @@ const SearchPage = () => {
         .order("name");
       if (error) throw error;
       return (data ?? []) as ClientOption[];
+    },
+  });
+
+  const { data: clientMatches = [], isError: clientSearchError } = useQuery<
+    Array<{ id: string; name: string; slug: string; status: string }>
+  >({
+    queryKey: ["client-search", debouncedQuery],
+    enabled: debouncedQuery.length >= 3,
+    staleTime: 30_000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("clients")
+        .select("id, name, slug, status")
+        .ilike("name", `%${debouncedQuery}%`)
+        .in("status", ["ativo", "trial"])
+        .order("name")
+        .limit(5);
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; name: string; slug: string; status: string }>;
     },
   });
 
@@ -165,12 +182,45 @@ const SearchPage = () => {
         </div>
       )}
 
-      {!isError && showResults && !isLoading && results.length === 0 && (
+      {!isError && showResults && !isLoading && results.length === 0 && clientMatches.length === 0 && (
         <p className="text-sm text-muted-foreground">Nenhum resultado encontrado para &quot;{debouncedQuery}&quot;</p>
+      )}
+
+      {showResults && clientMatches.length > 0 && (
+        <div className="space-y-2">
+          <h3 className="text-sm font-semibold text-foreground">Clientes</h3>
+          <div className="grid gap-2">
+            {clientMatches.map((c) => (
+              <Link
+                key={c.id}
+                to={`/clients/${c.slug}`}
+                className="flex items-center justify-between rounded-lg border border-border bg-card px-4 py-3 transition-shadow duration-200 hover:shadow-md"
+              >
+                <div>
+                  <span className="font-medium text-sm text-foreground">{c.name}</span>
+                  <p className="text-xs text-muted-foreground">{c.slug}</p>
+                </div>
+                <span
+                  className={`inline-flex items-center rounded-sm px-2 py-0.5 text-xs font-medium ${
+                    c.status === "ativo"
+                      ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400"
+                      : c.status === "trial"
+                        ? "bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400"
+                        : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
+                  }`}
+                >
+                  {c.status === "ativo" ? "Ativo" : c.status === "trial" ? "Trial" : "Inativo"}
+                </span>
+              </Link>
+            ))}
+          </div>
+          <hr className="border-border" />
+        </div>
       )}
 
       {!isError && showResults && !isLoading && results.length > 0 && (
         <>
+          <h3 className="text-sm font-semibold text-foreground">Interações</h3>
           <p className="text-sm text-muted-foreground">
             {page * PAGE_SIZE + 1}-{Math.min((page + 1) * PAGE_SIZE, totalCount)} de {totalCount} resultados
           </p>
