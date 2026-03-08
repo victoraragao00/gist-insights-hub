@@ -1,4 +1,4 @@
-# CONTEXT.md — Estado do Projeto (v8 — 2026-03-08)
+# CONTEXT.md — Estado do Projeto (v10 — 2026-03-08)
 
 > Mantido pelo Claude Code ao final de cada sessao. Lido por todos os agentes para manter contexto.
 >
@@ -50,8 +50,8 @@
 | #20 | m9: Replace useState with useMutation | Resolvido (PR #27) | Cursor |
 | #21 | m12: Add real pagination | Resolvido (PR #28) | Cursor |
 | #22 | m6: Replace static DOM IDs with useId | Resolvido (PR #25) | Cursor |
-| #29 | m9: handleToggleRule sem useMutation | Aberto | Cursor |
-| #30 | UX: NotFound em ingles | Aberto | Cursor |
+| #29 | m9: handleToggleRule sem useMutation | Resolvido (PR #31) | Cursor |
+| #30 | UX: NotFound em ingles | Resolvido (PR #31) | Cursor |
 
 ---
 
@@ -66,7 +66,7 @@
 | m4 | staleTime ausente em 6 queries | Resolvido — PR #24 |
 | m5 | invalidateQueries sem `user?.id` | Resolvido — PR #24 |
 | m6 | DOM IDs estaticos | Resolvido — PR #25 |
-| m9 | useState manual para escrita | Resolvido — PR #27 |
+| m9 | useState manual para escrita | Resolvido — PR #27 + PR #31 |
 | m12 | Sem paginacao real | Resolvido — PR #28 |
 
 ## Problemas de UX identificados
@@ -76,7 +76,7 @@
 - Pagina Auditorias e placeholder sem funcionalidade
 - Coluna "Saude" com semantica invertida (mais % = mais vermelho)
 - Marca inconsistente (Login diz "Hub Central", sidebar diz "uMode")
-- 404 em ingles, app em PT-BR
+- ~~404 em ingles, app em PT-BR~~ — Resolvido (PR #31)
 
 ---
 
@@ -150,7 +150,7 @@ Papeis, restricoes, fluxos e checklist completos em AGENTS.md (v6).
 
 1. **Concluido:** Reclassificacao do backlog (100% da janela 365d, 6 jobs, ~$2.22)
 2. **Concluido:** Divida tecnica do Checklist CTO (m1, m3, m4, m5, m6, m9, m12) — 6 PRs mergeados
-3. **Em andamento:** Pendencias residuais (handleToggleRule #29, NotFound PT-BR #30)
+3. **Concluido:** Pendencias residuais (handleToggleRule #29, NotFound PT-BR #30) — PR #31
 4. **Proximo:** Dashboard com dados classificados (tom, tema, tendencias)
 5. **Proximo:** Limpar "Em breve", alinhar marca, corrigir UX
 6. **Fase 6:** Auditorias e Alertas
