@@ -572,6 +572,18 @@ export type Database = {
         }[]
       }
       deactivate_stale_clients: { Args: { _days: number }; Returns: number }
+      global_stats_30d: {
+        Args: { p_user_id: string }
+        Returns: {
+          last_calculated_at: string
+          monthly_tone_evolution: Json
+          pct_alerta: number
+          pct_critico: number
+          top_themes: Json
+          total_clients_monitored: number
+          total_interactions_30d: number
+        }[]
+      }
       user_accessible_client_ids: {
         Args: { _user_id: string }
         Returns: string[]
