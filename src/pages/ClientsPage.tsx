@@ -12,6 +12,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { MoreHorizontal, Search, ArrowUp, ArrowDown, ArrowUpDown, AlertCircle } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -20,11 +21,18 @@ import { usePriorityScores } from "@/hooks/usePriorityScores";
 
 // ── Types ──
 
+const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
+  ativo: { label: "Ativo", className: "bg-emerald-50 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400" },
+  trial: { label: "Trial", className: "bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400" },
+  inativo: { label: "Inativo", className: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400" },
+};
+
 interface ClientRow {
   id: string;
   name: string;
   slug: string;
   active: boolean;
+  status: string;
   channel_bindings: Array<{
     channel: string;
     label: string | null;
@@ -128,6 +136,7 @@ const ClientsPage = () => {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
+  const [includeInactive, setIncludeInactive] = useState(false);
   const [sortKey, setSortKey] = useState<SortCol>("last_contact");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
@@ -148,18 +157,19 @@ const ClientsPage = () => {
   }, [sortKey]);
 
   const { data: clientsData, isLoading: loadingClients, isError: clientsError, refetch: refetchClients } = useQuery<{ list: ClientRow[]; totalCount: number }>({
-    queryKey: ["clients_list", user?.id, page],
+    queryKey: ["clients_list", user?.id, page, includeInactive],
     enabled: !!user?.id,
     staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       const from = page * PAGE_SIZE;
       const to = (page + 1) * PAGE_SIZE - 1;
-      const { data, error, count } = await supabase
+      let query = supabase
         .from("clients")
-        .select("id, name, slug, active, channel_bindings(channel, label, active)", { count: "exact" })
-        .eq("active", true)
-        .order("name")
-        .range(from, to);
+        .select("id, name, slug, active, status, channel_bindings(channel, label, active)", { count: "exact" });
+      if (!includeInactive) {
+        query = query.in("status", ["ativo", "trial"]);
+      }
+      const { data, error, count } = await query.order("name").range(from, to);
       if (error) throw error;
       return { list: (data ?? []) as ClientRow[], totalCount: count ?? 0 };
     },
@@ -283,9 +293,14 @@ const ClientsPage = () => {
           </div>
         ) : !clientsError && clientsWithStats.length === 0 ? (
           <div className="py-20 text-center text-muted-foreground text-sm">
-            Nenhum cliente ativo. Adicione um cliente para começar.
+            Nenhum cliente encontrado. {includeInactive ? "Adicione um cliente para começar." : "Ative \"Incluir inativos\" para ver todos."}
           </div>
         ) : (
+          <>
+          <div className="flex items-center gap-2 px-4 py-2 border-b border-border">
+            <Switch checked={includeInactive} onCheckedChange={setIncludeInactive} />
+            <span className="text-sm text-muted-foreground">Incluir inativos</span>
+          </div>
           <Table>
             <TableHeader>
               <TableRow>
@@ -329,9 +344,14 @@ const ClientsPage = () => {
                     }}
                   >
                     <TableCell>
-                      <div>
-                        <span className="font-medium text-sm text-foreground">{client.name}</span>
-                        <p className="text-xs text-muted-foreground">{client.slug}</p>
+                      <div className="flex items-center gap-2">
+                        <div>
+                          <span className="font-medium text-sm text-foreground">{client.name}</span>
+                          <p className="text-xs text-muted-foreground">{client.slug}</p>
+                        </div>
+                        <span className={`inline-flex items-center rounded-sm px-2 py-0.5 text-xs font-medium shrink-0 ${STATUS_CONFIG[client.status]?.className ?? ""}`}>
+                          {STATUS_CONFIG[client.status]?.label ?? client.status}
+                        </span>
                       </div>
                     </TableCell>
                     <TableCell>
@@ -401,6 +421,7 @@ const ClientsPage = () => {
               })}
             </TableBody>
           </Table>
+          </>
         )}
         {!clientsError && !loadingClients && clientsWithStats.length > 0 && totalCount > PAGE_SIZE && (
           <div className="flex items-center justify-between px-4 py-3 border-t border-border">
