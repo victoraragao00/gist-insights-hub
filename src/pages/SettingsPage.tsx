@@ -178,7 +178,6 @@ const SettingsPage = () => {
   const [syncError, setSyncError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<"active" | "inactive" | "all">("active");
   const [inactiveDays, setInactiveDays] = useState(90);
-  const [applyingRule, setApplyingRule] = useState(false);
   const queryClient = useQueryClient();
 
   // ── Queries ──
@@ -382,28 +381,24 @@ const SettingsPage = () => {
     startSync({ syncContacts: false, syncHistory: true });
   }, [startSync]);
 
-  // ── Inactivation rule handler ──
+  // ── Inactivation rule mutation ──
 
-  const handleApplyInactivationRule = useCallback(async () => {
-    if (inactiveDays < 1) {
-      toast.error("O número de dias deve ser pelo menos 1.");
-      return;
-    }
-    setApplyingRule(true);
-    try {
-      const { data, error } = await supabase.rpc("deactivate_stale_clients", { _days: inactiveDays });
+  const applyInactivationRuleMutation = useMutation({
+    mutationFn: async (days: number) => {
+      if (days < 1) throw new Error("O número de dias deve ser pelo menos 1.");
+      const { data, error } = await supabase.rpc("deactivate_stale_clients", { _days: days });
       if (error) throw error;
-      const count = typeof data === "number" ? data : 0;
+      return typeof data === "number" ? data : 0;
+    },
+    onSuccess: (count) => {
       toast.success(`${count} cliente(s) inativado(s).`);
       queryClient.invalidateQueries({ queryKey: ["sync_clients"] });
       queryClient.invalidateQueries({ queryKey: ["clients"] });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Erro desconhecido";
-      toast.error("Erro ao aplicar regra: " + msg);
-    } finally {
-      setApplyingRule(false);
-    }
-  }, [inactiveDays, queryClient]);
+    },
+    onError: (err) => {
+      toast.error(err instanceof Error ? err.message : "Erro desconhecido");
+    },
+  });
 
   // ── Integration cards config ──
 
@@ -576,11 +571,11 @@ const SettingsPage = () => {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={handleApplyInactivationRule}
-                disabled={applyingRule}
+                onClick={() => applyInactivationRuleMutation.mutate(inactiveDays)}
+                disabled={applyInactivationRuleMutation.isPending}
                 className="ml-auto"
               >
-                {applyingRule ? (
+                {applyInactivationRuleMutation.isPending ? (
                   <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> Aplicando...</>
                 ) : (
                   "Aplicar regra agora"
