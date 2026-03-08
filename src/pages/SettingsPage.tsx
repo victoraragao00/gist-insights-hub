@@ -96,7 +96,7 @@ function AutoSyncCard() {
     queryKey: ["app_settings", "auto_sync_enabled"],
     staleTime: 60 * 1000,
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from("app_settings")
         .select("value")
         .eq("key", "auto_sync_enabled")
@@ -109,7 +109,7 @@ function AutoSyncCard() {
 
   const toggleMutation = useMutation({
     mutationFn: async (enabled: boolean) => {
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from("app_settings")
         .update({ value: enabled, updated_at: new Date().toISOString() })
         .eq("key", "auto_sync_enabled");
@@ -362,7 +362,12 @@ const SettingsPage = () => {
   const handleRetryJob = useCallback(async (jobId: string) => {
     const { error } = await supabase
       .from('sync_jobs')
-      .update({ status: 'pending' as any, retry_count: 0, completed_at: null, heartbeat_at: null } as any)
+      .update({
+        status: 'pending',
+        retry_count: 0,
+        completed_at: null,
+        heartbeat_at: null,
+      })
       .eq('id', jobId);
     if (error) {
       toast.error("Erro ao retentar: " + error.message);
@@ -386,7 +391,7 @@ const SettingsPage = () => {
     }
     setApplyingRule(true);
     try {
-      const { data, error } = await (supabase.rpc as any)("deactivate_stale_clients", { _days: inactiveDays });
+      const { data, error } = await supabase.rpc("deactivate_stale_clients", { _days: inactiveDays });
       if (error) throw error;
       const count = typeof data === "number" ? data : 0;
       toast.success(`${count} cliente(s) inativado(s).`);

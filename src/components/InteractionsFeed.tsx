@@ -23,8 +23,8 @@ interface Interaction {
   tone: string | null;
   theme: string | null;
   classified_at: string | null;
-  raw_payload: any;
-  attachments: any;
+  raw_payload: Record<string, unknown>;
+  attachments: unknown[];
 }
 
 interface Conversation {
@@ -87,10 +87,14 @@ function getAttachmentName(att: Attachment): string {
   }
 }
 
-function parseAttachments(raw: any): Attachment[] {
+function parseAttachments(raw: unknown): Attachment[] {
   if (!raw) return [];
-  if (Array.isArray(raw)) return raw.filter((a: any) => a?.url);
-  return [];
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((a): a is Attachment => {
+    if (typeof a !== "object" || a === null) return false;
+    const o = a as Record<string, unknown>;
+    return typeof o.url === "string";
+  });
 }
 
 // ---------- Helpers ----------
@@ -168,7 +172,8 @@ function buildConversations(interactions: Interaction[]): Conversation[] {
 
     const worstTone = messages.reduce<"ok" | "atencao" | "alerta" | "critico">((worst, msg) => {
       const t = (msg.tone ?? "ok") as string;
-      return (TONE_RANK[t] ?? 0) > (TONE_RANK[worst] ?? 0) ? (t as any) : worst;
+      const tone = t as "ok" | "atencao" | "alerta" | "critico";
+      return (TONE_RANK[t] ?? 0) > (TONE_RANK[worst] ?? 0) ? tone : worst;
     }, "ok");
 
     const themeMsg = [...messages].reverse().find((m) => m.theme != null);
