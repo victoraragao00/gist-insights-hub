@@ -26,6 +26,7 @@ import { toast } from "sonner";
 import { GistContactWizard } from "@/components/GistContactWizard";
 import { useAuth } from "@/context/AuthContext";
 import { useClient, type SyncJobRecord } from "@/context/ClientContext";
+import { useUserRole } from "@/hooks/useUserRole";
 
 // ── Types ──────────────────────────────────────────────
 
@@ -78,13 +79,206 @@ function jobTypeLabel(type: string): string {
 
 function jobStatusBadge(status: string) {
   switch (status) {
-    case 'pending': return <Badge variant="outline" className="text-xs bg-yellow-50 text-yellow-700 border-yellow-200"><Clock className="h-3 w-3 mr-1" />Pendente</Badge>;
-    case 'running': return <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200"><Loader2 className="h-3 w-3 mr-1 animate-spin" />Executando</Badge>;
-    case 'completed': return <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200"><CheckCircle2 className="h-3 w-3 mr-1" />Concluído</Badge>;
-    case 'failed': return <Badge variant="outline" className="text-xs bg-red-50 text-red-700 border-red-200"><XCircle className="h-3 w-3 mr-1" />Falhou</Badge>;
-    case 'cancelled': return <Badge variant="outline" className="text-xs bg-muted text-muted-foreground"><X className="h-3 w-3 mr-1" />Cancelado</Badge>;
+    case 'pending': return <Badge variant="outline" className="text-xs bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-950 dark:text-yellow-300 dark:border-yellow-800"><Clock className="h-3 w-3 mr-1" />Pendente</Badge>;
+    case 'running': return <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800"><Loader2 className="h-3 w-3 mr-1 animate-spin" />Executando</Badge>;
+    case 'completed': return <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200 dark:bg-green-950 dark:text-green-300 dark:border-green-800"><CheckCircle2 className="h-3 w-3 mr-1" />Concluído</Badge>;
+    case 'failed': return <Badge variant="outline" className="text-xs bg-red-50 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-300 dark:border-red-800"><XCircle className="h-3 w-3 mr-1" />Falhou</Badge>;
+    case 'cancelled': return <Badge variant="outline" className="text-xs bg-muted text-muted-foreground dark:bg-muted dark:text-muted-foreground"><X className="h-3 w-3 mr-1" />Cancelado</Badge>;
     default: return <Badge variant="outline" className="text-xs">{status}</Badge>;
   }
+}
+
+// ── Prioridades (admin only) ────────────────────────────
+
+type ClientTier = "azzas" | "enterprise" | "medium" | "small";
+
+interface PriorityConfigRow {
+  client_id: string;
+  client_name: string;
+  client_slug: string;
+  config_id: string | null;
+  tier: ClientTier;
+  weight_multiplier: number;
+}
+
+function SettingsPrioritiesTab() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  const { data: clients = [] } = useQuery<{ id: string; name: string; slug: string }[]>({
+    queryKey: ["clients_priority", user?.id],
+    enabled: !!user?.id,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("clients")
+        .select("id, name, slug")
+        .eq("active", true)
+        .order("name");
+      if (error) throw error;
+      return (data ?? []) as { id: string; name: string; slug: string }[];
+    },
+  });
+
+  const { data: configs = [] } = useQuery<{ id: string; client_id: string; tier: ClientTier; weight_multiplier: number }[]>({
+    queryKey: ["client_priority_config", user?.id],
+    enabled: !!user?.id,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("client_priority_config")
+        .select("id, client_id, tier, weight_multiplier");
+      if (error) throw error;
+      return (data ?? []) as { id: string; client_id: string; tier: ClientTier; weight_multiplier: number }[];
+    },
+  });
+
+  const rows: PriorityConfigRow[] = useMemo(() => {
+    const byClient = new Map<string, { id: string; tier: ClientTier; weight_multiplier: number }>();
+    configs.forEach((c) => byClient.set(c.client_id, { id: c.id, tier: c.tier, weight_multiplier: c.weight_multiplier }));
+    return clients.map((c) => {
+      const cfg = byClient.get(c.id);
+      return {
+        client_id: c.id,
+        client_name: c.name,
+        client_slug: c.slug,
+        config_id: cfg?.id ?? null,
+        tier: cfg?.tier ?? "medium",
+        weight_multiplier: cfg?.weight_multiplier ?? 1,
+      };
+    });
+  }, [clients, configs]);
+
+  const saveMutation = useMutation({
+    mutationFn: async ({ client_id, tier, weight_multiplier }: { client_id: string; tier: ClientTier; weight_multiplier: number }) => {
+      const { error } = await supabase.from("client_priority_config").upsert(
+        {
+          client_id,
+          tier,
+          weight_multiplier,
+          updated_at: new Date().toISOString(),
+          recurrence_threshold_users: 3,
+          recurrence_window_days: 15,
+          active: true,
+        },
+        { onConflict: "client_id" }
+      );
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["client_priority_config"] });
+      queryClient.invalidateQueries({ queryKey: ["priority-scores"] });
+      toast.success("Prioridade atualizada");
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Erro ao salvar"),
+  });
+
+  const [editing, setEditing] = useState<Record<string, { tier: ClientTier; weight_multiplier: number }>>({});
+
+  const getEdit = (row: PriorityConfigRow) =>
+    editing[row.client_id] ?? { tier: row.tier, weight_multiplier: row.weight_multiplier };
+  const setEdit = (clientId: string, next: { tier: ClientTier; weight_multiplier: number }) =>
+    setEditing((prev) => ({ ...prev, [clientId]: next }));
+
+  return (
+    <div className="space-y-4 mt-4">
+      <Card className="border border-border">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base font-semibold">Tier e peso por cliente</CardTitle>
+          <CardDescription>
+            Altere o tier e o multiplicador de peso. Os scores são recalculados periodicamente.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Cliente</TableHead>
+                <TableHead>Tier</TableHead>
+                <TableHead>Peso</TableHead>
+                <TableHead className="w-24" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map((row) => {
+                const edit = getEdit(row);
+                const isDirty =
+                  edit.tier !== row.tier || edit.weight_multiplier !== row.weight_multiplier;
+                return (
+                  <TableRow key={row.client_id}>
+                    <TableCell>
+                      <span className="font-medium text-sm">{row.client_name}</span>
+                      <p className="text-xs text-muted-foreground">{row.client_slug}</p>
+                    </TableCell>
+                    <TableCell>
+                      <Select
+                        value={edit.tier}
+                        onValueChange={(v) => setEdit(row.client_id, { ...edit, tier: v as ClientTier })}
+                      >
+                        <SelectTrigger className="w-36 h-9">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="azzas">azzas</SelectItem>
+                          <SelectItem value="enterprise">enterprise</SelectItem>
+                          <SelectItem value="medium">medium</SelectItem>
+                          <SelectItem value="small">small</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        type="number"
+                        min={0.1}
+                        step={0.1}
+                        className="w-24 h-9"
+                        value={edit.weight_multiplier}
+                        onChange={(e) =>
+                          setEdit(row.client_id, {
+                            ...edit,
+                            weight_multiplier: Number(e.target.value) || 1,
+                          })
+                        }
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        size="sm"
+                        disabled={!isDirty || saveMutation.isPending}
+                        onClick={() => {
+                          saveMutation.mutate(
+                            {
+                              client_id: row.client_id,
+                              tier: edit.tier,
+                              weight_multiplier: edit.weight_multiplier,
+                            },
+                            {
+                              onSuccess: () =>
+                                setEditing((prev) => {
+                                  const next = { ...prev };
+                                  delete next[row.client_id];
+                                  return next;
+                                }),
+                            }
+                          );
+                        }}
+                      >
+                        {saveMutation.isPending && (saveMutation.variables as { client_id: string } | undefined)?.client_id === row.client_id ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          "Salvar"
+                        )}
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </div>
+  );
 }
 
 // ── Auto-Sync Card ──────────────────────────────────────
@@ -160,6 +354,7 @@ function AutoSyncCard() {
 
 const SettingsPage = () => {
   const { user } = useAuth();
+  const { isAdmin } = useUserRole();
   const { syncState, startSync, cancelSync } = useClient();
 
   // Wizard state
@@ -424,7 +619,14 @@ const SettingsPage = () => {
           <TabsTrigger value="integrations">Integrações</TabsTrigger>
           <TabsTrigger value="sync">Sincronização</TabsTrigger>
           <TabsTrigger value="uploads">Uploads</TabsTrigger>
+          {isAdmin && <TabsTrigger value="priorities">Prioridades</TabsTrigger>}
         </TabsList>
+
+        {isAdmin && (
+          <TabsContent value="priorities" className="mt-4">
+            <SettingsPrioritiesTab />
+          </TabsContent>
+        )}
 
         {/* ═══ Tab: Integrações ═══ */}
         <TabsContent value="integrations" className="space-y-4 mt-4">
