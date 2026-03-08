@@ -125,6 +125,8 @@ const DOC_ICONS: Record<string, string> = {
   pdf: "📄", xlsx: "📊", xls: "📊", docx: "📋", doc: "📋",
 };
 
+const PAGE_SIZE = 50;
+
 function isSameLocalDay(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
@@ -168,6 +170,8 @@ const ClientDetailPage = () => {
   const queryClient = useQueryClient();
 
   const [scopeText, setScopeText] = useState<string | null>(null);
+  const [pageInteractions, setPageInteractions] = useState(0);
+  const [pageParticipants, setPageParticipants] = useState(0);
 
   const thirtyDaysAgo = useMemo(
     () => new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(), []
@@ -194,21 +198,26 @@ const ClientDetailPage = () => {
   const clientId = client?.id;
   const meta = (client?.metadata ?? {}) as ClientMetadata;
 
-  const { data: participants = [] } = useQuery<Participant[]>({
-    queryKey: ["detail_participants", user?.id, clientId],
+  const { data: participantsData } = useQuery<{ list: Participant[]; totalCount: number }>({
+    queryKey: ["detail_participants", user?.id, clientId, pageParticipants],
     enabled: !!clientId && !!user?.id,
     staleTime: 5 * 60 * 1000,
     queryFn: async () => {
-      const { data, error } = await supabase
+      const from = pageParticipants * PAGE_SIZE;
+      const to = (pageParticipants + 1) * PAGE_SIZE - 1;
+      const { data, error, count } = await supabase
         .from("participants")
-        .select("id, name, role, side, identifiers, active")
+        .select("id, name, role, side, identifiers, active", { count: "exact" })
         .eq("client_id", clientId!)
         .order("name")
-        .limit(200);
+        .range(from, to);
       if (error) throw error;
-      return (data ?? []) as Participant[];
+      return { list: (data ?? []) as Participant[], totalCount: count ?? 0 };
     },
   });
+
+  const participants = participantsData?.list ?? [];
+  const participantsTotalCount = participantsData?.totalCount ?? 0;
 
   const { data: bindings = [] } = useQuery<ChannelBinding[]>({
     queryKey: ["detail_bindings", user?.id, clientId],
@@ -219,28 +228,33 @@ const ClientDetailPage = () => {
         .from("channel_bindings")
         .select("id, channel, channel_identifier, label, active")
         .eq("client_id", clientId!)
-        .limit(100);
+        .range(0, PAGE_SIZE - 1);
       if (error) throw error;
       return (data ?? []) as ChannelBinding[];
     },
   });
 
-  const { data: interactions = [] } = useQuery<Interaction[]>({
-    queryKey: ["detail_interactions_30d", user?.id, clientId, thirtyDaysAgo],
+  const { data: interactionsData } = useQuery<{ list: Interaction[]; totalCount: number }>({
+    queryKey: ["detail_interactions_30d", user?.id, clientId, thirtyDaysAgo, pageInteractions],
     enabled: !!clientId && !!user?.id,
     staleTime: 5 * 60 * 1000,
     queryFn: async () => {
-      const { data, error } = await supabase
+      const from = pageInteractions * PAGE_SIZE;
+      const to = (pageInteractions + 1) * PAGE_SIZE - 1;
+      const { data, error, count } = await supabase
         .from("interactions")
-        .select("id, tone, occurred_at, sender_raw, sender_side, content, channel, is_out_of_scope")
+        .select("id, tone, occurred_at, sender_raw, sender_side, content, channel, is_out_of_scope", { count: "exact" })
         .eq("client_id", clientId!)
         .gte("occurred_at", thirtyDaysAgo)
         .order("occurred_at", { ascending: false })
-        .limit(200);
+        .range(from, to);
       if (error) throw error;
-      return (data ?? []) as Interaction[];
+      return { list: (data ?? []) as Interaction[], totalCount: count ?? 0 };
     },
   });
+
+  const interactions = interactionsData?.list ?? [];
+  const interactionsTotalCount = interactionsData?.totalCount ?? 0;
 
   const { data: auditRules = [] } = useQuery<AuditRule[]>({
     queryKey: ["detail_audit_rules", user?.id, clientId],
@@ -251,7 +265,7 @@ const ClientDetailPage = () => {
         .from("audit_rules")
         .select("id, metric, name, active")
         .eq("client_id", clientId!)
-        .limit(100);
+        .range(0, PAGE_SIZE - 1);
       if (error) throw error;
       return (data ?? []) as AuditRule[];
     },
@@ -476,7 +490,7 @@ const ClientDetailPage = () => {
         <TabsList className="bg-muted/50">
           <TabsTrigger value="overview">Visão Geral</TabsTrigger>
           <TabsTrigger value="interactions">Interações</TabsTrigger>
-          <TabsTrigger value="participants">Participantes ({participants.length})</TabsTrigger>
+          <TabsTrigger value="participants">Participantes ({participantsTotalCount})</TabsTrigger>
           <TabsTrigger value="channels">Canais ({bindings.length})</TabsTrigger>
           <TabsTrigger value="documents">Documentos ({documents.length})</TabsTrigger>
           <TabsTrigger value="rules">Regras de Negócio</TabsTrigger>
@@ -598,6 +612,31 @@ const ClientDetailPage = () => {
               )}
             </CardContent>
           </Card>
+          {interactionsTotalCount > PAGE_SIZE && (
+            <div className="flex items-center justify-between mt-4">
+              <span className="text-sm text-muted-foreground">
+                Página {pageInteractions + 1} de {Math.ceil(interactionsTotalCount / PAGE_SIZE) || 1}
+              </span>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setPageInteractions((p) => p - 1)}
+                  disabled={pageInteractions === 0}
+                >
+                  Anterior
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setPageInteractions((p) => p + 1)}
+                  disabled={(pageInteractions + 1) * PAGE_SIZE >= interactionsTotalCount}
+                >
+                  Próxima
+                </Button>
+              </div>
+            </div>
+          )}
         </TabsContent>
 
         {/* ── TAB: Interações ── */}
@@ -609,6 +648,31 @@ const ClientDetailPage = () => {
         <TabsContent value="participants" className="space-y-6">
           <ParticipantSection title="Time do cliente" participants={clientTeam} badgeColor="bg-orange-100 text-orange-700" />
           <ParticipantSection title="Time uMode" participants={umodeTeam} badgeColor="bg-blue-100 text-blue-700" />
+          {participantsTotalCount > PAGE_SIZE && (
+            <div className="flex items-center justify-between mt-4">
+              <span className="text-sm text-muted-foreground">
+                Página {pageParticipants + 1} de {Math.ceil(participantsTotalCount / PAGE_SIZE) || 1}
+              </span>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setPageParticipants((p) => p - 1)}
+                  disabled={pageParticipants === 0}
+                >
+                  Anterior
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setPageParticipants((p) => p + 1)}
+                  disabled={(pageParticipants + 1) * PAGE_SIZE >= participantsTotalCount}
+                >
+                  Próxima
+                </Button>
+              </div>
+            </div>
+          )}
           <Button variant="outline" size="sm" onClick={() => toast.info("Em breve")}>
             + Adicionar participante
           </Button>

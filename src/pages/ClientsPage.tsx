@@ -46,6 +46,9 @@ interface ClientStatsRow {
   last_contact: string | null;
 }
 
+// ── Pagination ──
+const PAGE_SIZE = 50;
+
 // ── Helpers ──
 
 const CHANNEL_ICONS: Record<string, string> = {
@@ -113,6 +116,7 @@ const ClientsPage = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(0);
   const [sortKey, setSortKey] = useState<"name" | "total" | "tone" | "health" | "last_contact">("last_contact");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
@@ -125,21 +129,26 @@ const ClientsPage = () => {
     }
   }, [sortKey]);
 
-  const { data: clients = [], isLoading: loadingClients } = useQuery<ClientRow[]>({
-    queryKey: ["clients_list", user?.id],
+  const { data: clientsData, isLoading: loadingClients } = useQuery<{ list: ClientRow[]; totalCount: number }>({
+    queryKey: ["clients_list", user?.id, page],
     enabled: !!user?.id,
     staleTime: 5 * 60 * 1000,
     queryFn: async () => {
-      const { data, error } = await supabase
+      const from = page * PAGE_SIZE;
+      const to = (page + 1) * PAGE_SIZE - 1;
+      const { data, error, count } = await supabase
         .from("clients")
-        .select("id, name, slug, active, channel_bindings(channel, label, active)")
+        .select("id, name, slug, active, channel_bindings(channel, label, active)", { count: "exact" })
         .eq("active", true)
         .order("name")
-        .limit(100);
+        .range(from, to);
       if (error) throw error;
-      return (data ?? []) as ClientRow[];
+      return { list: (data ?? []) as ClientRow[], totalCount: count ?? 0 };
     },
   });
+
+  const clients = clientsData?.list ?? [];
+  const totalCount = clientsData?.totalCount ?? 0;
 
   const { data: statsMap = {} } = useQuery<Record<string, ClientStats>>({
     queryKey: ["client_stats_30d", user?.id],
@@ -341,6 +350,31 @@ const ClientsPage = () => {
               })}
             </TableBody>
           </Table>
+        )}
+        {!loadingClients && clientsWithStats.length > 0 && totalCount > PAGE_SIZE && (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-border">
+            <span className="text-sm text-muted-foreground">
+              Página {page + 1} de {Math.ceil(totalCount / PAGE_SIZE) || 1}
+            </span>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setPage((p) => p - 1)}
+                disabled={page === 0}
+              >
+                Anterior
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setPage((p) => p + 1)}
+                disabled={(page + 1) * PAGE_SIZE >= totalCount}
+              >
+                Próxima
+              </Button>
+            </div>
+          </div>
         )}
       </div>
     </div>
