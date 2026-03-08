@@ -444,37 +444,33 @@ const SettingsPage = () => {
                       {integ.connected ? "Conectado" : integ.enabled ? "Desconectado" : "Em breve"}
                     </Badge>
 
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        {integ.id === "gist" && integ.connected ? (
-                          <>
-                            <DropdownMenuItem onClick={handleImportHistory} disabled={syncing}>
-                              <Download className="h-4 w-4 mr-2" />
-                              Importar Histórico
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => setWizardOpen(true)}>
-                              <Users className="h-4 w-4 mr-2" />
-                              Gerenciar Contatos
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem disabled>
-                              Configurar Webhook
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem disabled className="text-destructive focus:text-destructive">
-                              Desconectar
-                            </DropdownMenuItem>
-                          </>
-                        ) : (
-                          <DropdownMenuItem disabled>Em breve...</DropdownMenuItem>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    {integ.enabled && integ.id === "gist" && integ.connected && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={handleImportHistory} disabled={syncing}>
+                            <Download className="h-4 w-4 mr-2" />
+                            Importar Histórico
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setWizardOpen(true)}>
+                            <Users className="h-4 w-4 mr-2" />
+                            Gerenciar Contatos
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem disabled>
+                            Configurar Webhook
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem disabled className="text-destructive focus:text-destructive">
+                            Desconectar
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
                   </div>
                 </CardContent>
               </Card>
