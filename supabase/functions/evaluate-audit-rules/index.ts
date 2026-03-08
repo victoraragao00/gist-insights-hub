@@ -109,7 +109,7 @@ async function calculateMetric(
       const { count: totalCount, error: totalError } = await query;
       if (totalError || !totalCount || totalCount === 0) return 0;
 
-      const alertaQuery = supabase
+      const alertaQuery = supaAdmin
         .from('interactions')
         .select('id', { count: 'exact' })
         .not('classified_at', 'is', null)
