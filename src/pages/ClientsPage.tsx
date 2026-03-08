@@ -11,7 +11,8 @@ import {
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, Search, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
+import { MoreHorizontal, Search, ArrowUp, ArrowDown, ArrowUpDown, AlertCircle } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
@@ -128,7 +129,7 @@ const ClientsPage = () => {
     }
   }, [sortKey]);
 
-  const { data: clientsData, isLoading: loadingClients } = useQuery<{ list: ClientRow[]; totalCount: number }>({
+  const { data: clientsData, isLoading: loadingClients, isError: clientsError, refetch: refetchClients } = useQuery<{ list: ClientRow[]; totalCount: number }>({
     queryKey: ["clients_list", user?.id, page],
     enabled: !!user?.id,
     staleTime: 5 * 60 * 1000,
@@ -224,9 +225,22 @@ const ClientsPage = () => {
         </div>
       </div>
 
+      {clientsError && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Erro ao carregar clientes</AlertTitle>
+          <AlertDescription>
+            Não foi possível carregar a lista. Tente novamente.
+            <Button variant="outline" size="sm" className="mt-2" onClick={() => refetchClients()}>
+              Tentar novamente
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Table */}
       <div className="rounded-xl border border-border bg-card">
-        {loadingClients ? (
+        {!clientsError && loadingClients ? (
           <div className="p-6 space-y-4">
             {[1, 2, 3].map((i) => (
               <div key={i} className="flex items-center gap-4">
@@ -239,7 +253,7 @@ const ClientsPage = () => {
               </div>
             ))}
           </div>
-        ) : clientsWithStats.length === 0 ? (
+        ) : !clientsError && clientsWithStats.length === 0 ? (
           <div className="py-20 text-center text-muted-foreground text-sm">
             Nenhum cliente ativo. Adicione um cliente para começar.
           </div>
@@ -337,7 +351,7 @@ const ClientsPage = () => {
             </TableBody>
           </Table>
         )}
-        {!loadingClients && clientsWithStats.length > 0 && totalCount > PAGE_SIZE && (
+        {!clientsError && !loadingClients && clientsWithStats.length > 0 && totalCount > PAGE_SIZE && (
           <div className="flex items-center justify-between px-4 py-3 border-t border-border">
             <span className="text-sm text-muted-foreground">
               Página {page + 1} de {Math.ceil(totalCount / PAGE_SIZE) || 1}
