@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +10,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -27,6 +30,7 @@ import { InteractionsFeed } from "@/components/InteractionsFeed";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
+import { useUserRole } from "@/hooks/useUserRole";
 import { usePriorityScores } from "@/hooks/usePriorityScores";
 import { useClientToneTrend } from "@/hooks/useClientToneTrend";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
@@ -175,13 +179,20 @@ function formatRelativeTime(dateStr: string): string {
 
 // ── Component ──
 
+const TIER_OPTIONS = ["azzas", "enterprise", "medium", "small"] as const;
+const STATUS_OPTIONS = ["ativo", "trial", "inativo"] as const;
+
 const ClientDetailPage = () => {
   const { slug } = useParams<{ slug: string }>();
   const { user } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { isAdmin } = useUserRole();
 
   const [scopeText, setScopeText] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editStatus, setEditStatus] = useState<string>("ativo");
+  const [editTier, setEditTier] = useState<string>("medium");
   const [pageInteractions, setPageInteractions] = useState(0);
   const [pageParticipants, setPageParticipants] = useState(0);
 
@@ -380,30 +391,73 @@ const ClientDetailPage = () => {
     [interactions]
   );
 
-  // Initialize scope from metadata
-  if (scopeText === null && client) {
-    setScopeText(meta.scope ?? "");
-  }
+  // Initialize edit state when client and clientScore load
+  useEffect(() => {
+    if (!client) return;
+    setEditName(client.name);
+    setEditStatus(client.status ?? "ativo");
+    setScopeText((client.metadata as ClientMetadata | null)?.scope ?? "");
+  }, [client]);
+
+  useEffect(() => {
+    if (clientScore) setEditTier(clientScore.tier);
+  }, [clientScore]);
 
   // ── Actions ──
 
-  const saveScopeMutation = useMutation({
-    mutationFn: async (payload: { client: ClientDetail; scopeText: string | null }) => {
+  const saveClientMutation = useMutation({
+    mutationFn: async (payload: {
+      client: ClientDetail;
+      name: string;
+      status: string;
+      scopeText: string | null;
+      tier: string;
+    }) => {
       const existing = (payload.client.metadata ?? {}) as Record<string, unknown>;
-      const { error } = await supabase
+      const { error: errClient } = await supabase
         .from("clients")
-        .update({ metadata: { ...existing, scope: payload.scopeText } })
+        .update({
+          name: payload.name,
+          status: payload.status,
+          metadata: { ...existing, scope: payload.scopeText },
+        })
         .eq("id", payload.client.id);
-      if (error) throw error;
+      if (errClient) throw errClient;
+
+      const { error: errConfig } = await supabase
+        .from("client_priority_config")
+        .upsert(
+          {
+            client_id: payload.client.id,
+            tier: payload.tier as "azzas" | "enterprise" | "medium" | "small",
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "client_id" }
+        );
+      if (errConfig) throw errConfig;
     },
     onSuccess: () => {
-      toast.success("Escopo salvo!");
+      toast.success("Dados do cliente salvos!");
       queryClient.invalidateQueries({ queryKey: ["client_detail", user?.id, slug] });
+      queryClient.invalidateQueries({ queryKey: ["clients_list", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["client_priority_config"] });
+      queryClient.invalidateQueries({ queryKey: ["priority-scores", user?.id] });
     },
     onError: (err) => {
       toast.error("Erro ao salvar: " + (err instanceof Error ? err.message : "Erro"));
     },
   });
+
+  const handleSaveClient = () => {
+    if (!client) return;
+    saveClientMutation.mutate({
+      client,
+      name: editName,
+      status: editStatus,
+      scopeText,
+      tier: editTier,
+    });
+  };
 
   const deactivateMutation = useMutation({
     mutationFn: async (clientToDeactivate: ClientDetail) => {
@@ -854,29 +908,6 @@ const ClientDetailPage = () => {
 
         {/* ── TAB 5: Regras de Negócio ── */}
         <TabsContent value="rules" className="space-y-6">
-          {/* Escopo */}
-          <Card className="border border-border rounded-xl">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base font-semibold">Escopo contratado</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Textarea
-                rows={4}
-                placeholder="Nenhum escopo definido."
-                value={scopeText ?? ""}
-                onChange={(e) => setScopeText(e.target.value)}
-              />
-              <Button
-                size="sm"
-                onClick={() => client && saveScopeMutation.mutate({ client, scopeText })}
-                disabled={saveScopeMutation.isPending}
-              >
-                {saveScopeMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
-                Salvar Escopo
-              </Button>
-            </CardContent>
-          </Card>
-
           {/* Temas */}
           <Card className="border border-border rounded-xl">
             <CardHeader className="pb-3">
@@ -919,6 +950,96 @@ const ClientDetailPage = () => {
 
         {/* ── TAB 6: Configurações ── */}
         <TabsContent value="settings" className="space-y-6">
+          {/* Dados do cliente */}
+          <Card className="border border-border rounded-xl">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-semibold">Dados do cliente</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {isAdmin ? (
+                <>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Nome</Label>
+                    <Input
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      className="h-9 text-sm"
+                      placeholder="Nome do cliente"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Status</Label>
+                    <Select value={editStatus} onValueChange={setEditStatus}>
+                      <SelectTrigger className="h-9 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {STATUS_OPTIONS.map((s) => (
+                          <SelectItem key={s} value={s}>
+                            {STATUS_CONFIG[s]?.label ?? s}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Escopo contratado</Label>
+                    <Textarea
+                      rows={4}
+                      placeholder="Nenhum escopo definido."
+                      value={scopeText ?? ""}
+                      onChange={(e) => setScopeText(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Tier</Label>
+                    <Select value={editTier} onValueChange={setEditTier}>
+                      <SelectTrigger className="h-9 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {TIER_OPTIONS.map((t) => (
+                          <SelectItem key={t} value={t}>
+                            {t}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={handleSaveClient}
+                    disabled={saveClientMutation.isPending}
+                  >
+                    {saveClientMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
+                    Salvar
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Nome</Label>
+                    <p className="text-sm">{editName || "—"}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Status</Label>
+                    <Badge className={STATUS_CONFIG[editStatus]?.className ?? ""}>
+                      {STATUS_CONFIG[editStatus]?.label ?? editStatus}
+                    </Badge>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Escopo contratado</Label>
+                    <p className="text-sm whitespace-pre-wrap">{scopeText || "Nenhum escopo definido."}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Tier</Label>
+                    <Badge variant="secondary">{editTier}</Badge>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* SLA */}
             <Card className="border border-border rounded-xl">
