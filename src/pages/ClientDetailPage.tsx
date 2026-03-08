@@ -393,17 +393,19 @@ const ClientDetailPage = () => {
     },
   });
 
-  const handleToggleRule = async (ruleId: string, active: boolean) => {
-    const { error } = await supabase
-      .from("audit_rules")
-      .update({ active })
-      .eq("id", ruleId);
-    if (error) {
-      toast.error("Erro ao atualizar regra");
-      return;
-    }
-    queryClient.invalidateQueries({ queryKey: ["detail_audit_rules", user?.id, clientId] });
-  };
+  const toggleRuleMutation = useMutation({
+    mutationFn: async ({ ruleId, active }: { ruleId: string; active: boolean }) => {
+      const { error } = await supabase
+        .from("audit_rules")
+        .update({ active })
+        .eq("id", ruleId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["detail_audit_rules", user?.id, clientId] });
+    },
+    onError: () => toast.error("Erro ao atualizar regra"),
+  });
 
   // ── Loading / Not found ──
 
@@ -918,7 +920,7 @@ const ClientDetailPage = () => {
                       <span className="text-sm">{rule.name}</span>
                       <Switch
                         checked={rule.active ?? false}
-                        onCheckedChange={(checked) => handleToggleRule(rule.id, checked)}
+                        onCheckedChange={(checked) => toggleRuleMutation.mutate({ ruleId: rule.id, active: checked })}
                       />
                     </div>
                   ))
