@@ -54,7 +54,7 @@ const LoginPage = () => {
           <div className="flex h-12 w-12 mx-auto items-center justify-center rounded-xl bg-primary text-primary-foreground font-bold text-lg mb-2">
             H
           </div>
-          <CardTitle className="text-xl">Hub Central</CardTitle>
+          <CardTitle className="text-xl">CX Hub</CardTitle>
           <CardDescription>Entre com suas credenciais</CardDescription>
         </CardHeader>
         <CardContent>

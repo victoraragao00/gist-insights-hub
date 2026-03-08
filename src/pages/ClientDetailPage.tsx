@@ -470,21 +470,6 @@ const ClientDetailPage = () => {
             </span>
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => toast.info("Em breve")}>
-            <Pencil className="h-3.5 w-3.5 mr-1" /> Editar
-          </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-9 w-9">
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => toast.info("Em breve")}>Exportar dados</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
       </div>
 
       {/* Tabs */}
@@ -520,7 +505,7 @@ const ClientDetailPage = () => {
               value={meta.last_seen_at ? formatDate(meta.last_seen_at) : "Não disponível"}
               sub={meta.last_seen_at ? `atualizado ${formatRelativeTime(meta.last_seen_at)}` : "sem dados"}
             />
-            <KPICard label="Tempo médio resposta" value="Em breve" sub="funcionalidade futura" />
+            <KPICard label="Tempo médio resposta" value="--" sub="funcionalidade futura" />
           </div>
 
           {/* Volume Chart */}
@@ -675,9 +660,6 @@ const ClientDetailPage = () => {
               </div>
             </div>
           )}
-          <Button variant="outline" size="sm" onClick={() => toast.info("Em breve")}>
-            + Adicionar participante
-          </Button>
         </TabsContent>
 
         {/* ── TAB 3: Canais ── */}
@@ -709,7 +691,6 @@ const ClientDetailPage = () => {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => toast.info("Em breve")}>Reimportar Histórico</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => toast.info("Em breve")}>Desconectar</DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
@@ -735,25 +716,18 @@ const ClientDetailPage = () => {
                         <p className="text-xs text-muted-foreground">Não conectado</p>
                       </div>
                     </div>
-                    <Badge variant="outline" className="text-xs">Em breve</Badge>
                   </div>
                 ))}
               </CardContent>
             </Card>
           )}
 
-          <Button variant="outline" size="sm" onClick={() => toast.info("Em breve")}>
-            + Conectar canal
-          </Button>
         </TabsContent>
 
         {/* ── TAB 4: Documentos ── */}
         <TabsContent value="documents" className="space-y-6">
           <div className="flex items-center justify-between">
             <h3 className="text-base font-semibold text-foreground">Documentos</h3>
-            <Button variant="outline" size="sm" onClick={() => toast.info("Em breve")}>
-              <Upload className="h-3.5 w-3.5 mr-1" /> Upload
-            </Button>
           </div>
 
           {documents.length === 0 ? (
@@ -787,15 +761,6 @@ const ClientDetailPage = () => {
             </div>
           )}
 
-          {/* Upload zone */}
-          <div
-            className="border-2 border-dashed border-border rounded-xl p-8 text-center cursor-pointer hover:border-primary/40 transition-colors"
-            onClick={() => toast.info("Em breve")}
-          >
-            <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-            <p className="text-sm text-muted-foreground">Arraste arquivos aqui ou clique para fazer upload</p>
-            <p className="text-xs text-muted-foreground mt-1">PDF, DOCX, XLSX, PNG — máximo 20MB</p>
-          </div>
         </TabsContent>
 
         {/* ── TAB 5: Regras de Negócio ── */}
@@ -834,13 +799,6 @@ const ClientDetailPage = () => {
                 {monitoredThemes.map((theme) => (
                   <Badge key={theme} className="bg-primary/10 text-primary border-0">{theme}</Badge>
                 ))}
-                <Badge
-                  variant="outline"
-                  className="cursor-pointer hover:bg-accent"
-                  onClick={() => toast.info("Em breve")}
-                >
-                  + adicionar
-                </Badge>
               </div>
             </CardContent>
           </Card>
@@ -866,9 +824,6 @@ const ClientDetailPage = () => {
                   </Badge>
                 </div>
               ))}
-              <Button variant="outline" size="sm" onClick={() => toast.info("Em breve")}>
-                + Nova regra
-              </Button>
             </CardContent>
           </Card>
         </TabsContent>
@@ -900,9 +855,6 @@ const ClientDetailPage = () => {
                   <Label className="text-xs text-muted-foreground">Dias úteis</Label>
                   <Input value={sla?.working_days ?? "Seg – Sex"} readOnly className="h-9 text-sm" />
                 </div>
-                <Button variant="outline" size="sm" onClick={() => toast.info("Em breve")}>
-                  <Pencil className="h-3.5 w-3.5 mr-1" /> Editar SLA
-                </Button>
               </CardContent>
             </Card>
 
@@ -1026,19 +978,6 @@ function ParticipantSection({ title, participants, badgeColor }: {
                           <span key={idx} className="text-sm">{CHANNEL_ICONS[id.channel] ?? "📡"}</span>
                         ))}
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-7 w-7">
-                            <MoreHorizontal className="h-3.5 w-3.5" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => toast.info("Em breve")}>Editar</DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => toast.info("Em breve")}>Remover</DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 );
