@@ -16,6 +16,37 @@ Submeter todo codigo para review do Claude Code antes de merge.
 - Supabase client para backend
 - sonner para toasts (UNICA lib permitida)
 - Shadcn/ui para componentes base
+- recharts para graficos (via ChartContainer de src/components/ui/chart.tsx)
+- lucide-react para icones
+- date-fns com locale pt-BR para datas
+- tailwindcss-animate para animacoes (JA INSTALADO)
+
+## DESIGN SYSTEM (fonte unica de verdade)
+
+Ler `docs/DESIGN_SYSTEM.md` antes de qualquer decisao visual.
+Todas as cores semanticas, motion patterns, e regras de componentes estao la.
+
+### Cores — NUNCA inventar. Usar apenas as definidas no Design System:
+- Tom (ok/atencao/alerta/critico): emerald/yellow/orange/red
+- Tier (azzas/enterprise/medium/small): primary/blue/slate/gray
+- Score (0-29/30-59/60-79/80-100): emerald/yellow/orange/red
+- Severity (high/medium/low): red/yellow/emerald
+- Saude (>=80/60-79/40-59/<40): emerald/yellow/orange/red
+
+### Motion — NUNCA criar keyframes inline. Usar apenas:
+- Custom registrados: animate-pulse-subtle, animate-fade-in-up, animate-shimmer, animate-progress-fill, animate-score-pop
+- tailwindcss-animate: animate-in, fade-in-*, zoom-in-*, slide-in-from-*, duration-*, delay-*
+- CSS nativo: transition-*, hover:scale-*, active:scale-95, animate-spin, animate-pulse
+
+### Componentes — regras de decisao:
+- Confirmacao destrutiva: AlertDialog (nunca Dialog)
+- Formulario/conteudo rico: Dialog
+- Detalhe contextual: Sheet (nunca Drawer)
+- Feedback temporario: toast (sonner)
+- Estado persistente: Alert (inline)
+- Listas < 10: Cards em grid
+- Listas 10-50: Table
+- Listas > 50: Table + Pagination (m12)
 
 ## REGRAS CRITICAS
 
@@ -40,7 +71,7 @@ m2:  Error boundaries em toda rota — <ErrorBoundary> page-level
 m3:  Toast unico — apenas `sonner`. Nunca use-toast. Um unico <Toaster> em App.tsx
 m4:  staleTime > 0 — minimo 5min para dados estaveis, 30s para dinamicos. Nunca zero
 m5:  queryKey completo — toda dependencia (data, filtro, id) inclusa no array
-m6:  useRef para referencias DOM — nunca id="..." estatico
+m6:  useId() para DOM IDs — nunca id="..." estatico
 m7:  Guard contra chamadas duplas — flag ou debounce quando dois eventos disparam a mesma acao
 m8:  Erros Supabase tratados — sempre destructurar { data, error } e checar error
 m9:  useMutation para escrita — nunca useState manual para loading/error
@@ -49,14 +80,27 @@ m11: Zero imports nao usados — limpar antes de commitar
 m12: Paginacao em listas > 50 itens — offset ou cursor, nunca cap arbitrario
 m13: Testes em caminhos criticos — hooks de negocio, auth, upload, processamento
 
+## PROIBICOES EXPLICITAS
+
+1. **Nunca instalar libs sem justificativa no PR.** framer-motion e permitido se justificado.
+2. **Nunca usar cores arbitrarias.** Nao inventar bg-purple-437. Usar a paleta do Design System.
+3. **Nunca duplicar componente shadcn.** Se existe em src/components/ui/, usar esse.
+4. **Nunca hardcodar numeros magicos.** Criar constante nomeada (ex: SCORE_CAP = 100).
+5. **Nunca criar keyframe inline em JSX.** Registrar no tailwind.config.ts ou usar tailwindcss-animate.
+6. **Nunca usar px para espacamento.** Usar classes Tailwind (p-4, gap-6, etc).
+7. **Nunca ignorar dark mode.** Toda cor custom precisa de variante dark:.
+8. **Nunca remover animacao de preferencia do usuario.** Usar motion-safe: prefix.
+9. **Nunca usar setTimeout para animacao.** Usar CSS transitions ou animation-delay.
+10. **Nunca usar index como key em listas dinamicas.** Usar ID unico.
+
 ## ANTI-PADROES PROIBIDOS
 
-- Funcao que processa, valida e persiste ao mesmo tempo → dividir em funcoes separadas
-- Loop assincrono em componente React → usar sync_jobs + pg_cron
-- Estado de progresso em localStorage → usar coluna progress em sync_jobs
-- Codigo monolitico → modulos com responsabilidade unica
-- Aceitar output de IA sem revisar → adaptar, refatorar ou descartar
-- UPDATE/DELETE sem filtro auto_created → sempre metadata->>'auto_created' = 'true'
+- Funcao que processa, valida e persiste ao mesmo tempo -> dividir em funcoes separadas
+- Loop assincrono em componente React -> usar sync_jobs + pg_cron
+- Estado de progresso em localStorage -> usar coluna progress em sync_jobs
+- Codigo monolitico -> modulos com responsabilidade unica
+- Aceitar output de IA sem revisar -> adaptar, refatorar ou descartar
+- UPDATE/DELETE sem filtro auto_created -> sempre metadata->>'auto_created' = 'true'
 
 ## PRINCIPIOS DO PLAYBOOK
 
@@ -74,12 +118,13 @@ m13: Testes em caminhos criticos — hooks de negocio, auth, upload, processamen
 - Hooks: camelCase com prefixo use (useClientStats.ts)
 - Utils: camelCase (formatDate.ts)
 - Tipos: PascalCase (ClientStats)
-- Constantes: UPPER_SNAKE_CASE
+- Constantes: UPPER_SNAKE_CASE (SCORE_CAP, PAGE_SIZE)
 
 ## WORKFLOW
 
 1. Ler CONTEXT.md para entender estado atual
-2. Implementar em branch de feature
-3. Submeter PR para review do Claude Code
-4. Claude Code revisa contra Checklist CTO
-5. Merge apos aprovacao
+2. Ler docs/DESIGN_SYSTEM.md para decisoes visuais
+3. Implementar em branch de feature
+4. Submeter PR para review do Claude Code
+5. Claude Code revisa contra Checklist CTO + Design System
+6. Merge apos aprovacao
