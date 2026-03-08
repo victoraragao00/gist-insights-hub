@@ -69,10 +69,11 @@ Restricoes:
 - **Frontend Contract obrigatorio:** toda Issue/PR do Lovable que desbloqueia trabalho do Cursor DEVE incluir secao "Frontend Contract" com: return type (campos e tipos), queryKey sugerido, staleTime recomendado, enabled condition e edge cases. O Contract vive na Issue/PR (nunca como codigo UI) — Cursor consome o Contract para criar hooks e componentes.
 - **Zero autonomia em decisoes tecnicas:** se uma instrucao do prompt parece errada, o Lovable DEVE reportar ao Operador ANTES de alterar. Nunca adaptar, "melhorar" ou omitir instrucoes marcadas como OBRIGATORIO.
 - **SQL Patterns obrigatorios** (verificados pelo Claude Code em toda entrega):
-  - `user_accessible_client_ids()` retorna `uuid[]` — SEMPRE usar `unnest()` em CTEs: `SELECT unnest(user_accessible_client_ids(p_user_id)) AS cid`
+  - `user_accessible_client_ids()` retorna `SETOF uuid` — NAO usar `unnest()`, cada row ja e uuid escalar
   - Date ranges index-friendly: `occurred_at >= d.day AND occurred_at < d.day + interval '1 day'` — NUNCA `occurred_at::date`
   - Colunas de interactions: `sender_raw` e `sender_side` (NAO sender_name/sender_type)
   - Full-text search: `search_vector @@ plainto_tsquery('portuguese', p_query)` com `ts_rank` — NUNCA ILIKE
+  - **Antes de exigir correcoes em SQL:** verificar a definicao real da funcao no banco (migration original ou `\df+`), nao confiar apenas no TypeScript
 
 ### Formato obrigatorio de prompts para o Lovable
 
