@@ -1,8 +1,8 @@
-# CONTEXT.md — Estado do Projeto (v6 — 2026-03-07)
+# CONTEXT.md — Estado do Projeto (v7 — 2026-03-08)
 
 > Mantido pelo Claude Code ao final de cada sessao. Lido por todos os agentes para manter contexto.
 >
-> last_updated: 2026-03-07
+> last_updated: 2026-03-08
 > last_updated_by: Claude Code
 
 ---
@@ -16,9 +16,20 @@
 | 2 | Integracoes Gist (proxy, bindings, discover, confirm-mapping) | Concluido |
 | 3 | Sync Engine (enqueue + process-jobs worker) | Concluido |
 | 4 | Classificacao IA (classify_batch via Gemini/Claude) | Concluido — Gemini Pro + prompt Mega Agente v6 |
-| 5 | Dashboard e KPIs | Em progresso — KPIs live, client_stats_30d, tabelas ordenaveis |
+| 5 | Dashboard e KPIs | Em progresso — Cursor assumiu frontend, auditoria de UI/UX concluida |
 | 6 | Auditorias e Alertas | Placeholder |
 | 7 | Insights IA avancados | Placeholder |
+
+---
+
+## Reclassificacao do Backlog
+
+- **Status:** Em andamento (~45% concluido)
+- **Classificadas:** ~14.870 de ~33.091 msgs
+- **Conversas pendentes:** ~887
+- **Jobs executados:** 4 classify_batch (Gemini Pro + v6)
+- **Modelo:** gemini-2.5-pro, 3 timeouts de Gemini (normal)
+- **Previsao:** mais 1-2 jobs para finalizar
 
 ---
 
@@ -33,6 +44,31 @@
 | #14 | Calibracao de tom + filtro 365d | Resolvido | Lovable |
 | #15 | Prompt Mega Agente v3 | Resolvido | Lovable |
 | #16 | Gemini Pro definitivo + prompt v6 com few-shot examples | Resolvido | Lovable |
+
+---
+
+## Divida Tecnica (auditoria Cursor — 2026-03-08)
+
+Violacoes do Checklist do CTO encontradas no codigo atual:
+
+| Item | Problema | Onde | Severidade |
+|------|----------|------|-----------|
+| m1 | `any` em codigo nao-UI | InteractionsFeed, ClientContext, SettingsPage | Alta |
+| m3 | `use-toast.ts` e `ui/toaster.tsx` existem (nao usados, bomba relogio) | src/components/ui/ | Media |
+| m4 | staleTime ausente em 6 queries | ClientDetailPage | Alta |
+| m5 | invalidateQueries sem `user?.id` na key | ClientDetailPage | Media |
+| m9 | useState manual em vez de useMutation (3 handlers) | ClientDetailPage, SettingsPage | Alta |
+| m12 | Sem paginacao real (limit 100/200 hardcoded) | ClientsPage, ClientDetailPage | Alta |
+| m6 | DOM IDs estaticos em inputs | LoginPage, SignupPage | Baixa |
+
+## Problemas de UX identificados
+
+- Dashboard mostra KPIs do Gist mas nao reflete dados de classificacao IA (tom, tema, tendencias)
+- Excesso de botoes "Em breve" — transmite produto inacabado
+- Pagina Auditorias e placeholder sem funcionalidade
+- Coluna "Saude" com semantica invertida (mais % = mais vermelho)
+- Marca inconsistente (Login diz "Hub Central", sidebar diz "uMode")
+- 404 em ingles, app em PT-BR
 
 ---
 
@@ -69,7 +105,7 @@
 **Conclusao:** Gemini Pro + Mega Agente v6 e a versao definitiva. Nota 9.0/10, primeiro acima de 9. Claude performou pior com o mesmo prompt (8.6). Custo mensal ~$0.16.
 
 ### Volume e Custos
-- **Backlog:** ~33k msgs em ~1.680 conversas
+- **Backlog:** ~33k msgs em ~1.680 conversas (~45% ja classificado)
 - **Volume mensal:** ~117 conversas/mes (media ultimos 6 meses, tendencia crescente)
 - **Custo Gemini Pro:** ~$2.22 backlog + ~$0.16/mes recorrente (~$2/ano)
 
@@ -77,26 +113,36 @@
 
 ## Colaboracao
 
-Papeis, restricoes, fluxos e checklist completos em AGENTS.md.
+Papeis, restricoes, fluxos e checklist completos em AGENTS.md (v6).
 
-| Agente | Papel |
-|--------|-------|
-| **Claude Code** | Revisao e Engenharia |
-| **Lovable** | Desenvolvimento e Deploy |
-| **Projeto** | Auditoria e Estrategia |
-| **Operador** (Joao) | Orquestrador Humano |
+| Agente | Papel | Canal |
+|--------|-------|-------|
+| **Claude Code** | Revisao e Engenharia | Terminal / CLI |
+| **Cursor** | Desenvolvimento Frontend | Cursor IDE |
+| **Lovable** | Migrations e Edge Functions (escopo reduzido) | Interface Lovable |
+| **Projeto** | Auditoria e Estrategia | claude.ai |
+| **Operador** (Joao) | Orquestrador Humano | Supabase Dashboard / GitHub |
+
+### Mudanca de estrategia (2026-03-08)
+- **Cursor assumiu o frontend** para reduzir dependencia e custo do Lovable
+- **Lovable fica restrito** a migrations, edge functions e deploy no Supabase
+- **Claude Code revisa** todo codigo do Cursor contra Checklist do CTO
+- **Plano de independencia:** migrar ownership do Supabase project para conta propria (futuro)
 
 ### Preferencias do Operador
 - Respostas diretas e concisas — sem enrolacao
 - Conteudo self-contained para copy-paste — nunca pedir para intermediar
 - Nao dar estimativas de tempo — focar no que precisa ser feito
+- Arquivos compartilhados em `~/Desktop/CX HUB/`
 - Repo publico: github.com/HyTrackWater/gist-insights-hub
 
 ---
 
 ## Proximos Passos
 
-1. **Em andamento:** Reclassificacao completa do backlog (~33k msgs) com Gemini Pro + v6
-2. **Fase 5:** Avancar dashboard com dados classificados
-3. **Fase 6:** Auditorias e Alertas
-4. **Fase 7:** Insights IA avancados
+1. **Em andamento:** Reclassificacao do backlog (~55% pendente, mais 1-2 jobs)
+2. **Proximo:** Corrigir divida tecnica do Checklist CTO (m1, m3, m4, m5, m9, m12)
+3. **Fase 5:** Dashboard com dados classificados (tom, tema, tendencias)
+4. **Fase 5:** Limpar "Em breve", alinhar marca, corrigir UX
+5. **Fase 6:** Auditorias e Alertas
+6. **Fase 7:** Insights IA avancados
