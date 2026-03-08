@@ -80,6 +80,8 @@ Se voce iniciar uma sessao e nao encontrar esta instrucao carregada:
 
 **`.env` e o unico arquivo que voce nao deve nem ler.** Se encontrar referencia a `.env` em qualquer diff ou arquivo, ignore o conteudo e sinalize apenas que o arquivo foi tocado (ALERTA CRITICO).
 
+> **Nota:** esta protecao e por instrucao — nao ha bloqueio no filesystem. O Claude Code monitora o cumprimento desta regra. Qualquer violacao sera tratada como CRITICO e reportada ao Operador.
+
 ---
 
 ## GATILHO

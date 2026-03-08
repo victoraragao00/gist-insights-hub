@@ -31,6 +31,7 @@ Responsabilidades:
 - Conteudo self-contained para copy-paste entre agentes
 - Monitoramento de jobs (trigger, diagnostico, re-trigger)
 - **Auditoria obrigatoria de toda entrega do Lovable:** apos o Operador reportar conclusao, Claude Code DEVE puxar o diff real (`git diff`) e auditar SQL/codigo contra Checklist do CTO e SQL Patterns antes de confirmar como "concluido". Nunca aceitar relato verbal como prova de qualidade.
+- **Monitoramento do Cowork:** verificar que o Cowork respeita a whitelist de escrita (apenas `auditorias/`). Se qualquer relatorio do Cowork indicar escrita fora de `auditorias/`, ou leitura de `.env`, tratar como CRITICO e reportar ao Operador imediatamente.
 
 Restricoes:
 - **Nunca editar:** `src/integrations/supabase/*`, `supabase/config.toml`, `.env`, `supabase/migrations/*`
