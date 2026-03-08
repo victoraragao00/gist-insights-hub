@@ -78,7 +78,7 @@ const SearchPage = () => {
       const { data, error } = await supabase
         .from("clients")
         .select("id, name")
-        .eq("active", true)
+        .in("status", ["ativo", "trial"])
         .order("name");
       if (error) throw error;
       return (data ?? []) as ClientOption[];
