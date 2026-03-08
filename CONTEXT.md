@@ -327,13 +327,14 @@ AUDIT_BATCH_SIZE=20
 
 ## Colaboracao
 
-Papeis, restricoes, fluxos e checklist completos em AGENTS.md (v8).
+Papeis, restricoes, fluxos e checklist completos em AGENTS.md (v9).
 
 | Agente | Papel | Canal |
 |--------|-------|-------|
 | **Claude Code** | Revisao e Engenharia | Terminal / CLI |
 | **Cursor** | Desenvolvimento Frontend | Cursor IDE |
 | **Lovable** | Migrations e Edge Functions (escopo reduzido) | Interface Lovable |
+| **Cowork** | Guardiao de Documentacao | Claude Desktop (pasta do repo) |
 | **Projeto** | Auditoria e Estrategia | claude.ai |
 | **Operador** (Joao) | Orquestrador Humano | Supabase Dashboard / GitHub |
 
@@ -347,8 +348,37 @@ Papeis, restricoes, fluxos e checklist completos em AGENTS.md (v8).
 - Respostas diretas e concisas — sem enrolacao
 - Conteudo self-contained para copy-paste — nunca pedir para intermediar
 - Nao dar estimativas de tempo — focar no que precisa ser feito
-- Arquivos compartilhados em `~/Desktop/CX HUB/`
+- Todos os outputs dentro do repo conforme estrutura de pastas (nunca `~/Desktop/CX HUB/`)
 - Repo publico: github.com/HyTrackWater/gist-insights-hub
+
+---
+
+## Estrutura de Pastas (desde 2026-03-08)
+
+```
+gist-insights-hub/
+├── CONTEXT.md, AGENTS.md, CLAUDE.md, README.md   # Raiz — docs de governo
+├── docs/
+│   ├── PRD.md                                     # PRD completo (documento vivo)
+│   ├── DESIGN_SYSTEM.md                           # Design System
+│   ├── E2E_TEST_PLAN.md                           # Testes E2E
+│   ├── COWORK_GUARDIAN_INSTRUCTION_v2.md           # Instrucao do Cowork
+│   ├── mega-agente/                               # Prompt do Mega Agente
+│   ├── prompts/                                   # Prompts ativos Cursor + Lovable
+│   │   └── archive/                               # Prompts de fases anteriores
+│   ├── auditorias/                                # Auditorias MANUAIS (Claude Code, MA, UX)
+│   │   ├── blind-tests/                           # Blind tests de classificacao IA
+│   │   └── ux/                                    # Auditorias UX/UI
+│   └── plans/                                     # Planos executivos historicos
+├── auditorias/                                    # Relatorios AUTOMATICOS do Cowork
+│   └── PENDENTES.md                               # Violacoes abertas — mantido pelo Cowork
+├── scripts/
+├── src/                                           # Frontend (Cursor) — NAO TOCAR
+└── supabase/                                      # Backend (Lovable) — NAO TOCAR
+```
+
+Regra: `auditorias/` (raiz) = Cowork automatico. `docs/auditorias/` = manuais.
+`~/Desktop/CX HUB/` descontinuada em 2026-03-08.
 
 ---
 
@@ -386,7 +416,10 @@ Papeis, restricoes, fluxos e checklist completos em AGENTS.md (v8).
 11. **Concluido:** Sprint P1 — Edicao de cliente na tab Configuracoes (Issue #59, PR #61)
 12. **Concluido:** Sprint P3 — CRUD de audit_rules na pagina Auditorias (Issue #60, PR #62)
 13. **Concluido:** Sprint P4 — Busca server-side em 3 telas (Issue #63, PR #64)
-14. **Pendente:** Lovable S6 — Edge function deliver-audit-alerts (baixa prioridade, depende de decisao sobre canal)
-15. **Fechado:** PR #36 (docs: Auditoria UX/UI) — auditoria concluida
-16. **Fechado:** Issue #13 — Banner reclassificacao (won't-fix, cenario ja passou)
-17. **Fase 7:** Insights IA avancados
+14. **Concluido:** Cowork configurado como Guardiao de Documentacao (2026-03-08)
+15. **Concluido:** Estrutura de pastas unificada no repo (migracao de `~/Desktop/CX HUB/`)
+16. **Concluido:** `auditorias/PENDENTES.md` criado com violacoes A1 e A2
+17. **Pendente:** Lovable S6 — Edge function deliver-audit-alerts (baixa prioridade, depende de decisao sobre canal)
+18. **Fechado:** PR #36 (docs: Auditoria UX/UI) — auditoria concluida
+19. **Fechado:** Issue #13 — Banner reclassificacao (won't-fix, cenario ja passou)
+20. **Fase 7:** Insights IA avancados

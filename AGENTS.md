@@ -6,7 +6,7 @@
 >
 > last_updated: 2026-03-08
 > last_updated_by: Claude Code
-> version: v8
+> version: v9
 
 ---
 
@@ -17,6 +17,7 @@
 | **Claude Code** | Revisao e Engenharia | Terminal / CLI |
 | **Cursor** | Desenvolvimento Frontend | Cursor IDE |
 | **Lovable** | Migrations e Edge Functions | Interface Lovable |
+| **Cowork** | Guardiao de Documentacao | Claude Desktop (pasta do repo) |
 | **Projeto** (Claude.ai) | Auditoria e Estrategia | claude.ai |
 | **Operador** (Joao) | Orquestrador Humano | Supabase Dashboard / GitHub |
 
@@ -86,12 +87,27 @@ Todo prompt gerado pelo Claude Code para o Lovable DEVE conter, nesta ordem:
 6. **Verificacao:** queries de teste pos-deploy
 7. **Frontend Contract** (se aplicavel)
 
+### Cowork (Guardiao de Documentacao)
+Responsabilidades:
+- Monitorar alteracoes em arquivos de documentacao e codigo do repo
+- Auditar contra Checklist CTO (m1-m13) e Playbook uMode
+- Gerar relatorio em `auditorias/AUDITORIA_YYYYMMDD_HHMM.md` a cada alteracao
+- Manter `auditorias/PENDENTES.md` atualizado com violacoes abertas e resolvidas
+- Cross-check: feature nova em `src/` sem atualizacao em `E2E_TEST_PLAN.md` → ATENCAO
+
+Restricoes:
+- **Nunca edita codigo** — apenas le e reporta
+- **Nunca demanda diretamente ao Cursor ou Lovable** — sempre via Operador → Claude Code → Issue
+- **Nunca cria branches ou commits de codigo**
+- Unico arquivo que pode escrever: `auditorias/PENDENTES.md` e relatorios em `auditorias/`
+- Instrucao completa em: `docs/COWORK_GUARDIAN_INSTRUCTION_v2.md`
+
 ### Projeto (Claude.ai)
 Responsabilidades:
 - Auditorias cegas de classificacao IA (blind tests)
 - Comparacao entre modelos e prompts
 - Calibracao do Mega Agente (prompt engineering)
-- Atualizacao do PRD (`instrucao_cx_hub_umode_v*.md`)
+- Atualizacao do PRD (`docs/PRD.md`)
 
 Restricoes:
 - Sem acesso direto ao repo ou Supabase
@@ -126,10 +142,22 @@ Claude Code cria Issue no GitHub com:
 Claude Code revisa contra Checklist do CTO
   |
   v
+Cowork audita automaticamente (arquivo alterado → relatorio)
+  |
+  v
 Operador testa no Supabase / Projeto audita (blind tests)
   |
   v
 Claude Code atualiza CONTEXT.md
+
+Fluxo alternativo (Cowork detecta violacao):
+  Cowork detecta violacao em arquivo monitorado
+    → salva relatorio em auditorias/AUDITORIA_YYYYMMDD_HHMM.md
+    → atualiza auditorias/PENDENTES.md
+    → Operador encaminha relatorio para Claude Code
+    → Claude Code valida e cria Issue no GitHub
+    → Cursor (frontend) ou Lovable (backend) executa
+    → Claude Code fecha violacao em PENDENTES.md
 ```
 
 **Protocolo de rollback** (quando um agente de desenvolvimento quebra algo):
@@ -256,6 +284,14 @@ m13: Testes em caminhos criticos (hooks, auth, fluxo de ingestao)
 | Sync sem `since_timestamp` | Parar loop no primeiro item mais antigo |
 | Usar OpenAI | Gemini `gemini-2.5-pro` + fallback `claude-sonnet-4` |
 
+### Do Fluxo de Agentes
+| Anti-padrao | Alternativa |
+|-------------|-------------|
+| Salvar outputs em `~/Desktop/CX HUB/` | Tudo dentro do repo em `docs/` conforme estrutura de pastas |
+| Cowork demandar diretamente ao Cursor/Lovable | Cowork → Operador → Claude Code → Issue |
+| Arquivos `.txt` | Sempre `.md` |
+| Referenciar `~/Desktop/CX HUB/` em documentacao | Todos os caminhos dentro do repo |
+
 ---
 
 ## 6. Principios Inviolaveis do PRD
@@ -285,7 +321,32 @@ m13: Testes em caminhos criticos (hooks, auth, fluxo de ingestao)
 
 ---
 
-## 8. Glossario
+## 8. Convencao de Nomenclatura de Arquivos
+
+Todos os outputs de agentes sao salvos dentro do repo `gist-insights-hub/`. A pasta `~/Desktop/CX HUB/` foi descontinuada em 2026-03-08.
+
+| Tipo | Padrao | Destino |
+|------|--------|---------|
+| Prompts Cursor | `CURSOR_{FEATURE}.md` | `docs/prompts/` |
+| Prompts Lovable | `LOVABLE_{SESSION}_{FEATURE}.md` | `docs/prompts/` |
+| Briefings MA | `BRIEFING_MA_{SPRINT}.md` | `docs/prompts/` |
+| Auditorias Cowork | `AUDITORIA_YYYYMMDD_HHMM.md` | `auditorias/` |
+| Auditorias manuais | `AUDITORIA_{TIPO}_{DATA}.md` | `docs/auditorias/` |
+| Planos executivos | `PLANO_{TIPO}_vN_{DATA}.md` | `docs/plans/` |
+| Relatorios | `RELATORIO_{ASSUNTO}_{DATA}.md` | `docs/auditorias/` |
+| PRD | `PRD.md` | `docs/` |
+| Mega Agente prompt | `MEGA_AGENTE_vN.md` | `docs/mega-agente/` |
+
+**Regras:**
+- Sempre `.md` (nunca `.txt`)
+- Datas no formato `YYYY-MM-DD` em nomes de arquivo
+- Sem espacos — underscore como separador
+- Versao com `vN` antes da data quando aplicavel
+- Links para agentes: SEMPRE link publico GitHub, NUNCA caminho local
+
+---
+
+## 9. Glossario
 
 | Termo | Definicao |
 |-------|-----------|
@@ -303,7 +364,7 @@ m13: Testes em caminhos criticos (hooks, auth, fluxo de ingestao)
 
 ---
 
-## 9. Lacunas no Playbook (para nao esperar diretriz inexistente)
+## 10. Lacunas no Playbook (para nao esperar diretriz inexistente)
 
 Secoes criadas no Playbook mas ainda sem conteudo documentado:
 - **Metricas de Latencia** — mencionada como metrica de partida, sem thresholds definidos
@@ -319,7 +380,7 @@ mas o processo de validacao formal "ainda esta sendo pilotado" (meta: cobertura 
 
 ---
 
-## 10. Stack de Referencia
+## 11. Stack de Referencia
 
 | Camada | Tecnologia |
 |--------|-----------|
