@@ -22,11 +22,10 @@ Recalculates priority scores for one or all clients.
 
 **Body** (all fields optional):
 
-| Field     | Type    | Description                                         |
-|-----------|---------|-----------------------------------------------------|
-| force     | boolean | Forces recalculation (ignores any cache)            |
-| client_id | UUID    | Limits to a specific client. Absent = all clients   |
-| _offset   | number  | Internal — used by auto-chain. Do not set manually  |
+| Field     | Type   | Description                                         |
+|-----------|--------|-----------------------------------------------------|
+| client_id | UUID   | Limits to a specific client. Absent = all clients   |
+| _offset   | number | Internal — used by auto-chain. Do not set manually  |
 
 **Sample Response — success (200):**
 
