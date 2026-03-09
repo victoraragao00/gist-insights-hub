@@ -118,7 +118,7 @@ AUDIT_BATCH_SIZE=20
 | #2-#10 | Bugs iniciais (proxy, safety filter, realtime, timeouts, attachments) | Resolvidos | Lovable |
 | #11 | Migration: conversation_id column + backfill + index | Resolvido | Lovable |
 | #12 | classify_batch por conversa (nao por mensagem isolada) | Resolvido | Lovable |
-| #13 | Banner de reclassificacao (opcional) | Aberto | Lovable |
+| #13 | Banner de reclassificacao (opcional) | Fechado (won't-fix) | Lovable |
 | #14 | Calibracao de tom + filtro 365d | Resolvido | Lovable |
 | #15 | Prompt Mega Agente v3 | Resolvido | Lovable |
 | #16 | Gemini Pro definitivo + prompt v6 com few-shot examples | Resolvido | Lovable |
