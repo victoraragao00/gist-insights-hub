@@ -12,8 +12,9 @@ dist
 dist-ssr
 *.local
 
-# Environment variables (NEVER commit secrets)
-.env
+# Environment variables — .env com VITE_* (chaves publicas) fica no repo
+# porque o Lovable precisa para build. NUNCA colocar service_role_key ou
+# secrets de IA (GEMINI_API_KEY, CLAUDE_API_KEY) neste arquivo.
 .env.local
 .env.*.local
 .env.production
