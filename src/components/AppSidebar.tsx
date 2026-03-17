@@ -1,4 +1,4 @@
-import { LayoutDashboard, Search, ShieldAlert, Settings, Users } from "lucide-react";
+import { LayoutDashboard, Search, ShieldAlert, Settings, Users, Kanban } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import umodeLogo from "@/assets/umode-logo-full.png";
 import umodeIcon from "@/assets/umode-icon.png";
