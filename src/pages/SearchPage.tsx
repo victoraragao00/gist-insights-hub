@@ -101,6 +101,10 @@ const SearchPage = () => {
     },
   });
 
+  useEffect(() => {
+    if (clientSearchError) toast.error("Erro ao buscar clientes");
+  }, [clientSearchError]);
+
   const totalCount = results[0]?.total_count ?? 0;
   const totalPages = Math.ceil(totalCount / PAGE_SIZE) || 1;
   const showResults = debouncedQuery.length >= 3;
