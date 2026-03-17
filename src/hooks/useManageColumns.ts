@@ -124,7 +124,7 @@ export function useDeleteColumn() {
       toast.success("Coluna excluída");
     },
     onError: (err) => {
-      if (typeof err === "object" && err !== null && "code" in err && (err as ColumnHasTicketsError).code === "COLUMN_HAS_TICKETS") {
+      if (typeof err === "object" && err !== null && "code" in err && (err as unknown as ColumnHasTicketsError).code === "COLUMN_HAS_TICKETS") {
         // Let caller handle this
         throw err;
       }

@@ -174,7 +174,7 @@ const DemandsPage = () => {
           Nenhuma demanda encontrada com os filtros selecionados
         </div>
       ) : (
-        <DndContext sensors={sensors} collisionDetection={closestCorner} onDragEnd={handleDragEnd}>
+        <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
           <div className="flex gap-4 overflow-x-auto pb-4">
             {columns.map((col) => (
               <KanbanColumn

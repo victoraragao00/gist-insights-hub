@@ -163,8 +163,8 @@ export function ColumnSettingsTab() {
       { id: col.id },
       {
         onError: (err) => {
-          if (typeof err === "object" && err !== null && "code" in err && (err as ColumnHasTicketsError).code === "COLUMN_HAS_TICKETS") {
-            setTicketCount((err as ColumnHasTicketsError).count);
+          if (typeof err === "object" && err !== null && "code" in err && (err as unknown as ColumnHasTicketsError).code === "COLUMN_HAS_TICKETS") {
+            setTicketCount((err as unknown as ColumnHasTicketsError).count);
             setMoveToId(columns.find((c) => c.id !== col.id)?.id ?? "");
             setShowMoveDialog(true);
           }
