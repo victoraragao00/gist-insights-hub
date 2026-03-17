@@ -56,9 +56,8 @@ const SearchPage = () => {
     setPage(0);
   }, [debouncedQuery]);
 
-  useEffect(() => {
-    if (clientSearchError) toast.error("Erro ao buscar clientes");
-  }, [clientSearchError]);
+
+
 
   const { data: results = [], isLoading, isError, refetch } = useSearchInteractions({
     query: debouncedQuery,
@@ -101,6 +100,10 @@ const SearchPage = () => {
       return (data ?? []) as Array<{ id: string; name: string; slug: string; status: string }>;
     },
   });
+
+  useEffect(() => {
+    if (clientSearchError) toast.error("Erro ao buscar clientes");
+  }, [clientSearchError]);
 
   const totalCount = results[0]?.total_count ?? 0;
   const totalPages = Math.ceil(totalCount / PAGE_SIZE) || 1;
