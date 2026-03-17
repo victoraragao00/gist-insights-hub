@@ -5,11 +5,11 @@ import {
 } from "@dnd-kit/core";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus } from "lucide-react";
+import { Plus, ChevronsUpDown, Check } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useClient } from "@/context/ClientContext";
 import {
@@ -19,6 +19,61 @@ import {
 import { KanbanColumn } from "@/components/demands/KanbanColumn";
 import { DemandDetailSheet } from "@/components/demands/DemandDetailSheet";
 import { CreateDemandDialog } from "@/components/demands/CreateDemandDialog";
+
+// ── Filter Combobox ──
+
+interface FilterComboboxProps {
+  value: string;
+  onValueChange: (value: string) => void;
+  placeholder: string;
+  searchPlaceholder: string;
+  options: { value: string; label: string }[];
+  className?: string;
+}
+
+function FilterCombobox({ value, onValueChange, placeholder, searchPlaceholder, options, className }: FilterComboboxProps) {
+  const [open, setOpen] = useState(false);
+  const selectedLabel = options.find((o) => o.value === value)?.label;
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className={cn("h-9 justify-between font-normal", className)}
+        >
+          <span className="truncate">{selectedLabel && value !== "" ? selectedLabel : placeholder}</span>
+          <ChevronsUpDown className="ml-1 h-3.5 w-3.5 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="p-0 w-52" align="start">
+        <Command>
+          <CommandInput placeholder={searchPlaceholder} />
+          <CommandList>
+            <CommandEmpty>Nenhum resultado</CommandEmpty>
+            <CommandGroup>
+              {options.map((opt) => (
+                <CommandItem
+                  key={opt.value}
+                  value={opt.label}
+                  onSelect={() => {
+                    onValueChange(opt.value === value ? "" : opt.value);
+                    setOpen(false);
+                  }}
+                >
+                  <Check className={cn("mr-2 h-4 w-4", value === opt.value ? "opacity-100" : "opacity-0")} />
+                  {opt.label}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 const DemandsPage = () => {
   const { clients } = useClient();
@@ -132,30 +187,48 @@ const DemandsPage = () => {
           onChange={(e) => setSearch(e.target.value)}
           className="h-9 w-56"
         />
-        <Select value={filterClient} onValueChange={setFilterClient}>
-          <SelectTrigger className="h-9 w-44"><SelectValue placeholder="Cliente" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
-            {clients.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <Select value={filterType} onValueChange={setFilterType}>
-          <SelectTrigger className="h-9 w-40"><SelectValue placeholder="Tipo" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
-            {types.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <Select value={filterPriority} onValueChange={setFilterPriority}>
-          <SelectTrigger className="h-9 w-36"><SelectValue placeholder="Prioridade" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todas</SelectItem>
-            <SelectItem value="urgent">Urgente</SelectItem>
-            <SelectItem value="high">Alta</SelectItem>
-            <SelectItem value="medium">Média</SelectItem>
-            <SelectItem value="low">Baixa</SelectItem>
-          </SelectContent>
-        </Select>
+
+        {/* Client combobox */}
+        <FilterCombobox
+          value={filterClient}
+          onValueChange={setFilterClient}
+          placeholder="Cliente"
+          searchPlaceholder="Buscar cliente..."
+          options={[
+            { value: "all", label: "Todos" },
+            ...clients.map((c) => ({ value: c.id, label: c.name })),
+          ]}
+          className="w-44"
+        />
+
+        {/* Type combobox */}
+        <FilterCombobox
+          value={filterType}
+          onValueChange={setFilterType}
+          placeholder="Tipo"
+          searchPlaceholder="Buscar tipo..."
+          options={[
+            { value: "all", label: "Todos" },
+            ...types.map((t) => ({ value: t.id, label: t.name })),
+          ]}
+          className="w-40"
+        />
+
+        {/* Priority combobox */}
+        <FilterCombobox
+          value={filterPriority}
+          onValueChange={setFilterPriority}
+          placeholder="Prioridade"
+          searchPlaceholder="Buscar prioridade..."
+          options={[
+            { value: "all", label: "Todas" },
+            { value: "urgent", label: "Urgente" },
+            { value: "high", label: "Alta" },
+            { value: "medium", label: "Média" },
+            { value: "low", label: "Baixa" },
+          ]}
+          className="w-36"
+        />
       </div>
 
       {/* Kanban Board */}
