@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from "react";
 import {
-  DndContext, closestCorner, PointerSensor, useSensor, useSensors,
+  DndContext, closestCorners, PointerSensor, useSensor, useSensors,
   type DragEndEvent,
 } from "@dnd-kit/core";
 import { Button } from "@/components/ui/button";
