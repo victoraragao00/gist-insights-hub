@@ -27,6 +27,7 @@ import { GistContactWizard } from "@/components/GistContactWizard";
 import { useAuth } from "@/context/AuthContext";
 import { useClient, type SyncJobRecord } from "@/context/ClientContext";
 import { useUserRole } from "@/hooks/useUserRole";
+import { ColumnSettingsTab } from "@/components/demands/ColumnSettingsTab";
 
 // ── Types ──────────────────────────────────────────────
 
