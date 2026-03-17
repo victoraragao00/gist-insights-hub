@@ -621,6 +621,7 @@ const SettingsPage = () => {
           <TabsTrigger value="sync">Sincronização</TabsTrigger>
           <TabsTrigger value="uploads">Uploads</TabsTrigger>
           {isAdmin && <TabsTrigger value="priorities">Prioridades</TabsTrigger>}
+          {isAdmin && <TabsTrigger value="columns">Colunas</TabsTrigger>}
         </TabsList>
 
         {isAdmin && (
