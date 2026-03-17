@@ -1085,6 +1085,13 @@ const SettingsPage = () => {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* ── Columns Tab ── */}
+        {isAdmin && (
+          <TabsContent value="columns">
+            <ColumnSettingsTab />
+          </TabsContent>
+        )}
       </Tabs>
 
       {/* ── Contact Wizard ── */}
