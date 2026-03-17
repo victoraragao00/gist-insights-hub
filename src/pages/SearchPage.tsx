@@ -56,9 +56,8 @@ const SearchPage = () => {
     setPage(0);
   }, [debouncedQuery]);
 
-  useEffect(() => {
-    if (clientSearchError) toast.error("Erro ao buscar clientes");
-  }, [clientSearchError]);
+
+
 
   const { data: results = [], isLoading, isError, refetch } = useSearchInteractions({
     query: debouncedQuery,
