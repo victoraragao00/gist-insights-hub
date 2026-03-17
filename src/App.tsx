@@ -10,6 +10,7 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import Index from "./pages/Index";
 import ClientsPage from "./pages/ClientsPage";
 import ClientDetailPage from "./pages/ClientDetailPage";
+import DemandsPage from "./pages/DemandsPage";
 import SearchPage from "./pages/SearchPage";
 import Audits from "./pages/Audits";
 import SettingsPage from "./pages/SettingsPage";
