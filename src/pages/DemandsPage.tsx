@@ -20,6 +20,61 @@ import { KanbanColumn } from "@/components/demands/KanbanColumn";
 import { DemandDetailSheet } from "@/components/demands/DemandDetailSheet";
 import { CreateDemandDialog } from "@/components/demands/CreateDemandDialog";
 
+// ── Filter Combobox ──
+
+interface FilterComboboxProps {
+  value: string;
+  onValueChange: (value: string) => void;
+  placeholder: string;
+  searchPlaceholder: string;
+  options: { value: string; label: string }[];
+  className?: string;
+}
+
+function FilterCombobox({ value, onValueChange, placeholder, searchPlaceholder, options, className }: FilterComboboxProps) {
+  const [open, setOpen] = useState(false);
+  const selectedLabel = options.find((o) => o.value === value)?.label;
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className={cn("h-9 justify-between font-normal", className)}
+        >
+          <span className="truncate">{selectedLabel && value !== "" ? selectedLabel : placeholder}</span>
+          <ChevronsUpDown className="ml-1 h-3.5 w-3.5 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="p-0 w-52" align="start">
+        <Command>
+          <CommandInput placeholder={searchPlaceholder} />
+          <CommandList>
+            <CommandEmpty>Nenhum resultado</CommandEmpty>
+            <CommandGroup>
+              {options.map((opt) => (
+                <CommandItem
+                  key={opt.value}
+                  value={opt.label}
+                  onSelect={() => {
+                    onValueChange(opt.value === value ? "" : opt.value);
+                    setOpen(false);
+                  }}
+                >
+                  <Check className={cn("mr-2 h-4 w-4", value === opt.value ? "opacity-100" : "opacity-0")} />
+                  {opt.label}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 const DemandsPage = () => {
   const { clients } = useClient();
   const { data: columns = [], isLoading: colsLoading } = useTicketColumns();
