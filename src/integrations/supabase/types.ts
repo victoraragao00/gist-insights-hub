@@ -254,6 +254,177 @@ export type Database = {
         }
         Relationships: []
       }
+      demand_activities: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          demand_id: string
+          description: string
+          event_type: Database["public"]["Enums"]["demand_event_type"]
+          from_value: string | null
+          id: string
+          to_value: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          demand_id: string
+          description: string
+          event_type: Database["public"]["Enums"]["demand_event_type"]
+          from_value?: string | null
+          id?: string
+          to_value?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          demand_id?: string
+          description?: string
+          event_type?: Database["public"]["Enums"]["demand_event_type"]
+          from_value?: string | null
+          id?: string
+          to_value?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "demand_activities_demand_id_fkey"
+            columns: ["demand_id"]
+            isOneToOne: false
+            referencedRelation: "demands"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      demand_types: {
+        Row: {
+          active: boolean | null
+          color: string | null
+          created_at: string | null
+          icon: string | null
+          id: string
+          name: string
+          position: number
+        }
+        Insert: {
+          active?: boolean | null
+          color?: string | null
+          created_at?: string | null
+          icon?: string | null
+          id?: string
+          name: string
+          position?: number
+        }
+        Update: {
+          active?: boolean | null
+          color?: string | null
+          created_at?: string | null
+          icon?: string | null
+          id?: string
+          name?: string
+          position?: number
+        }
+        Relationships: []
+      }
+      demands: {
+        Row: {
+          actual_effort: string | null
+          assignee: string | null
+          blocked_at: string | null
+          blocked_by: string | null
+          blocker_reason: string | null
+          cancellation_reason: string | null
+          client_id: string
+          column_id: string
+          created_at: string | null
+          created_by: string | null
+          demand_type_id: string
+          description: string | null
+          estimated_effort: string | null
+          expected_result: string | null
+          finished_at: string | null
+          id: string
+          is_blocked: boolean | null
+          last_updated: string | null
+          notes: string | null
+          position: number
+          priority: Database["public"]["Enums"]["demand_priority"]
+          started_at: string | null
+          title: string
+        }
+        Insert: {
+          actual_effort?: string | null
+          assignee?: string | null
+          blocked_at?: string | null
+          blocked_by?: string | null
+          blocker_reason?: string | null
+          cancellation_reason?: string | null
+          client_id: string
+          column_id: string
+          created_at?: string | null
+          created_by?: string | null
+          demand_type_id: string
+          description?: string | null
+          estimated_effort?: string | null
+          expected_result?: string | null
+          finished_at?: string | null
+          id?: string
+          is_blocked?: boolean | null
+          last_updated?: string | null
+          notes?: string | null
+          position?: number
+          priority?: Database["public"]["Enums"]["demand_priority"]
+          started_at?: string | null
+          title: string
+        }
+        Update: {
+          actual_effort?: string | null
+          assignee?: string | null
+          blocked_at?: string | null
+          blocked_by?: string | null
+          blocker_reason?: string | null
+          cancellation_reason?: string | null
+          client_id?: string
+          column_id?: string
+          created_at?: string | null
+          created_by?: string | null
+          demand_type_id?: string
+          description?: string | null
+          estimated_effort?: string | null
+          expected_result?: string | null
+          finished_at?: string | null
+          id?: string
+          is_blocked?: boolean | null
+          last_updated?: string | null
+          notes?: string | null
+          position?: number
+          priority?: Database["public"]["Enums"]["demand_priority"]
+          started_at?: string | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "demands_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "demands_column_id_fkey"
+            columns: ["column_id"]
+            isOneToOne: false
+            referencedRelation: "ticket_columns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "demands_demand_type_id_fkey"
+            columns: ["demand_type_id"]
+            isOneToOne: false
+            referencedRelation: "demand_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       interactions: {
         Row: {
           attachments: Json | null
@@ -495,6 +666,36 @@ export type Database = {
           },
         ]
       }
+      ticket_columns: {
+        Row: {
+          color: string | null
+          created_at: string | null
+          id: string
+          name: string
+          position: number
+          triggers_finished_at: boolean | null
+          triggers_started_at: boolean | null
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string | null
+          id?: string
+          name: string
+          position: number
+          triggers_finished_at?: boolean | null
+          triggers_started_at?: boolean | null
+        }
+        Update: {
+          color?: string | null
+          created_at?: string | null
+          id?: string
+          name?: string
+          position?: number
+          triggers_finished_at?: boolean | null
+          triggers_started_at?: boolean | null
+        }
+        Relationships: []
+      }
       user_client_access: {
         Row: {
           client_id: string
@@ -645,6 +846,16 @@ export type Database = {
         | "transcription_tactiq"
         | "manual"
       client_tier: "azzas" | "enterprise" | "medium" | "small"
+      demand_event_type:
+        | "created"
+        | "moved"
+        | "assigned"
+        | "blocked"
+        | "unblocked"
+        | "edited"
+        | "cancelled"
+        | "linked_interaction"
+      demand_priority: "low" | "medium" | "high" | "urgent"
       interaction_type: "text" | "audio" | "image" | "file" | "system"
       job_status: "pending" | "running" | "completed" | "failed" | "cancelled"
       job_type:
@@ -791,6 +1002,17 @@ export const Constants = {
         "manual",
       ],
       client_tier: ["azzas", "enterprise", "medium", "small"],
+      demand_event_type: [
+        "created",
+        "moved",
+        "assigned",
+        "blocked",
+        "unblocked",
+        "edited",
+        "cancelled",
+        "linked_interaction",
+      ],
+      demand_priority: ["low", "medium", "high", "urgent"],
       interaction_type: ["text", "audio", "image", "file", "system"],
       job_status: ["pending", "running", "completed", "failed", "cancelled"],
       job_type: [
