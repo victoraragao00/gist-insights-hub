@@ -27,6 +27,7 @@ import { GistContactWizard } from "@/components/GistContactWizard";
 import { useAuth } from "@/context/AuthContext";
 import { useClient, type SyncJobRecord } from "@/context/ClientContext";
 import { useUserRole } from "@/hooks/useUserRole";
+import { ColumnSettingsTab } from "@/components/demands/ColumnSettingsTab";
 
 // ── Types ──────────────────────────────────────────────
 
@@ -620,6 +621,7 @@ const SettingsPage = () => {
           <TabsTrigger value="sync">Sincronização</TabsTrigger>
           <TabsTrigger value="uploads">Uploads</TabsTrigger>
           {isAdmin && <TabsTrigger value="priorities">Prioridades</TabsTrigger>}
+          {isAdmin && <TabsTrigger value="columns">Colunas</TabsTrigger>}
         </TabsList>
 
         {isAdmin && (
@@ -1083,6 +1085,13 @@ const SettingsPage = () => {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* ── Columns Tab ── */}
+        {isAdmin && (
+          <TabsContent value="columns">
+            <ColumnSettingsTab />
+          </TabsContent>
+        )}
       </Tabs>
 
       {/* ── Contact Wizard ── */}
