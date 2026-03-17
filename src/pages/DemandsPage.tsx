@@ -132,30 +132,48 @@ const DemandsPage = () => {
           onChange={(e) => setSearch(e.target.value)}
           className="h-9 w-56"
         />
-        <Select value={filterClient} onValueChange={setFilterClient}>
-          <SelectTrigger className="h-9 w-44"><SelectValue placeholder="Cliente" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
-            {clients.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <Select value={filterType} onValueChange={setFilterType}>
-          <SelectTrigger className="h-9 w-40"><SelectValue placeholder="Tipo" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
-            {types.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <Select value={filterPriority} onValueChange={setFilterPriority}>
-          <SelectTrigger className="h-9 w-36"><SelectValue placeholder="Prioridade" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todas</SelectItem>
-            <SelectItem value="urgent">Urgente</SelectItem>
-            <SelectItem value="high">Alta</SelectItem>
-            <SelectItem value="medium">Média</SelectItem>
-            <SelectItem value="low">Baixa</SelectItem>
-          </SelectContent>
-        </Select>
+
+        {/* Client combobox */}
+        <FilterCombobox
+          value={filterClient}
+          onValueChange={setFilterClient}
+          placeholder="Cliente"
+          searchPlaceholder="Buscar cliente..."
+          options={[
+            { value: "all", label: "Todos" },
+            ...clients.map((c) => ({ value: c.id, label: c.name })),
+          ]}
+          className="w-44"
+        />
+
+        {/* Type combobox */}
+        <FilterCombobox
+          value={filterType}
+          onValueChange={setFilterType}
+          placeholder="Tipo"
+          searchPlaceholder="Buscar tipo..."
+          options={[
+            { value: "all", label: "Todos" },
+            ...types.map((t) => ({ value: t.id, label: t.name })),
+          ]}
+          className="w-40"
+        />
+
+        {/* Priority combobox */}
+        <FilterCombobox
+          value={filterPriority}
+          onValueChange={setFilterPriority}
+          placeholder="Prioridade"
+          searchPlaceholder="Buscar prioridade..."
+          options={[
+            { value: "all", label: "Todas" },
+            { value: "urgent", label: "Urgente" },
+            { value: "high", label: "Alta" },
+            { value: "medium", label: "Média" },
+            { value: "low", label: "Baixa" },
+          ]}
+          className="w-36"
+        />
       </div>
 
       {/* Kanban Board */}
