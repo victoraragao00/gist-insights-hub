@@ -88,6 +88,7 @@ const DemandsPage = () => {
   const [filterClient, setFilterClient] = useState<string>("");
   const [filterType, setFilterType] = useState<string>("");
   const [filterPriority, setFilterPriority] = useState<string>("");
+  const [filterArea, setFilterArea] = useState<string>("");
 
   const filters: DemandFilters = useMemo(() => ({
     search: debouncedSearch.length >= 3 ? debouncedSearch : undefined,
