@@ -295,6 +295,33 @@ export type Database = {
           },
         ]
       }
+      demand_areas: {
+        Row: {
+          active: boolean | null
+          color: string | null
+          created_at: string | null
+          id: string
+          name: string
+          position: number
+        }
+        Insert: {
+          active?: boolean | null
+          color?: string | null
+          created_at?: string | null
+          id?: string
+          name: string
+          position?: number
+        }
+        Update: {
+          active?: boolean | null
+          color?: string | null
+          created_at?: string | null
+          id?: string
+          name?: string
+          position?: number
+        }
+        Relationships: []
+      }
       demand_types: {
         Row: {
           active: boolean | null
