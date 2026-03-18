@@ -246,6 +246,7 @@ const DemandsPage = () => {
           ]}
           className="w-36"
         />
+      </div>
 
       {/* Kanban Board */}
       {isLoading ? (
