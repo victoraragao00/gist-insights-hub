@@ -15,6 +15,8 @@ export interface DemandRow extends Tables<"demands"> {
   clients?: { name: string } | null;
   demand_types?: { name: string; color: string | null; icon: string | null } | null;
   ticket_columns?: { name: string; color: string | null } | null;
+  demand_areas?: { name: string; color: string | null } | null;
+  demand_assignees?: { name: string } | null;
 }
 
 export interface DemandFilters {
@@ -22,6 +24,7 @@ export interface DemandFilters {
   column_id?: string;
   priority?: DemandPriority;
   demand_type_id?: string;
+  area_id?: string;
   search?: string;
 }
 
@@ -65,7 +68,7 @@ export function useDemands(filters?: DemandFilters) {
     queryFn: async () => {
       let query = supabase
         .from("demands")
-        .select("*, clients(name), demand_types(name, color, icon), ticket_columns(name, color)")
+        .select("*, clients(name), demand_types(name, color, icon), ticket_columns(name, color), demand_areas(name, color), demand_assignees(name)")
         .order("column_id")
         .order("position", { ascending: true })
         .limit(200);
@@ -74,6 +77,7 @@ export function useDemands(filters?: DemandFilters) {
       if (filters?.column_id) query = query.eq("column_id", filters.column_id);
       if (filters?.priority) query = query.eq("priority", filters.priority);
       if (filters?.demand_type_id) query = query.eq("demand_type_id", filters.demand_type_id);
+      if (filters?.area_id) query = query.eq("area_id", filters.area_id);
       if (filters?.search && filters.search.length >= 3) {
         query = query.ilike("title", `%${filters.search}%`);
       }
@@ -116,6 +120,9 @@ export function useCreateDemand() {
       demand_type_id: string;
       priority: DemandPriority;
       column_id: string;
+      area_id?: string;
+      assignee_id?: string;
+      rfi_url?: string;
       description?: string;
       expected_result?: string;
       assignee?: string;

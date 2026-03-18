@@ -16,6 +16,7 @@ import {
   useTicketColumns, useDemandTypes, useDemands, useMoveDemand,
   type DemandRow, type DemandPriority, type DemandFilters,
 } from "@/hooks/useDemands";
+import { useDemandAreas } from "@/hooks/useDemandAreas";
 import { KanbanColumn } from "@/components/demands/KanbanColumn";
 import { DemandDetailSheet } from "@/components/demands/DemandDetailSheet";
 import { CreateDemandDialog } from "@/components/demands/CreateDemandDialog";
@@ -79,6 +80,7 @@ const DemandsPage = () => {
   const { clients } = useClient();
   const { data: columns = [], isLoading: colsLoading } = useTicketColumns();
   const { data: types = [] } = useDemandTypes();
+  const { data: areas = [] } = useDemandAreas();
 
   // Filters
   const [search, setSearch] = useState("");
@@ -86,13 +88,15 @@ const DemandsPage = () => {
   const [filterClient, setFilterClient] = useState<string>("");
   const [filterType, setFilterType] = useState<string>("");
   const [filterPriority, setFilterPriority] = useState<string>("");
+  const [filterArea, setFilterArea] = useState<string>("");
 
   const filters: DemandFilters = useMemo(() => ({
     search: debouncedSearch.length >= 3 ? debouncedSearch : undefined,
     client_id: filterClient || undefined,
     demand_type_id: filterType || undefined,
     priority: (filterPriority as DemandPriority) || undefined,
-  }), [debouncedSearch, filterClient, filterType, filterPriority]);
+    area_id: filterArea || undefined,
+  }), [debouncedSearch, filterClient, filterType, filterPriority, filterArea]);
 
   const { data: demands = [], isLoading: demandsLoading } = useDemands(filters);
   const moveMutation = useMoveDemand();
@@ -226,6 +230,19 @@ const DemandsPage = () => {
             { value: "high", label: "Alta" },
             { value: "medium", label: "Média" },
             { value: "low", label: "Baixa" },
+          ]}
+          className="w-36"
+        />
+
+        {/* Area combobox */}
+        <FilterCombobox
+          value={filterArea}
+          onValueChange={setFilterArea}
+          placeholder="Área"
+          searchPlaceholder="Buscar área..."
+          options={[
+            { value: "all", label: "Todas" },
+            ...areas.map((a) => ({ value: a.id, label: a.name })),
           ]}
           className="w-36"
         />

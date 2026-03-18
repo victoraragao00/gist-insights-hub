@@ -295,6 +295,142 @@ export type Database = {
           },
         ]
       }
+      demand_areas: {
+        Row: {
+          active: boolean | null
+          color: string | null
+          created_at: string | null
+          id: string
+          name: string
+          position: number
+        }
+        Insert: {
+          active?: boolean | null
+          color?: string | null
+          created_at?: string | null
+          id?: string
+          name: string
+          position?: number
+        }
+        Update: {
+          active?: boolean | null
+          color?: string | null
+          created_at?: string | null
+          id?: string
+          name?: string
+          position?: number
+        }
+        Relationships: []
+      }
+      demand_assignees: {
+        Row: {
+          active: boolean | null
+          created_at: string | null
+          email: string | null
+          id: string
+          name: string
+          role: string | null
+        }
+        Insert: {
+          active?: boolean | null
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          name: string
+          role?: string | null
+        }
+        Update: {
+          active?: boolean | null
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          name?: string
+          role?: string | null
+        }
+        Relationships: []
+      }
+      demand_attachments: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          demand_id: string
+          filename: string | null
+          id: string
+          mime_type: string | null
+          size_bytes: number | null
+          type: string
+          url: string
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          demand_id: string
+          filename?: string | null
+          id?: string
+          mime_type?: string | null
+          size_bytes?: number | null
+          type: string
+          url: string
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          demand_id?: string
+          filename?: string | null
+          id?: string
+          mime_type?: string | null
+          size_bytes?: number | null
+          type?: string
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "demand_attachments_demand_id_fkey"
+            columns: ["demand_id"]
+            isOneToOne: false
+            referencedRelation: "demands"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      demand_notifications: {
+        Row: {
+          created_at: string | null
+          demand_id: string | null
+          id: string
+          message: string
+          read: boolean | null
+          type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          demand_id?: string | null
+          id?: string
+          message: string
+          read?: boolean | null
+          type: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          demand_id?: string | null
+          id?: string
+          message?: string
+          read?: boolean | null
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "demand_notifications_demand_id_fkey"
+            columns: ["demand_id"]
+            isOneToOne: false
+            referencedRelation: "demands"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       demand_types: {
         Row: {
           active: boolean | null
@@ -328,7 +464,9 @@ export type Database = {
       demands: {
         Row: {
           actual_effort: string | null
+          area_id: string | null
           assignee: string | null
+          assignee_id: string | null
           blocked_at: string | null
           blocked_by: string | null
           blocker_reason: string | null
@@ -348,12 +486,15 @@ export type Database = {
           notes: string | null
           position: number
           priority: Database["public"]["Enums"]["demand_priority"]
+          rfi_url: string | null
           started_at: string | null
           title: string
         }
         Insert: {
           actual_effort?: string | null
+          area_id?: string | null
           assignee?: string | null
+          assignee_id?: string | null
           blocked_at?: string | null
           blocked_by?: string | null
           blocker_reason?: string | null
@@ -373,12 +514,15 @@ export type Database = {
           notes?: string | null
           position?: number
           priority?: Database["public"]["Enums"]["demand_priority"]
+          rfi_url?: string | null
           started_at?: string | null
           title: string
         }
         Update: {
           actual_effort?: string | null
+          area_id?: string | null
           assignee?: string | null
+          assignee_id?: string | null
           blocked_at?: string | null
           blocked_by?: string | null
           blocker_reason?: string | null
@@ -398,10 +542,25 @@ export type Database = {
           notes?: string | null
           position?: number
           priority?: Database["public"]["Enums"]["demand_priority"]
+          rfi_url?: string | null
           started_at?: string | null
           title?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "demands_area_id_fkey"
+            columns: ["area_id"]
+            isOneToOne: false
+            referencedRelation: "demand_areas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "demands_assignee_id_fkey"
+            columns: ["assignee_id"]
+            isOneToOne: false
+            referencedRelation: "demand_assignees"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "demands_client_id_fkey"
             columns: ["client_id"]

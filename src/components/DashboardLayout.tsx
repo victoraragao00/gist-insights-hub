@@ -5,6 +5,7 @@ import { useClient } from "@/context/ClientContext";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { X, Loader2 } from "lucide-react";
+import { NotificationBell } from "@/components/NotificationBell";
 
 function SyncProgressBar() {
   const { syncState, cancelSync } = useClient();
@@ -51,6 +52,7 @@ export function DashboardLayout() {
           <header className="h-14 flex items-center border-b px-4 bg-card">
             <SidebarTrigger className="mr-4" />
             <div className="flex-1" />
+            <NotificationBell />
           </header>
           <SyncProgressBar />
           <main className="flex-1 p-4 md:p-6 overflow-auto">
