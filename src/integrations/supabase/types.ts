@@ -349,6 +349,88 @@ export type Database = {
         }
         Relationships: []
       }
+      demand_attachments: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          demand_id: string
+          filename: string | null
+          id: string
+          mime_type: string | null
+          size_bytes: number | null
+          type: string
+          url: string
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          demand_id: string
+          filename?: string | null
+          id?: string
+          mime_type?: string | null
+          size_bytes?: number | null
+          type: string
+          url: string
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          demand_id?: string
+          filename?: string | null
+          id?: string
+          mime_type?: string | null
+          size_bytes?: number | null
+          type?: string
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "demand_attachments_demand_id_fkey"
+            columns: ["demand_id"]
+            isOneToOne: false
+            referencedRelation: "demands"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      demand_notifications: {
+        Row: {
+          created_at: string | null
+          demand_id: string | null
+          id: string
+          message: string
+          read: boolean | null
+          type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          demand_id?: string | null
+          id?: string
+          message: string
+          read?: boolean | null
+          type: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          demand_id?: string | null
+          id?: string
+          message?: string
+          read?: boolean | null
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "demand_notifications_demand_id_fkey"
+            columns: ["demand_id"]
+            isOneToOne: false
+            referencedRelation: "demands"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       demand_types: {
         Row: {
           active: boolean | null
