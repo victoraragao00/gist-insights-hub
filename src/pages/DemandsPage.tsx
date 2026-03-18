@@ -16,6 +16,7 @@ import {
   useTicketColumns, useDemandTypes, useDemands, useMoveDemand,
   type DemandRow, type DemandPriority, type DemandFilters,
 } from "@/hooks/useDemands";
+import { useDemandAreas } from "@/hooks/useDemandAreas";
 import { KanbanColumn } from "@/components/demands/KanbanColumn";
 import { DemandDetailSheet } from "@/components/demands/DemandDetailSheet";
 import { CreateDemandDialog } from "@/components/demands/CreateDemandDialog";

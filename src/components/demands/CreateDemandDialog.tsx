@@ -11,6 +11,8 @@ import {
 } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
 import { useCreateDemand, useTicketColumns, useDemandTypes, type DemandPriority } from "@/hooks/useDemands";
+import { useDemandAreas } from "@/hooks/useDemandAreas";
+import { useDemandAssignees } from "@/hooks/useDemandAssignees";
 import { useClient } from "@/context/ClientContext";
 
 interface CreateDemandDialogProps {
@@ -23,22 +25,25 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId }: Crea
   const { clients } = useClient();
   const { data: columns = [] } = useTicketColumns();
   const { data: types = [] } = useDemandTypes();
+  const { data: areas = [] } = useDemandAreas();
+  const { data: assignees = [] } = useDemandAssignees();
   const createMutation = useCreateDemand();
 
   const [title, setTitle] = useState("");
   const [clientId, setClientId] = useState("");
   const [typeId, setTypeId] = useState("");
+  const [areaId, setAreaId] = useState("");
+  const [assigneeId, setAssigneeId] = useState("");
   const [priority, setPriority] = useState<DemandPriority>("medium");
   const [columnId, setColumnId] = useState(defaultColumnId ?? "");
   const [description, setDescription] = useState("");
   const [expectedResult, setExpectedResult] = useState("");
-  const [assignee, setAssignee] = useState("");
+  const [rfiUrl, setRfiUrl] = useState("");
   const [notes, setNotes] = useState("");
 
-  // Set default column when columns load
   const effectiveColumnId = columnId || columns[0]?.id || "";
 
-  const canSubmit = title.trim().length > 0 && clientId && typeId;
+  const canSubmit = title.trim().length > 0 && clientId && typeId && areaId;
 
   const handleSubmit = () => {
     if (!canSubmit) return;
@@ -49,9 +54,11 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId }: Crea
         demand_type_id: typeId,
         priority,
         column_id: effectiveColumnId,
+        area_id: areaId || undefined,
+        assignee_id: assigneeId || undefined,
+        rfi_url: rfiUrl || undefined,
         description: description || undefined,
         expected_result: expectedResult || undefined,
-        assignee: assignee || undefined,
         notes: notes || undefined,
       },
       {
@@ -67,11 +74,13 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId }: Crea
     setTitle("");
     setClientId("");
     setTypeId("");
+    setAreaId("");
+    setAssigneeId("");
     setPriority("medium");
     setColumnId(defaultColumnId ?? "");
     setDescription("");
     setExpectedResult("");
-    setAssignee("");
+    setRfiUrl("");
     setNotes("");
   };
 
@@ -115,6 +124,37 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId }: Crea
             </div>
           </div>
 
+          {/* Area + Assignee */}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label>Área Responsável *</Label>
+              <Select value={areaId} onValueChange={setAreaId}>
+                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectContent>
+                  {areas.map((a) => (
+                    <SelectItem key={a.id} value={a.id}>
+                      <span className="flex items-center gap-2">
+                        {a.color && <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: a.color }} />}
+                        {a.name}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Responsável</Label>
+              <Select value={assigneeId} onValueChange={setAssigneeId}>
+                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectContent>
+                  {assignees.map((a) => (
+                    <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
           {/* Priority + Column */}
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
@@ -142,6 +182,12 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId }: Crea
             </div>
           </div>
 
+          {/* RFI URL */}
+          <div className="space-y-1.5">
+            <Label>RFI Vinculado</Label>
+            <Input value={rfiUrl} onChange={(e) => setRfiUrl(e.target.value)} type="url" placeholder="https://..." />
+          </div>
+
           {/* Description */}
           <div className="space-y-1.5">
             <Label>Descrição</Label>
@@ -154,16 +200,10 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId }: Crea
             <Textarea value={expectedResult} onChange={(e) => setExpectedResult(e.target.value)} rows={2} />
           </div>
 
-          {/* Assignee + Notes */}
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label>Responsável</Label>
-              <Input value={assignee} onChange={(e) => setAssignee(e.target.value)} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Notas</Label>
-              <Input value={notes} onChange={(e) => setNotes(e.target.value)} />
-            </div>
+          {/* Notes */}
+          <div className="space-y-1.5">
+            <Label>Notas</Label>
+            <Input value={notes} onChange={(e) => setNotes(e.target.value)} />
           </div>
         </div>
 

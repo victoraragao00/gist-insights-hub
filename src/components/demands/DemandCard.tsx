@@ -86,6 +86,20 @@ export function DemandCard({ demand, onClick }: DemandCardProps) {
           </Badge>
         )}
 
+        {/* Area badge */}
+        {demand.demand_areas && (
+          <Badge
+            variant="outline"
+            className="text-xs"
+            style={{
+              borderColor: demand.demand_areas.color ?? undefined,
+              color: demand.demand_areas.color ?? undefined,
+            }}
+          >
+            {demand.demand_areas.name}
+          </Badge>
+        )}
+
         {/* Priority badge */}
         <Badge className={cn("text-xs border-0", PRIORITY_CLASSES[demand.priority])}>
           {PRIORITY_LABELS[demand.priority]}
@@ -110,8 +124,8 @@ export function DemandCard({ demand, onClick }: DemandCardProps) {
         )}
       </div>
 
-      {demand.assignee && (
-        <p className="text-xs text-muted-foreground mt-1 truncate">→ {demand.assignee}</p>
+      {demand.demand_assignees?.name && (
+        <p className="text-xs text-muted-foreground mt-1 truncate">→ {demand.demand_assignees.name}</p>
       )}
     </div>
   );
