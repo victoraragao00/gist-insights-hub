@@ -233,7 +233,19 @@ const DemandsPage = () => {
           ]}
           className="w-36"
         />
-      </div>
+
+        {/* Area combobox */}
+        <FilterCombobox
+          value={filterArea}
+          onValueChange={setFilterArea}
+          placeholder="Área"
+          searchPlaceholder="Buscar área..."
+          options={[
+            { value: "all", label: "Todas" },
+            ...areas.map((a) => ({ value: a.id, label: a.name })),
+          ]}
+          className="w-36"
+        />
 
       {/* Kanban Board */}
       {isLoading ? (
