@@ -1096,6 +1096,18 @@ const SettingsPage = () => {
             <ColumnSettingsTab />
           </TabsContent>
         )}
+
+        {isAdmin && (
+          <TabsContent value="areas">
+            <AreaSettingsTab />
+          </TabsContent>
+        )}
+
+        {isAdmin && (
+          <TabsContent value="assignees">
+            <AssigneeSettingsTab />
+          </TabsContent>
+        )}
       </Tabs>
 
       {/* ── Contact Wizard ── */}
