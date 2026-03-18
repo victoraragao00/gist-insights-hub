@@ -5,6 +5,7 @@ import { useClient } from "@/context/ClientContext";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { X, Loader2 } from "lucide-react";
+import { NotificationBell } from "@/components/NotificationBell";
 
 function SyncProgressBar() {
   const { syncState, cancelSync } = useClient();
