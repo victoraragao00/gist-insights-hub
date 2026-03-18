@@ -95,7 +95,8 @@ const DemandsPage = () => {
     client_id: filterClient || undefined,
     demand_type_id: filterType || undefined,
     priority: (filterPriority as DemandPriority) || undefined,
-  }), [debouncedSearch, filterClient, filterType, filterPriority]);
+    area_id: filterArea || undefined,
+  }), [debouncedSearch, filterClient, filterType, filterPriority, filterArea]);
 
   const { data: demands = [], isLoading: demandsLoading } = useDemands(filters);
   const moveMutation = useMoveDemand();
