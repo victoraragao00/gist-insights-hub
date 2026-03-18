@@ -322,6 +322,33 @@ export type Database = {
         }
         Relationships: []
       }
+      demand_assignees: {
+        Row: {
+          active: boolean | null
+          created_at: string | null
+          email: string | null
+          id: string
+          name: string
+          role: string | null
+        }
+        Insert: {
+          active?: boolean | null
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          name: string
+          role?: string | null
+        }
+        Update: {
+          active?: boolean | null
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          name?: string
+          role?: string | null
+        }
+        Relationships: []
+      }
       demand_types: {
         Row: {
           active: boolean | null
@@ -355,7 +382,9 @@ export type Database = {
       demands: {
         Row: {
           actual_effort: string | null
+          area_id: string | null
           assignee: string | null
+          assignee_id: string | null
           blocked_at: string | null
           blocked_by: string | null
           blocker_reason: string | null
@@ -375,12 +404,15 @@ export type Database = {
           notes: string | null
           position: number
           priority: Database["public"]["Enums"]["demand_priority"]
+          rfi_url: string | null
           started_at: string | null
           title: string
         }
         Insert: {
           actual_effort?: string | null
+          area_id?: string | null
           assignee?: string | null
+          assignee_id?: string | null
           blocked_at?: string | null
           blocked_by?: string | null
           blocker_reason?: string | null
@@ -400,12 +432,15 @@ export type Database = {
           notes?: string | null
           position?: number
           priority?: Database["public"]["Enums"]["demand_priority"]
+          rfi_url?: string | null
           started_at?: string | null
           title: string
         }
         Update: {
           actual_effort?: string | null
+          area_id?: string | null
           assignee?: string | null
+          assignee_id?: string | null
           blocked_at?: string | null
           blocked_by?: string | null
           blocker_reason?: string | null
@@ -425,10 +460,25 @@ export type Database = {
           notes?: string | null
           position?: number
           priority?: Database["public"]["Enums"]["demand_priority"]
+          rfi_url?: string | null
           started_at?: string | null
           title?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "demands_area_id_fkey"
+            columns: ["area_id"]
+            isOneToOne: false
+            referencedRelation: "demand_areas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "demands_assignee_id_fkey"
+            columns: ["assignee_id"]
+            isOneToOne: false
+            referencedRelation: "demand_assignees"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "demands_client_id_fkey"
             columns: ["client_id"]
