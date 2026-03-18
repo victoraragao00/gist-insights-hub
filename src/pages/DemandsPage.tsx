@@ -80,6 +80,7 @@ const DemandsPage = () => {
   const { clients } = useClient();
   const { data: columns = [], isLoading: colsLoading } = useTicketColumns();
   const { data: types = [] } = useDemandTypes();
+  const { data: areas = [] } = useDemandAreas();
 
   // Filters
   const [search, setSearch] = useState("");
