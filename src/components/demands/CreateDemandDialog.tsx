@@ -19,9 +19,10 @@ interface CreateDemandDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   defaultColumnId?: string;
+  defaultClientId?: string;
 }
 
-export function CreateDemandDialog({ open, onOpenChange, defaultColumnId }: CreateDemandDialogProps) {
+export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaultClientId }: CreateDemandDialogProps) {
   const { clients } = useClient();
   const { data: columns = [] } = useTicketColumns();
   const { data: types = [] } = useDemandTypes();
@@ -30,7 +31,7 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId }: Crea
   const createMutation = useCreateDemand();
 
   const [title, setTitle] = useState("");
-  const [clientId, setClientId] = useState("");
+  const [clientId, setClientId] = useState(defaultClientId ?? "");
   const [typeId, setTypeId] = useState("");
   const [areaId, setAreaId] = useState("");
   const [assigneeId, setAssigneeId] = useState("");
@@ -72,7 +73,7 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId }: Crea
 
   const resetForm = () => {
     setTitle("");
-    setClientId("");
+    setClientId(defaultClientId ?? "");
     setTypeId("");
     setAreaId("");
     setAssigneeId("");

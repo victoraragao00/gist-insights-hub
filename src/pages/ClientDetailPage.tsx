@@ -24,7 +24,7 @@ import {
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ChevronRight, Pencil, MoreHorizontal, Loader2, Upload, AlertCircle } from "lucide-react";
+import { ChevronRight, MoreHorizontal, Loader2, AlertCircle, Plus } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { InteractionsFeed } from "@/components/InteractionsFeed";
 import { supabase } from "@/integrations/supabase/client";
@@ -33,8 +33,12 @@ import { useAuth } from "@/context/AuthContext";
 import { useUserRole } from "@/hooks/useUserRole";
 import { usePriorityScores } from "@/hooks/usePriorityScores";
 import { useClientToneTrend } from "@/hooks/useClientToneTrend";
+import { useClientDemands } from "@/hooks/useClientDemands";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { ChartContainer } from "@/components/ui/chart";
+import { CreateDemandDialog } from "@/components/demands/CreateDemandDialog";
+import { DemandDetailSheet } from "@/components/demands/DemandDetailSheet";
+import type { DemandRow } from "@/hooks/useDemands";
 
 // ── Types ──
 
@@ -195,6 +199,9 @@ const ClientDetailPage = () => {
   const [editTier, setEditTier] = useState<string>("medium");
   const [pageInteractions, setPageInteractions] = useState(0);
   const [pageParticipants, setPageParticipants] = useState(0);
+  const [createDemandOpen, setCreateDemandOpen] = useState(false);
+  const [selectedDemand, setSelectedDemand] = useState<DemandRow | null>(null);
+  const [demandSheetOpen, setDemandSheetOpen] = useState(false);
 
   const thirtyDaysAgo = useMemo(
     () => new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(), []
@@ -315,6 +322,7 @@ const ClientDetailPage = () => {
   }, [client, scores]);
 
   const { data: toneTrend, isLoading: toneTrendLoading } = useClientToneTrend(clientId ?? undefined);
+  const { data: clientDemands = [], isLoading: loadingDemands } = useClientDemands(clientId);
   const toneTrendChartData = useMemo(
     () =>
       toneTrend?.map((d) => ({
@@ -584,8 +592,9 @@ const ClientDetailPage = () => {
 
       {/* Tabs */}
       <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="bg-muted/50">
+        <TabsList className="bg-muted/50 flex-wrap h-auto">
           <TabsTrigger value="overview">Visão Geral</TabsTrigger>
+          <TabsTrigger value="demands">Demandas ({clientDemands.length})</TabsTrigger>
           <TabsTrigger value="interactions">Interações</TabsTrigger>
           <TabsTrigger value="participants">Participantes ({participantsTotalCount})</TabsTrigger>
           <TabsTrigger value="channels">Canais ({bindings.length})</TabsTrigger>
@@ -767,6 +776,133 @@ const ClientDetailPage = () => {
               </div>
             </div>
           )}
+        </TabsContent>
+
+        {/* ── TAB: Demandas ── */}
+        <TabsContent value="demands" className="space-y-6">
+          {/* KPI Row */}
+          {loadingDemands ? (
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-24 rounded-xl" />)}
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <KPICard label="Total" value={String(clientDemands.length)} sub="demandas" />
+              <KPICard
+                label="Abertos"
+                value={String(clientDemands.filter((d) => !d.ticket_columns?.triggers_finished_at).length)}
+                sub="em andamento"
+              />
+              <KPICard
+                label="Concluídos"
+                value={String(clientDemands.filter((d) => d.ticket_columns?.triggers_finished_at).length)}
+                sub="finalizados"
+              />
+              <KPICard
+                label="Bloqueados"
+                value={String(clientDemands.filter((d) => d.is_blocked).length)}
+                sub="com bloqueio"
+              />
+            </div>
+          )}
+
+          {/* Header + button */}
+          <div className="flex items-center justify-between">
+            <h3 className="text-base font-semibold text-foreground">Últimas 20 demandas</h3>
+            <Button
+              size="sm"
+              onClick={() => setCreateDemandOpen(true)}
+            >
+              <Plus className="h-4 w-4 mr-1" /> Nova demanda
+            </Button>
+          </div>
+
+          {loadingDemands && (
+            <div className="space-y-2">
+              {[1, 2, 3].map((i) => <Skeleton key={i} className="h-14 rounded-lg" />)}
+            </div>
+          )}
+
+          {!loadingDemands && clientDemands.length === 0 && (
+            <div className="text-center py-12 text-muted-foreground text-sm">
+              Nenhuma demanda para este cliente
+            </div>
+          )}
+
+          {clientDemands.map((d) => {
+            const PRIORITY_BADGE: Record<string, string> = {
+              urgent: "bg-red-50 text-red-600 dark:bg-red-950 dark:text-red-400",
+              high: "bg-orange-50 text-orange-600 dark:bg-orange-950 dark:text-orange-400",
+              medium: "bg-yellow-50 text-yellow-600 dark:bg-yellow-950 dark:text-yellow-400",
+              low: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400",
+            };
+            const PRIORITY_LABEL: Record<string, string> = {
+              urgent: "Urgente", high: "Alta", medium: "Média", low: "Baixa",
+            };
+            return (
+              <button
+                key={d.id}
+                onClick={() => {
+                  setSelectedDemand(d as unknown as DemandRow);
+                  setDemandSheetOpen(true);
+                }}
+                className="w-full text-left rounded-lg border border-border p-3 hover:bg-accent transition-colors space-y-1.5"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <span className="text-sm font-medium truncate flex-1">{d.title}</span>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {d.is_blocked && (
+                      <Badge variant="outline" className="text-xs border-destructive/30 text-destructive">Bloqueado</Badge>
+                    )}
+                    <span className={`inline-flex items-center rounded-sm px-1.5 py-0.5 text-xs font-medium ${PRIORITY_BADGE[d.priority] ?? ""}`}>
+                      {PRIORITY_LABEL[d.priority] ?? d.priority}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {d.demand_types && (
+                    <Badge
+                      variant="outline"
+                      className="text-xs border-0"
+                      style={d.demand_types.color ? { backgroundColor: d.demand_types.color + "20", color: d.demand_types.color } : undefined}
+                    >
+                      {d.demand_types.icon && <span className="mr-1">{d.demand_types.icon}</span>}
+                      {d.demand_types.name}
+                    </Badge>
+                  )}
+                  {d.ticket_columns && (
+                    <Badge
+                      variant="outline"
+                      className="text-xs border-0"
+                      style={d.ticket_columns.color ? { backgroundColor: d.ticket_columns.color + "20", color: d.ticket_columns.color } : undefined}
+                    >
+                      {d.ticket_columns.name}
+                    </Badge>
+                  )}
+                  {d.demand_assignees && (
+                    <span className="text-xs text-muted-foreground">{d.demand_assignees.name}</span>
+                  )}
+                  {d.created_at && (
+                    <span className="text-xs text-muted-foreground ml-auto">
+                      {new Date(d.created_at).toLocaleDateString("pt-BR")}
+                    </span>
+                  )}
+                </div>
+              </button>
+            );
+          })}
+
+          <CreateDemandDialog
+            open={createDemandOpen}
+            onOpenChange={setCreateDemandOpen}
+            defaultClientId={clientId}
+          />
+
+          <DemandDetailSheet
+            demand={selectedDemand}
+            open={demandSheetOpen}
+            onOpenChange={setDemandSheetOpen}
+          />
         </TabsContent>
 
         {/* ── TAB: Interações ── */}

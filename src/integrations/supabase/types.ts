@@ -393,6 +393,83 @@ export type Database = {
           },
         ]
       }
+      demand_comments: {
+        Row: {
+          content: string
+          created_at: string | null
+          created_by: string | null
+          demand_id: string
+          edited: boolean | null
+          edited_at: string | null
+          id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string | null
+          created_by?: string | null
+          demand_id: string
+          edited?: boolean | null
+          edited_at?: string | null
+          id?: string
+        }
+        Update: {
+          content?: string
+          created_at?: string | null
+          created_by?: string | null
+          demand_id?: string
+          edited?: boolean | null
+          edited_at?: string | null
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "demand_comments_demand_id_fkey"
+            columns: ["demand_id"]
+            isOneToOne: false
+            referencedRelation: "demands"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      demand_interactions: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          demand_id: string
+          id: string
+          interaction_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          demand_id: string
+          id?: string
+          interaction_id: string
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          demand_id?: string
+          id?: string
+          interaction_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "demand_interactions_demand_id_fkey"
+            columns: ["demand_id"]
+            isOneToOne: false
+            referencedRelation: "demands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "demand_interactions_interaction_id_fkey"
+            columns: ["interaction_id"]
+            isOneToOne: false
+            referencedRelation: "interactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       demand_notifications: {
         Row: {
           created_at: string | null
@@ -956,6 +1033,17 @@ export type Database = {
         }[]
       }
       deactivate_stale_clients: { Args: { _days: number }; Returns: number }
+      get_client_conversations: {
+        Args: { p_client_id: string }
+        Returns: {
+          conversation_id: string
+          first_message_at: string
+          last_content: string
+          last_message_at: string
+          message_count: number
+          sender_side: string
+        }[]
+      }
       global_stats_30d: {
         Args: { p_user_id: string }
         Returns: {
@@ -1014,6 +1102,7 @@ export type Database = {
         | "edited"
         | "cancelled"
         | "linked_interaction"
+        | "commented"
       demand_priority: "low" | "medium" | "high" | "urgent"
       interaction_type: "text" | "audio" | "image" | "file" | "system"
       job_status: "pending" | "running" | "completed" | "failed" | "cancelled"
@@ -1170,6 +1259,7 @@ export const Constants = {
         "edited",
         "cancelled",
         "linked_interaction",
+        "commented",
       ],
       demand_priority: ["low", "medium", "high", "urgent"],
       interaction_type: ["text", "audio", "image", "file", "system"],
