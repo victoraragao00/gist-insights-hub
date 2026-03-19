@@ -82,6 +82,7 @@ const DemandsPage = () => {
   const { data: columns = [], isLoading: colsLoading } = useTicketColumns();
   const { data: types = [] } = useDemandTypes();
   const { data: areas = [] } = useDemandAreas();
+  const exportCSVMutation = useExportDemandsCSV();
 
   // Filters
   const [search, setSearch] = useState("");
