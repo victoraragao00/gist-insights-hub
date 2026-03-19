@@ -1099,18 +1099,6 @@ const SettingsPage = () => {
         )}
 
         {isAdmin && (
-          <TabsContent value="areas">
-            <AreaSettingsTab />
-          </TabsContent>
-        )}
-
-        {isAdmin && (
-          <TabsContent value="assignees">
-            <AssigneeSettingsTab />
-          </TabsContent>
-        )}
-
-        {isAdmin && (
           <TabsContent value="users">
             <UserManagementTab />
           </TabsContent>
