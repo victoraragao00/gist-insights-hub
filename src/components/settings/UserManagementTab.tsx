@@ -127,12 +127,6 @@ export function UserManagementTab() {
       toast.error(err instanceof Error ? err.message : "Erro ao convidar");
     },
   });
-  const toggleActive = useToggleUserActive();
-
-  const [search, setSearch] = useState("");
-  const debouncedSearch = useDebounce(search, 300);
-  const [permissionsUser, setPermissionsUser] = useState<UserWithPermissions | null>(null);
-  const [confirmDeactivate, setConfirmDeactivate] = useState<UserWithPermissions | null>(null);
 
   const filtered = useMemo(() => {
     if (!debouncedSearch) return users;
