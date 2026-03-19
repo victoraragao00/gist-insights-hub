@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/select";
 import {
   Plus, ArrowRightLeft, User, Lock, Unlock, Edit, Trash2, Loader2,
-  FileText, Link2, Upload, ExternalLink, X, MessageSquare,
+  FileText, Link2, Upload, ExternalLink, X, MessageSquare, Eye, EyeOff,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -42,8 +42,12 @@ import {
   useDemandComments, useCreateComment, useUpdateComment, useDeleteComment,
   type DemandComment,
 } from "@/hooks/useDemandComments";
+import { useDemandWatchers, useToggleWatcher } from "@/hooks/useDemandWatchers";
 import { LinkConversationDialog } from "./LinkConversationDialog";
 import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import type { Tables } from "@/integrations/supabase/types";
 
 const EVENT_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
