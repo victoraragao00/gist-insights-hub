@@ -13,3 +13,5 @@ project_id = "qyfwbmukylyfsgzgocfo"
     verify_jwt = false
   [functions.sync-gist-contacts]
     verify_jwt = false
+  [functions.bootstrap-user-access]
+    verify_jwt = false
