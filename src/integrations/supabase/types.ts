@@ -393,6 +393,41 @@ export type Database = {
           },
         ]
       }
+      demand_client_tokens: {
+        Row: {
+          active: boolean | null
+          client_id: string
+          created_at: string | null
+          created_by: string | null
+          id: string
+          token: string
+        }
+        Insert: {
+          active?: boolean | null
+          client_id: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          token?: string
+        }
+        Update: {
+          active?: boolean | null
+          client_id?: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "demand_client_tokens_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       demand_comments: {
         Row: {
           content: string
@@ -537,6 +572,35 @@ export type Database = {
           position?: number
         }
         Relationships: []
+      }
+      demand_watchers: {
+        Row: {
+          created_at: string | null
+          demand_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          demand_id: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          demand_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "demand_watchers_demand_id_fkey"
+            columns: ["demand_id"]
+            isOneToOne: false
+            referencedRelation: "demands"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       demands: {
         Row: {
@@ -1043,6 +1107,11 @@ export type Database = {
           message_count: number
           sender_side: string
         }[]
+      }
+      get_client_public_demands: { Args: { p_token: string }; Returns: Json }
+      get_demand_analytics: {
+        Args: { p_client_id?: string; p_days?: number }
+        Returns: Json
       }
       global_stats_30d: {
         Args: { p_user_id: string }

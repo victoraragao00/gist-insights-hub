@@ -15,3 +15,5 @@ project_id = "qyfwbmukylyfsgzgocfo"
     verify_jwt = false
   [functions.bootstrap-user-access]
     verify_jwt = false
+  [functions.client-demands-public]
+    verify_jwt = false

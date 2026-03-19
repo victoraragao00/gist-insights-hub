@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/select";
 import {
   Plus, ArrowRightLeft, User, Lock, Unlock, Edit, Trash2, Loader2,
-  FileText, Link2, Upload, ExternalLink, X, MessageSquare,
+  FileText, Link2, Upload, ExternalLink, X, MessageSquare, Eye, EyeOff,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -42,8 +42,12 @@ import {
   useDemandComments, useCreateComment, useUpdateComment, useDeleteComment,
   type DemandComment,
 } from "@/hooks/useDemandComments";
+import { useDemandWatchers, useToggleWatcher } from "@/hooks/useDemandWatchers";
 import { LinkConversationDialog } from "./LinkConversationDialog";
 import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import type { Tables } from "@/integrations/supabase/types";
 
 const EVENT_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -209,6 +213,7 @@ function CommentItem({
 
 function DemandDetailContent({ demand, onClose }: { demand: DemandRow; onClose: () => void }) {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const { data: columns = [] } = useTicketColumns();
   const { data: types = [] } = useDemandTypes();
   const { data: areas = [] } = useDemandAreas();
@@ -217,6 +222,8 @@ function DemandDetailContent({ demand, onClose }: { demand: DemandRow; onClose: 
   const { data: attachments = [] } = useDemandAttachments(demand.id);
   const { data: linkedInteractions = [] } = useDemandInteractions(demand.id);
   const { data: comments = [] } = useDemandComments(demand.id);
+  const { data: watchers = [] } = useDemandWatchers(demand.id);
+  const toggleWatcherMutation = useToggleWatcher(demand.id);
 
   const updateMutation = useUpdateDemand();
   const moveMutation = useMoveDemand();
@@ -236,6 +243,18 @@ function DemandDetailContent({ demand, onClose }: { demand: DemandRow; onClose: 
   const [rfiUrl, setRfiUrl] = useState(demand.rfi_url ?? "");
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [newLinkUrl, setNewLinkUrl] = useState("");
+  // Block dialog state
+  const [blockDialogOpen, setBlockDialogOpen] = useState(false);
+  const [blockerReason, setBlockerReason] = useState("");
+  const [blockedBy, setBlockedBy] = useState("");
+  const [blockLoading, setBlockLoading] = useState(false);
+  // Cancel dialog state
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelOther, setCancelOther] = useState("");
+  const [cancelLoading, setCancelLoading] = useState(false);
+
+  const isWatching = watchers.some((w) => w.user_id === user?.id);
   const [linkConvOpen, setLinkConvOpen] = useState(false);
   const [newComment, setNewComment] = useState("");
 
@@ -294,6 +313,85 @@ function DemandDetailContent({ demand, onClose }: { demand: DemandRow; onClose: 
       { demandId: demand.id, content: newComment.trim() },
       { onSuccess: () => setNewComment("") }
     );
+  };
+
+  const handleBlock = async () => {
+    if (!blockerReason.trim()) return;
+    setBlockLoading(true);
+    try {
+      const { error } = await supabase
+        .from("demands")
+        .update({ is_blocked: true, blocked_at: new Date().toISOString(), blocker_reason: blockerReason.trim(), blocked_by: blockedBy.trim() || null })
+        .eq("id", demand.id);
+      if (error) throw error;
+      await supabase.from("demand_activities").insert({
+        demand_id: demand.id,
+        event_type: "blocked",
+        description: `Bloqueado: ${blockerReason.trim()}`,
+        created_by: user?.id,
+      });
+      toast.success("Demanda marcada como bloqueada");
+      queryClient.invalidateQueries({ queryKey: ["demands"] });
+      queryClient.invalidateQueries({ queryKey: ["client_demands"] });
+      setBlockDialogOpen(false);
+      setBlockerReason("");
+      setBlockedBy("");
+    } catch (err) {
+      toast.error("Erro ao bloquear: " + (err instanceof Error ? err.message : "Erro"));
+    } finally {
+      setBlockLoading(false);
+    }
+  };
+
+  const handleUnblock = async () => {
+    try {
+      const { error } = await supabase
+        .from("demands")
+        .update({ is_blocked: false, blocked_at: null, blocker_reason: null, blocked_by: null })
+        .eq("id", demand.id);
+      if (error) throw error;
+      await supabase.from("demand_activities").insert({
+        demand_id: demand.id,
+        event_type: "unblocked",
+        description: "Desbloqueado",
+        created_by: user?.id,
+      });
+      toast.success("Demanda desbloqueada");
+      queryClient.invalidateQueries({ queryKey: ["demands"] });
+      queryClient.invalidateQueries({ queryKey: ["client_demands"] });
+    } catch (err) {
+      toast.error("Erro ao desbloquear: " + (err instanceof Error ? err.message : "Erro"));
+    }
+  };
+
+  const handleCancel = async () => {
+    const reason = cancelReason === "outro" ? cancelOther.trim() : cancelReason;
+    if (!reason) return;
+    setCancelLoading(true);
+    try {
+      // Find the "Cancelado" column
+      const cancelCol = columns.find((c) => c.name.toLowerCase().includes("cancelad"));
+      const { error } = await supabase
+        .from("demands")
+        .update({ cancellation_reason: reason, ...(cancelCol ? { column_id: cancelCol.id } : {}) })
+        .eq("id", demand.id);
+      if (error) throw error;
+      await supabase.from("demand_activities").insert({
+        demand_id: demand.id,
+        event_type: "cancelled",
+        description: `Cancelado: ${reason}`,
+        created_by: user?.id,
+      });
+      toast.success("Demanda cancelada");
+      queryClient.invalidateQueries({ queryKey: ["demands"] });
+      queryClient.invalidateQueries({ queryKey: ["client_demands"] });
+      setCancelDialogOpen(false);
+      onClose();
+    } catch (err) {
+      toast.error("Erro ao cancelar: " + (err instanceof Error ? err.message : "Erro"));
+    } finally {
+      setCancelLoading(false);
+    }
   };
 
   // Group linked interactions by conversation_id
@@ -696,6 +794,94 @@ function DemandDetailContent({ demand, onClose }: { demand: DemandRow; onClose: 
 
       <Separator />
 
+      {/* Bloqueio */}
+      <div className="space-y-2">
+        <Label className="text-xs text-muted-foreground">Bloqueio</Label>
+        {demand.is_blocked ? (
+          <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <Badge variant="outline" className="border-destructive/30 text-destructive text-xs">
+                <Lock className="h-3 w-3 mr-1" /> Bloqueado
+              </Badge>
+              <span className="text-xs text-muted-foreground">
+                {demand.blocked_at ? formatDistanceToNow(new Date(demand.blocked_at), { addSuffix: true, locale: ptBR }) : ""}
+              </span>
+            </div>
+            {demand.blocked_by && <p className="text-xs text-muted-foreground">Por: {demand.blocked_by}</p>}
+            {demand.blocker_reason && <p className="text-xs text-foreground">{demand.blocker_reason}</p>}
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" size="sm" className="h-7 text-xs"><Unlock className="h-3 w-3 mr-1" /> Desbloquear</Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Desbloquear demanda?</AlertDialogTitle>
+                  <AlertDialogDescription>O bloqueio será removido e os campos limpos.</AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleUnblock}>Desbloquear</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        ) : (
+          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setBlockDialogOpen(true)}>
+            <Lock className="h-3 w-3 mr-1" /> Marcar como bloqueado
+          </Button>
+        )}
+      </div>
+
+      {/* Block Dialog */}
+      <Dialog open={blockDialogOpen} onOpenChange={setBlockDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DlgTitle>Marcar como Bloqueado</DlgTitle></DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label className="text-xs">Motivo do bloqueio *</Label>
+              <Textarea value={blockerReason} onChange={(e) => setBlockerReason(e.target.value)} rows={3} placeholder="Descreva o bloqueio..." />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Bloqueado por</Label>
+              <Input value={blockedBy} onChange={(e) => setBlockedBy(e.target.value)} placeholder="Nome ou área" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBlockDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={handleBlock} disabled={!blockerReason.trim() || blockLoading}>
+              {blockLoading && <Loader2 className="h-4 w-4 animate-spin mr-1" />} Confirmar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Separator />
+
+      {/* Watchers */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Label className="text-xs text-muted-foreground">Observadores ({watchers.length})</Label>
+          <Button
+            variant="outline" size="sm" className="h-7 text-xs"
+            onClick={() => toggleWatcherMutation.mutate(isWatching)}
+            disabled={toggleWatcherMutation.isPending}
+          >
+            {isWatching ? <><EyeOff className="h-3 w-3 mr-1" /> Parar de observar</> : <><Eye className="h-3 w-3 mr-1" /> Observar</>}
+          </Button>
+        </div>
+        {watchers.length > 0 && (
+          <div className="flex gap-1 flex-wrap">
+            {watchers.map((w) => (
+              <div key={w.id} className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-medium" title={w.user_id}>
+                {w.user_id.slice(0, 1).toUpperCase()}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <Separator />
+
       {/* Timeline */}
       <div className="space-y-2">
         <Label className="text-xs text-muted-foreground">Atividades</Label>
@@ -722,33 +908,66 @@ function DemandDetailContent({ demand, onClose }: { demand: DemandRow; onClose: 
 
       <Separator />
 
-      {/* Delete */}
-      <AlertDialog>
-        <AlertDialogTrigger asChild>
-          <Button variant="destructive" size="sm" className="w-full">
-            <Trash2 className="h-4 w-4 mr-1" /> Excluir Demanda
-          </Button>
-        </AlertDialogTrigger>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Excluir demanda?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta ação é irreversível. A demanda e todas as atividades serão excluídas.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                deleteMutation.mutate(demand.id, { onSuccess: onClose });
-              }}
+      {/* Footer buttons: Cancel + Delete */}
+      <div className="flex gap-2">
+        <Button variant="outline" size="sm" className="flex-1" onClick={() => setCancelDialogOpen(true)}>
+          <X className="h-4 w-4 mr-1" /> Cancelar demanda
+        </Button>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button variant="destructive" size="sm" className="flex-1">
+              <Trash2 className="h-4 w-4 mr-1" /> Excluir
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Excluir demanda?</AlertDialogTitle>
+              <AlertDialogDescription>Esta ação é irreversível.</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={() => { deleteMutation.mutate(demand.id, { onSuccess: onClose }); }}>
+                {deleteMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />} Excluir
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+
+      {/* Cancel Dialog */}
+      <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DlgTitle>Cancelar Demanda</DlgTitle></DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label className="text-xs">Motivo *</Label>
+              <Select value={cancelReason} onValueChange={setCancelReason}>
+                <SelectTrigger><SelectValue placeholder="Selecione o motivo" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Cliente mudou de escopo">Cliente mudou de escopo</SelectItem>
+                  <SelectItem value="Duplicata de outra demanda">Duplicata de outra demanda</SelectItem>
+                  <SelectItem value="Sem resposta do cliente">Sem resposta do cliente</SelectItem>
+                  <SelectItem value="Revisão estratégica">Revisão estratégica</SelectItem>
+                  <SelectItem value="outro">Outro</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {cancelReason === "outro" && (
+              <Textarea value={cancelOther} onChange={(e) => setCancelOther(e.target.value)} placeholder="Descreva o motivo..." rows={3} />
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCancelDialogOpen(false)}>Voltar</Button>
+            <Button
+              variant="destructive"
+              onClick={handleCancel}
+              disabled={!cancelReason || (cancelReason === "outro" && !cancelOther.trim()) || cancelLoading}
             >
-              {deleteMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
-              Excluir
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+              {cancelLoading && <Loader2 className="h-4 w-4 animate-spin mr-1" />} Confirmar cancelamento
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

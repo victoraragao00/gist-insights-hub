@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, ChevronsUpDown, Check } from "lucide-react";
+import { Plus, ChevronsUpDown, Check, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useClient } from "@/context/ClientContext";
@@ -20,6 +20,7 @@ import { useDemandAreas } from "@/hooks/useDemandAreas";
 import { KanbanColumn } from "@/components/demands/KanbanColumn";
 import { DemandDetailSheet } from "@/components/demands/DemandDetailSheet";
 import { CreateDemandDialog } from "@/components/demands/CreateDemandDialog";
+import { useExportDemandsCSV } from "@/hooks/useExportDemandsCSV";
 
 // ── Filter Combobox ──
 
@@ -81,6 +82,7 @@ const DemandsPage = () => {
   const { data: columns = [], isLoading: colsLoading } = useTicketColumns();
   const { data: types = [] } = useDemandTypes();
   const { data: areas = [] } = useDemandAreas();
+  const exportCSVMutation = useExportDemandsCSV();
 
   // Filters
   const [search, setSearch] = useState("");
@@ -180,11 +182,21 @@ const DemandsPage = () => {
   return (
     <div className="p-6 space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <h1 className="text-2xl font-bold text-foreground">Demandas</h1>
-        <Button onClick={() => { setCreateColumnId(undefined); setCreateOpen(true); }}>
-          <Plus className="h-4 w-4 mr-1" /> Nova demanda
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => exportCSVMutation.mutate(filters)}
+            disabled={exportCSVMutation.isPending}
+          >
+            <Download className="h-4 w-4 mr-1" /> Exportar CSV
+          </Button>
+          <Button onClick={() => { setCreateColumnId(undefined); setCreateOpen(true); }}>
+            <Plus className="h-4 w-4 mr-1" /> Nova demanda
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
