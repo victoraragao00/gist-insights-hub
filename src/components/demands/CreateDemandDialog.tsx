@@ -73,7 +73,7 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaul
 
   const resetForm = () => {
     setTitle("");
-    setClientId("");
+    setClientId(defaultClientId ?? "");
     setTypeId("");
     setAreaId("");
     setAssigneeId("");
