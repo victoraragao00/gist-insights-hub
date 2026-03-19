@@ -1,9 +1,20 @@
 import { useState } from "react";
 import { useClient } from "@/context/ClientContext";
 import { useDemandAnalytics } from "@/hooks/useDemandAnalytics";
-import { KPICard } from "@/components/KPICard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+
+function DashKPICard({ label, value, sub }: { label: string; value: string; sub: string }) {
+  return (
+    <Card className="border border-border rounded-xl shadow-sm">
+      <CardContent className="p-4 space-y-1">
+        <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">{label}</p>
+        <p className="text-2xl font-bold text-foreground">{value}</p>
+        <p className="text-xs text-muted-foreground">{sub}</p>
+      </CardContent>
+    </Card>
+  );
+}
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
