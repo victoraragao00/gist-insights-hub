@@ -884,8 +884,8 @@ const ClientDetailPage = () => {
                       {d.ticket_columns.name}
                     </Badge>
                   )}
-                  {d.demand_assignees && (
-                    <span className="text-xs text-muted-foreground">{d.demand_assignees.name}</span>
+                  {d.user_profiles && (
+                    <span className="text-xs text-muted-foreground">{d.user_profiles.full_name ?? d.user_profiles.email}</span>
                   )}
                   {d.created_at && (
                     <span className="text-xs text-muted-foreground ml-auto">
