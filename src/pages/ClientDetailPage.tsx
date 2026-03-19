@@ -905,7 +905,10 @@ const ClientDetailPage = () => {
           <DemandDetailSheet
             demand={selectedDemand}
             open={demandSheetOpen}
-            onOpenChange={setDemandSheetOpen}
+            onOpenChange={(open) => {
+              setDemandSheetOpen(open);
+              if (!open) setSelectedDemandId(null);
+            }}
           />
         </TabsContent>
 
