@@ -43,7 +43,31 @@ Deno.serve(async (req) => {
     const userId = authData.user.id;
     const supaAdmin = createClient(supabaseUrl, serviceKey);
 
-    // Check if user already has any access rows
+    // ── STEP 1: Ensure user_profiles exists (BEFORE user_client_access check) ──
+    const { data: profile } = await supaAdmin
+      .from('user_profiles')
+      .select('id')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (!profile) {
+      const { data: authUser } = await supaAdmin.auth.admin.getUserById(userId);
+      const { error: profileInsertError } = await supaAdmin.from('user_profiles').insert({
+        id: userId,
+        email: authUser?.user?.email ?? null,
+        full_name: authUser?.user?.user_metadata?.full_name
+          ?? (authUser?.user?.email ? authUser.user.email.split('@')[0] : null),
+        global_role: 'viewer',
+        active: true,
+      });
+      if (profileInsertError) {
+        console.error('[bootstrap-user-access] Failed to create user_profiles:', profileInsertError.message);
+      } else {
+        console.log(`[bootstrap-user-access] Created user_profiles for ${userId}`);
+      }
+    }
+
+    // ── STEP 2: Check if user already has any access rows ──
     const { count, error: countError } = await supaAdmin
       .from('user_client_access')
       .select('id', { count: 'exact', head: true })
@@ -57,7 +81,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Get all active clients
+    // ── STEP 3: Get all active clients ──
     const { data: clients, error: clientsError } = await supaAdmin
       .from('clients')
       .select('id')
@@ -71,7 +95,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Insert viewer access for all active clients
+    // ── STEP 4: Insert viewer access for all active clients ──
     const rows = clients.map((c: { id: string }) => ({
       user_id: userId,
       client_id: c.id,
