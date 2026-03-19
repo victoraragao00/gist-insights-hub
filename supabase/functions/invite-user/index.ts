@@ -28,13 +28,31 @@ Deno.serve(async (req) => {
     const callerClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
     });
-    const { data: profile, error: profileErr } = await callerClient
+    const { data: { user: callerUser } } = await callerClient.auth.getUser();
+    if (!callerUser) {
+      return new Response(JSON.stringify({ error: "Não autorizado" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { data: profile } = await callerClient
       .from("user_profiles")
       .select("global_role")
-      .eq("id", (await callerClient.auth.getUser()).data.user?.id ?? "")
+      .eq("id", callerUser.id)
       .maybeSingle();
 
-    if (profileErr || profile?.global_role !== "admin") {
+    const { data: clientAccess } = await callerClient
+      .from("user_client_access")
+      .select("role")
+      .eq("user_id", callerUser.id)
+      .eq("role", "admin")
+      .limit(1)
+      .maybeSingle();
+
+    const isAdmin = profile?.global_role === "admin" || clientAccess?.role === "admin";
+
+    if (!isAdmin) {
       return new Response(JSON.stringify({ error: "Apenas administradores podem convidar usuários" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
