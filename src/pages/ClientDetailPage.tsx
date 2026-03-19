@@ -24,7 +24,7 @@ import {
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ChevronRight, MoreHorizontal, Loader2, AlertCircle, Plus } from "lucide-react";
+import { ChevronRight, MoreHorizontal, Loader2, AlertCircle, Plus, Copy, RefreshCw, Link2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { InteractionsFeed } from "@/components/InteractionsFeed";
 import { supabase } from "@/integrations/supabase/client";
@@ -34,6 +34,7 @@ import { useUserRole } from "@/hooks/useUserRole";
 import { usePriorityScores } from "@/hooks/usePriorityScores";
 import { useClientToneTrend } from "@/hooks/useClientToneTrend";
 import { useClientDemands } from "@/hooks/useClientDemands";
+import { useClientToken, useGenerateClientToken } from "@/hooks/useClientToken";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { ChartContainer } from "@/components/ui/chart";
 import { CreateDemandDialog } from "@/components/demands/CreateDemandDialog";
