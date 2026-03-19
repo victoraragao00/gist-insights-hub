@@ -30,6 +30,7 @@ import { useUserRole } from "@/hooks/useUserRole";
 import { ColumnSettingsTab } from "@/components/demands/ColumnSettingsTab";
 import { AreaSettingsTab } from "@/components/demands/AreaSettingsTab";
 import { AssigneeSettingsTab } from "@/components/demands/AssigneeSettingsTab";
+import { UserManagementTab } from "@/components/settings/UserManagementTab";
 
 // ── Types ──────────────────────────────────────────────
 
