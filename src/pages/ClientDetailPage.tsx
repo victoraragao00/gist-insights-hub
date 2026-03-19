@@ -322,6 +322,7 @@ const ClientDetailPage = () => {
   }, [client, scores]);
 
   const { data: toneTrend, isLoading: toneTrendLoading } = useClientToneTrend(clientId ?? undefined);
+  const { data: clientDemands = [], isLoading: loadingDemands } = useClientDemands(clientId);
   const toneTrendChartData = useMemo(
     () =>
       toneTrend?.map((d) => ({
