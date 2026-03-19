@@ -200,7 +200,7 @@ const ClientDetailPage = () => {
   const [pageInteractions, setPageInteractions] = useState(0);
   const [pageParticipants, setPageParticipants] = useState(0);
   const [createDemandOpen, setCreateDemandOpen] = useState(false);
-  const [selectedDemand, setSelectedDemand] = useState<DemandRow | null>(null);
+  const [selectedDemandId, setSelectedDemandId] = useState<string | null>(null);
   const [demandSheetOpen, setDemandSheetOpen] = useState(false);
 
   const thirtyDaysAgo = useMemo(
@@ -323,6 +323,10 @@ const ClientDetailPage = () => {
 
   const { data: toneTrend, isLoading: toneTrendLoading } = useClientToneTrend(clientId ?? undefined);
   const { data: clientDemands = [], isLoading: loadingDemands } = useClientDemands(clientId);
+  const selectedDemand = useMemo(
+    () => (clientDemands as unknown as DemandRow[]).find((d) => d.id === selectedDemandId) ?? null,
+    [clientDemands, selectedDemandId]
+  );
   const toneTrendChartData = useMemo(
     () =>
       toneTrend?.map((d) => ({
@@ -843,7 +847,7 @@ const ClientDetailPage = () => {
               <button
                 key={d.id}
                 onClick={() => {
-                  setSelectedDemand(d as unknown as DemandRow);
+                  setSelectedDemandId(d.id);
                   setDemandSheetOpen(true);
                 }}
                 className="w-full text-left rounded-lg border border-border p-3 hover:bg-accent transition-colors space-y-1.5"
@@ -901,7 +905,10 @@ const ClientDetailPage = () => {
           <DemandDetailSheet
             demand={selectedDemand}
             open={demandSheetOpen}
-            onOpenChange={setDemandSheetOpen}
+            onOpenChange={(open) => {
+              setDemandSheetOpen(open);
+              if (!open) setSelectedDemandId(null);
+            }}
           />
         </TabsContent>
 
