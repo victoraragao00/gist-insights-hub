@@ -28,7 +28,19 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaul
   const { data: columns = [] } = useTicketColumns();
   const { data: types = [] } = useDemandTypes();
   const { data: areas = [] } = useDemandAreas();
-  const { data: assignees = [] } = useDemandAssignees();
+  const { data: userProfiles = [] } = useQuery({
+    queryKey: ["user_profiles_active"],
+    staleTime: 300_000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("user_profiles")
+        .select("id, full_name, email")
+        .eq("active", true)
+        .order("full_name", { ascending: true });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
   const createMutation = useCreateDemand();
 
   const [title, setTitle] = useState("");
