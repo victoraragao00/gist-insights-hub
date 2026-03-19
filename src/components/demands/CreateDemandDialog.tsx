@@ -19,6 +19,7 @@ interface CreateDemandDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   defaultColumnId?: string;
+  defaultClientId?: string;
 }
 
 export function CreateDemandDialog({ open, onOpenChange, defaultColumnId }: CreateDemandDialogProps) {
