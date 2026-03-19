@@ -1295,7 +1295,7 @@ function ClientTokenSection({ clientId, isAdmin }: { clientId: string | undefine
   const generateToken = useGenerateClientToken(clientId);
   const [regenerateOpen, setRegenerateOpen] = useState(false);
 
-  const baseUrl = window.location.origin;
+  const baseUrl = import.meta.env.VITE_PUBLIC_APP_URL ?? window.location.origin;
   const publicUrl = tokenData?.token ? `${baseUrl}/public/demands/${tokenData.token}` : null;
 
   const handleCopy = () => {
