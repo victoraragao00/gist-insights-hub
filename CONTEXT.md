@@ -1,4 +1,4 @@
-# CONTEXT.md — Estado do Projeto (v19 — 2026-03-19)
+# CONTEXT.md — Estado do Projeto (v20 — 2026-03-19)
 
 > Mantido pelo Claude Code ao final de cada sessao. Lido por todos os agentes para manter contexto.
 >
@@ -22,6 +22,8 @@
 | 6.6 | Sprint P1+P3+P4 (edicao cliente + CRUD rules + busca server-side) | Concluido — PRs #61, #62, #64 |
 | 7 | Modulo de Tickets / Kanban | Concluido — Lovable S1-A/B/C + validacao S1-C + fixes B1/B2 (Issues #66-#67) |
 | 7.1 | Onboarding User Access | Concluido — Migration (trigger + backfill) + Edge Function + ProtectedRoute bootstrap |
+| 7.2 | Integracao Gist ↔ Ticket + Comentarios | Concluido — Sprint S2 (Issue #68): demand_interactions, demand_comments, LinkConversationDialog, tab Demandas na ClientDetailPage |
+| 7.3 | Dashboard Analitico + One-Page + Bloqueio | Concluido — Sprint S3 (Issue #69): DemandsDashboardPage, PublicDemandsPage, client-demands-public, tokens, watchers, bloqueio/cancelamento, CSV export |
 | 8 | Insights IA avancados | Placeholder |
 
 ---
@@ -119,6 +121,57 @@ Validacao feita pelo Vitor (triagem). 2 bugs identificados e corrigidos:
 - `queryClient.invalidateQueries()` quando `bootstrapped: true` → dados aparecem sem F5
 - Fire-and-forget: nao bloqueia renderizacao
 
+## Fase 7.2 — Integracao Gist ↔ Ticket + Comentarios (Sprint S2 — Issue #68 — Concluido)
+
+### Migration
+- `ALTER TYPE demand_event_type ADD VALUE 'commented'`
+- Tabela `demand_interactions` — vinculo conversa ↔ ticket (UNIQUE demand_id+interaction_id, RLS via demands→client_id)
+- Tabela `demand_comments` — comentarios em tickets (RLS: read via demand, update/delete por created_by)
+- DB function `get_client_conversations(p_client_id)` — conversas agrupadas por conversation_id, SECURITY DEFINER
+- Realtime para ambas as tabelas novas
+
+### Hooks criados
+- `useDemandInteractions.ts` — useDemandInteractions, useClientConversations, useConversationMessages, useLinkInteractions, useUnlinkInteraction
+- `useDemandComments.ts` — useDemandComments (com Realtime subscription), useCreateComment, useUpdateComment, useDeleteComment
+- `useClientDemands.ts` — demands por client_id para tab na ClientDetailPage
+
+### Frontend
+- `LinkConversationDialog.tsx` — Dialog 2 passos (selecionar conversa → selecionar mensagens com checkboxes + "Selecionar todas")
+- `DemandDetailSheet.tsx` — secoes "Conversas Vinculadas" (agrupadas por conversation_id, desvincular por mensagem) + "Comentarios" (Realtime, edicao inline, badge "editado", AlertDialog excluir)
+- `ClientDetailPage.tsx` — nova tab "Demandas" com 4 KPIs (Total/Abertos/Concluidos/Bloqueados) + lista 20 tickets + botao "Nova demanda" pre-preenchido
+- EVENT_ICONS: `linked_interaction → Link2`, `commented → MessageSquare`
+- Fix preventivo: `selectedDemandId` + `useMemo` na ClientDetailPage (mesmo pattern B1)
+
+---
+
+## Fase 7.3 — Dashboard Analitico + One-Page + Bloqueio (Sprint S3 — Issue #69 — Concluido)
+
+### Migration
+- Tabela `demand_client_tokens` — token unico por cliente para One-Page publica (UNIQUE client_id, RLS via user_accessible_client_ids)
+- Tabela `demand_watchers` — observadores por ticket (UNIQUE demand_id+user_id, insert/delete por auth.uid())
+- DB function `get_demand_analytics(p_client_id, p_days)` — KPIs (total, open, completed, blocked, avg lead/cycle time), distribuicao por tipo/prioridade/coluna/area, tendencia semanal. SECURITY DEFINER + COALESCE para arrays
+- DB function `get_client_public_demands(p_token)` — dados publicos por token, NAO expoe notes/description/rfi_url/blocker_reason/created_by
+
+### Edge Function: `client-demands-public`
+- GET sem autenticacao (service_role para chamar DB function)
+- Token invalido → 404
+- CORS habilitado
+
+### Hooks criados
+- `useDemandAnalytics.ts` — RPC get_demand_analytics, staleTime 120s
+- `useDemandWatchers.ts` — query + useToggleWatcher mutation
+- `useClientToken.ts` — query + useGenerateClientToken mutation (UPSERT)
+- `usePublicDemands.ts` — chama Edge Function client-demands-public
+- `useExportDemandsCSV.ts` — gera CSV e faz download
+
+### Frontend
+- `DemandsDashboardPage.tsx` — rota `/demands/dashboard`, 6 KPIs + 5 graficos recharts, filtros cliente/periodo
+- `PublicDemandsPage.tsx` — rota `/public/demands/:token` FORA do ProtectedRoute, layout proprio sem sidebar, 4 KPIs + tabela de tickets, pagina de erro para token invalido
+- `DemandDetailSheet.tsx` — secoes Bloqueio (marcar/desbloquear com motivo + activity log) + Cancelamento (5 motivos + coluna Cancelado) + Watchers (toggle observar)
+- `ClientDetailPage.tsx` — secao "One-Page do Cliente" na aba Configuracoes (gerar/copiar/regenerar token, admin only)
+- `DemandsPage.tsx` — botao "Exportar CSV"
+- Sidebar: "Analytics de Demandas" adicionado
+
 ---
 
 ## Fase 5 — Priority Score Engine
@@ -205,6 +258,8 @@ AUDIT_BATCH_SIZE=20
 | #65 | fix: SearchPage TDZ | Corrigido | Lovable |
 | #66 | fix: edicao inline DemandDetailSheet | Fechada | Lovable |
 | #67 | fix: campo RFI nao clicavel | Fechada | Lovable |
+| #68 | Sprint S2: Gist ↔ Ticket + Comentarios | Fechada | Lovable |
+| #69 | Sprint S3: Dashboard + One-Page + Bloqueio | Fechada | Lovable |
 
 ---
 
@@ -277,12 +332,15 @@ Todos resolvidos. Ver PRs #31, #34, #35, #41, #43-#50, #51 para detalhes.
 - **Controle:** 100% manual (Operador). Independente de `active`.
 - **Frontend:** filtro default ativo/trial + toggle "Incluir inativos"
 
-### Modulo de Tickets / Kanban (Fase 7)
+### Modulo de Tickets / Kanban (Fase 7 + 7.2 + 7.3)
 
-Documentacao completa na secao "Fase 7" acima. Resumo:
-- **8 tabelas** com RLS, 2 ENUMs, 6 indexes, 1 trigger, 1 storage bucket
-- **7 componentes** React + **6 hooks** + DnD (@dnd-kit) + Realtime notifications
-- **Rota:** `/demands` com sidebar "Demandas"
+Documentacao completa nas secoes "Fase 7", "Fase 7.2" e "Fase 7.3" acima. Resumo:
+- **12 tabelas** com RLS (demands, activities, areas, assignees, attachments, notifications, interactions, comments, client_tokens, watchers + ticket_columns, demand_types)
+- **3 DB functions** (get_client_conversations, get_demand_analytics, get_client_public_demands)
+- **1 Edge Function** publica (client-demands-public)
+- **3 paginas** (DemandsPage/Kanban, DemandsDashboardPage, PublicDemandsPage)
+- **8 componentes** demands/ + **~15 hooks** + DnD + Realtime
+- **Rotas:** `/demands`, `/demands/dashboard`, `/public/demands/:token`
 
 ### Onboarding User Access (Fase 7.1)
 
@@ -367,9 +425,14 @@ gist-insights-hub/
 │   └── PENDENTES.md                               # Violacoes abertas
 ├── scripts/
 ├── src/                                           # Frontend + UI (Lovable)
-│   └── components/demands/                        # Modulo de Tickets (7 componentes)
+│   ├── components/demands/                        # Modulo de Tickets (8 componentes)
+│   └── pages/
+│       ├── DemandsDashboardPage.tsx                # Dashboard analitico de tickets
+│       └── PublicDemandsPage.tsx                   # One-Page publica (sem auth)
 └── supabase/                                      # Backend (Lovable) — migrations, edge functions
-    └── functions/bootstrap-user-access/           # Onboarding automatico
+    └── functions/
+        ├── bootstrap-user-access/                 # Onboarding automatico
+        └── client-demands-public/                 # One-Page publica (sem auth)
 ```
 
 ---
@@ -395,9 +458,15 @@ gist-insights-hub/
     - Migration: trigger on_client_created + backfill (viewer para todos)
     - Edge Function: bootstrap-user-access (primeiro login)
     - ProtectedRoute: fire-and-forget + invalidateQueries apos bootstrap
-13. **Pendente:** Lovable S6 — Edge function deliver-audit-alerts (baixa prioridade)
-14. **Pendente:** Issue #65 — fechar no GitHub (fix ja aplicado)
-15. **Pendente:** Verificar RLS nas 4 tabelas novas do modulo de Tickets (Operador: query pg_tables)
-16. **Pendente:** Testar aba "Areas" visivel apenas para admin (Operador: conta viewer)
-17. **Pendente:** Testar notificacoes in-app com 2 usuarios simultaneos
-18. **Fase 8:** Insights IA avancados
+13. **Concluido:** Fase 7.2 — Sprint S2: Integracao Gist ↔ Ticket + Comentarios (Issue #68)
+    - demand_interactions + demand_comments + get_client_conversations + Realtime
+    - LinkConversationDialog (2 passos) + secoes no Sheet + tab Demandas na ClientDetailPage
+14. **Concluido:** Fase 7.3 — Sprint S3: Dashboard Analitico + One-Page + Bloqueio (Issue #69)
+    - demand_client_tokens + demand_watchers + get_demand_analytics + get_client_public_demands
+    - Edge Function client-demands-public + DemandsDashboardPage + PublicDemandsPage
+    - Bloqueio/Cancelamento/Watchers no Sheet + token na ClientDetailPage + Export CSV
+15. **Pendente:** Lovable S6 — Edge function deliver-audit-alerts (baixa prioridade)
+16. **Pendente:** Issue #65 — fechar no GitHub (fix ja aplicado)
+17. **Pendente:** Verificar RLS nas tabelas novas do modulo de Tickets (Operador: query pg_tables)
+18. **Pendente:** Testar notificacoes in-app com 2 usuarios simultaneos
+19. **Fase 8:** Insights IA avancados
