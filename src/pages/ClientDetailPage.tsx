@@ -847,7 +847,7 @@ const ClientDetailPage = () => {
               <button
                 key={d.id}
                 onClick={() => {
-                  setSelectedDemand(d as unknown as DemandRow);
+                  setSelectedDemandId(d.id);
                   setDemandSheetOpen(true);
                 }}
                 className="w-full text-left rounded-lg border border-border p-3 hover:bg-accent transition-colors space-y-1.5"
