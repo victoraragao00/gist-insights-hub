@@ -1,8 +1,8 @@
-# CONTEXT.md — Estado do Projeto (v17 — 2026-03-08)
+# CONTEXT.md — Estado do Projeto (v19 — 2026-03-19)
 
 > Mantido pelo Claude Code ao final de cada sessao. Lido por todos os agentes para manter contexto.
 >
-> last_updated: 2026-03-08
+> last_updated: 2026-03-19
 > last_updated_by: Claude Code
 
 ---
@@ -20,7 +20,104 @@
 | 6 | Auditorias e Alertas | Concluido — Backend (Issues #37-#38 + Lovable S1-S5) + Frontend (PRs #51-#53) |
 | 6.5 | Campo status em clients (controle manual) | Concluido — Backend (Issue #54, Lovable S7) + Frontend (PRs #57-#58) |
 | 6.6 | Sprint P1+P3+P4 (edicao cliente + CRUD rules + busca server-side) | Concluido — PRs #61, #62, #64 |
-| 7 | Insights IA avancados | Placeholder |
+| 7 | Modulo de Tickets / Kanban | Concluido — Lovable S1-A/B/C + validacao S1-C + fixes B1/B2 (Issues #66-#67) |
+| 7.1 | Onboarding User Access | Concluido — Migration (trigger + backfill) + Edge Function + ProtectedRoute bootstrap |
+| 8 | Insights IA avancados | Placeholder |
+
+---
+
+## Fase 7 — Modulo de Tickets / Kanban (Lovable — Concluido)
+
+### Sprint S1-A: Backend Schema (2026-03-17)
+
+8 migrations criando o modelo de dados completo:
+
+**Tabelas criadas:**
+- `ticket_columns` — colunas do Kanban (name, position, color, triggers_started_at, triggers_finished_at)
+- `demand_types` — tipos de demanda (name, color, icon, active, position)
+- `demands` — demandas/tickets (title, description, expected_result, client_id, demand_type_id, priority ENUM, column_id, position, assignee TEXT, notes, is_blocked, blocker_reason, started_at, finished_at, area_id, assignee_id, rfi_url, created_by)
+- `demand_activities` — log de auditoria (demand_id, event_type ENUM, description, from_value, to_value)
+- `demand_areas` — areas responsaveis (name, color, active, position)
+- `demand_assignees` — responsaveis (name, email, role, active)
+- `demand_attachments` — anexos (demand_id, type file|link, url, filename, size_bytes, mime_type)
+- `demand_notifications` — notificacoes realtime (user_id, demand_id, type ENUM, message, read)
+
+**ENUMs:** `demand_priority` (low/medium/high/urgent), `demand_event_type` (created/moved/assigned/blocked/unblocked/edited/cancelled/linked_interaction)
+
+**Storage:** Bucket `demand-attachments` (private, RLS para upload/download)
+
+**RLS:** Todas as tabelas com RLS. `demands` filtrada por `user_accessible_client_ids()`. Settings tables (columns, types, areas, assignees) SELECT para todos, CRUD apenas admin.
+
+**Indexes:** idx_demands_client, idx_demands_column, idx_demands_priority, idx_demand_activities_demand, idx_demand_attachments_demand, idx_demand_notifications_user
+
+**Trigger:** `update_demand_last_updated()` — atualiza `last_updated` automaticamente
+
+### Sprint S1-B: Kanban Frontend (2026-03-17)
+
+**Pagina:** `DemandsPage.tsx` — Kanban board com drag-and-drop (@dnd-kit/core + @dnd-kit/sortable)
+- Rota `/demands`, sidebar "Demandas" com icone Kanban
+- DndContext com PointerSensor (8px activation distance)
+- Drop em colunas OU em cards dentro de colunas
+- Auto-trigger `started_at` / `finished_at` baseado em configuracao da coluna
+
+**Componentes:** DemandCard, KanbanColumn, CreateDemandDialog, DemandDetailSheet (inline editing + attachments + timeline)
+
+**Settings (admin-only, 3 tabs):** ColumnSettingsTab (DnD reorder, trigger badges), AreaSettingsTab (CRUD + color picker), AssigneeSettingsTab (CRUD + soft delete)
+
+**Filtros:** 5 combobox filters (Search 3+ chars, Client, Type, Priority, Area)
+
+### Sprint S1-C: Areas, Assignees, Attachments, Notifications (2026-03-18)
+
+**Hooks criados:**
+- `useDemands.ts` — queries + mutations (useTicketColumns, useDemandTypes, useDemands, useDemandActivities, useCreateDemand, useMoveDemand, useUpdateDemand, useDeleteDemand)
+- `useDemandAreas.ts` — CRUD areas (add, update, deactivate, reactivate, delete)
+- `useDemandAssignees.ts` — CRUD assignees
+- `useDemandAttachments.ts` — file upload (Supabase Storage), add link, delete
+- `useDemandNotifications.ts` — Realtime subscription (supabase.channel), mark read
+- `useManageColumns.ts` — CRUD colunas + reorder
+
+**staleTime:** Dados estaticos = 300s (5min). Dados dinamicos = 30s.
+
+**Dependencias adicionadas:** `@dnd-kit/core`, `@dnd-kit/sortable`, `@dnd-kit/utilities`
+
+### Validacao S1-C + Fixes B1/B2 (2026-03-19)
+
+Validacao feita pelo Vitor (triagem). 2 bugs identificados e corrigidos:
+
+**B1 — Edicao inline nao atualizava em tempo real (Issue #66 — Fechada)**
+- Causa raiz: DemandsPage armazenava objeto stale via useState + DemandDetailSheet nao re-sincronizava state local
+- Fix: `selectedDemandId` + `useMemo` no parent, `useEffect` de sync no Sheet
+
+**B2 — Campo RFI nao era link clicavel (Issue #67 — Fechada)**
+- Causa raiz: RFI renderizado sempre como `<Input>`, sem modo visualizacao
+- Fix: Icone ExternalLink clicavel + normalizacao automatica de URL (auto-prefix `https://`)
+
+---
+
+## Fase 7.1 — Onboarding User Access (Lovable — Concluido)
+
+**Problema:** Novo usuario fazia signup mas `user_client_access` ficava vazio → RLS filtrava tudo → app vazio.
+
+**Solucao (3 partes):**
+
+### Migration: Trigger `on_client_created` + Backfill
+- **Trigger:** `grant_new_client_to_all_users()` — SECURITY DEFINER, dispara AFTER INSERT em `clients`
+- Quando sync cria novo client, todos os users ganham acesso viewer automaticamente
+- **Backfill:** INSERT com CROSS JOIN + NOT EXISTS + ON CONFLICT DO NOTHING para users existentes sem acesso
+- Nao altera registros existentes (admins preservados)
+
+### Edge Function: `bootstrap-user-access`
+- Chamada no primeiro login autenticado via `ProtectedRoute`
+- Extrai user do JWT, verifica se tem 0 registros em `user_client_access`
+- Se 0: insere viewer para todos os clients ativos via service_role
+- Se >0: retorna `{ bootstrapped: false, reason: 'already_has_access' }`
+- Idempotente, zero hardcode
+
+### Frontend: `ProtectedRoute.tsx`
+- `useEffect` chama `bootstrap-user-access` uma vez por sessao (flag `sessionStorage`)
+- Flag so setada APOS sucesso da Edge Function (retry em caso de falha)
+- `queryClient.invalidateQueries()` quando `bootstrapped: true` → dados aparecem sem F5
+- Fire-and-forget: nao bloqueia renderizacao
 
 ---
 
@@ -34,54 +131,26 @@
 - **pg_cron:** schedule a cada 2h como safety net
 - **Seed:** 13 clientes configurados (By NV=azzas, Osklen=enterprise, restante=medium)
 - **Testes:** 9 casos unitarios para `calculateScore` (4) e `detectPatterns` (5) em `index.test.ts`
-- **Score inicial:** By NV score=296 com 3 padroes detectados, demais com score=0
-- **Correcoes aplicadas:** bug severity (worst_tone preservado), YAGNI force removido, testes adicionados
 - **types.ts:** regenerado com `client_priority_config`, `priority_scores`, `client_tier`
 
 ### Frontend (Issue #33 — Cursor — Concluido)
 
-- **PR #34 (UX fixes):** 17 "Em breve" removidos, getHealthColor corrigido (Design System 1.5), "Hub Central" -> "CX Hub", useGistKPIs.ts deletado, DropdownMenu vazio corrigido
-- **PR #35 (Dashboard):** Priority Dashboard com ranking por score, tier badges, patterns expandiveis, score cap visual 100, admin features (recalcular, clientes sem config), viewer read-only, empty/loading/error states, dark mode, mobile responsive
-- **Hooks criados:** useUserRole (role/isAdmin), usePriorityScores (two queries + merge), useRecalculatePriority (useMutation)
-- **Testes:** 5 testes (score cap + role logic)
-- **Animacoes usadas:** fade-in-up (stagger), score-pop, progress-fill, pulse-subtle (score>=80), shimmer
-- **Design System:** `docs/DESIGN_SYSTEM.md` criado como fonte unica de verdade para cores, motion, componentes
-- **Cursor Rules:** `.cursor/rules` atualizado com Design System, proibicoes explicitas, stack completa
-- **Keyframes custom:** 5 registrados no `tailwind.config.ts` (pulse-subtle, fade-in-up, shimmer, progress-fill, score-pop)
+- **PR #34 (UX fixes):** 17 "Em breve" removidos, getHealthColor corrigido, "Hub Central" -> "CX Hub"
+- **PR #35 (Dashboard):** Priority Dashboard com ranking, tier badges, patterns expandiveis, score cap visual 100, admin features, dark mode, mobile responsive
+- **Hooks criados:** useUserRole, usePriorityScores, useRecalculatePriority
+- **Design System:** `docs/DESIGN_SYSTEM.md` criado como fonte unica de verdade
+- **Keyframes custom:** 5 registrados no `tailwind.config.ts`
 
-### Auditoria UX/UI — 12 PRs do Cursor (todos mergeados)
+### Auditoria UX/UI — 12 PRs do Cursor (todos mergeados, historico)
 
-| PR | Titulo | LOTE | Arquivos |
-|----|--------|------|----------|
-| #39 | fix: error states in ClientsPage and ClientDetailPage | 1 | ClientsPage, ClientDetailPage |
-| #40 | fix: replace manual submitting state with useMutation in auth pages | 1 | LoginPage, SignupPage |
-| #41 | fix: honest empty state for Audits page | 1 | Audits |
-| #42 | fix: use React Router Link in NotFound page | 1 | NotFound |
-| #43 | feat: Settings priorities tab + jobStatusBadge dark mode | 1 | SettingsPage, useClientPriorityConfig (novo) |
-| #44 | fix: dark mode tone/status colors, shimmer skeletons, layout padding | 2 | ClientsPage, ClientDetailPage, DashboardLayout |
-| #45 | fix: accessibility aria-labels, focus-visible, active:scale | 3 | ClientsPage, ClientDetailPage |
-| #46 | feat: score column in ClientsPage | 4 | ClientsPage |
-| #47 | feat: Dashboard search by name and filter by tier | 4 | Index |
-| #48 | feat: ClientDetail score card and remove Tasks tab | 4 | ClientDetailPage |
-| #49 | feat: recharts volume chart in ClientDetail | 5 | ClientDetailPage |
-| #50 | feat: Dashboard global KPIs and trend charts | 5 | Index, useGlobalStats (novo) |
-| #51 | feat: Audits page with real alerts | 6-FE | Audits, useAuditAlerts (novo) |
-| #52 | feat: global search page | 6-FE | SearchPage (novo), useSearchInteractions (novo), App, AppSidebar |
-| #53 | feat: tone trend 7d chart | 6-FE | ClientDetailPage, useClientToneTrend (novo) |
-
-**Hooks adicionados (auditoria UX + Fase 6 frontend):**
-- `useClientPriorityConfig` — config de prioridades para aba Settings (PR #43)
-- `useGlobalStats` — chama `global_stats_30d` RPC para KPI cards e graficos (PR #50)
-- `useAuditAlerts` — chama `audit_alerts_summary` para pagina Auditorias (PR #51)
-- `useSearchInteractions` — chama `search_interactions` para busca global (PR #52)
-- `useClientToneTrend` — chama `client_tone_trend_7d` para grafico de tendencia (PR #53)
-
-**Paginas e componentes adicionados:**
-- `SearchPage.tsx` — busca full-text com debounce, filtros por cliente/tom, paginacao real (PR #52)
-- `Audits.tsx` — reescrito: KPI cards, tabela de alertas, empty/loading/error states (PR #51)
-- ClientDetailPage: recharts BarChart volume 14d (PR #49), stacked BarChart tom 7d (PR #53)
-- Index: 4 KPI cards, stacked BarChart evolucao tom, horizontal BarChart top temas, BarChart score, PieChart tier (PR #50)
-- Rota `/search` registrada em App.tsx, item "Busca" no AppSidebar (PR #52)
+| PR | Titulo | LOTE |
+|----|--------|------|
+| #39-#43 | Error states, auth useMutation, Audits empty state, NotFound Link, Settings priorities | 1 |
+| #44 | Dark mode tone/status colors, shimmer, layout padding | 2 |
+| #45 | Accessibility aria-labels, focus-visible | 3 |
+| #46-#48 | Score column, Dashboard search+filter, ClientDetail score card | 4 |
+| #49-#50 | Recharts volume chart, Dashboard global KPIs | 5 |
+| #51-#53 | Audits UI real, SearchPage, tone trend 7d chart | 6-FE |
 
 ### Env vars declaradas no Supabase
 
@@ -106,7 +175,6 @@ AUDIT_BATCH_SIZE=20
 - **Classificadas:** 21.262 msgs (todas dentro da janela de 365d)
 - **Nao classificadas:** 11.829 msgs (historicas com occurred_at > 1 ano, fora do escopo)
 - **Jobs executados:** 6 classify_batch (Gemini Pro + v6)
-- **Modelo:** gemini-2.5-pro, 4 timeouts de Gemini (normal)
 - **Custo total backlog:** ~$2.22
 
 ---
@@ -122,39 +190,21 @@ AUDIT_BATCH_SIZE=20
 | #14 | Calibracao de tom + filtro 365d | Resolvido | Lovable |
 | #15 | Prompt Mega Agente v3 | Resolvido | Lovable |
 | #16 | Gemini Pro definitivo + prompt v6 com few-shot examples | Resolvido | Lovable |
-| #17 | m3: Remove unused toast files | Resolvido (PR #23) | Cursor |
-| #18 | m1: Replace `any` types in non-UI code | Resolvido (PR #26) | Cursor |
-| #19 | m4+m5: Fix staleTime and queryKey | Resolvido (PR #24) | Cursor |
-| #20 | m9: Replace useState with useMutation | Resolvido (PR #27) | Cursor |
-| #21 | m12: Add real pagination | Resolvido (PR #28) | Cursor |
-| #22 | m6: Replace static DOM IDs with useId | Resolvido (PR #25) | Cursor |
-| #29 | m9: handleToggleRule sem useMutation | Resolvido (PR #31) | Cursor |
-| #30 | UX: NotFound em ingles | Resolvido (PR #31) | Cursor |
+| #17-#22 | Divida tecnica CTO (m1,m3,m4,m5,m6,m9,m12) | Resolvidos (PRs #23-#28) | Cursor |
+| #29-#30 | m9 handleToggleRule + UX NotFound | Resolvido (PR #31) | Cursor |
 | #32 | Fase 5: Priority Score Engine backend | Concluido | Lovable |
 | #33 | Fase 5: Priority Dashboard + UX cleanup | Concluido (PR #34 + PR #35) | Cursor |
-| #37 | DB function global_stats_30d para Dashboard KPIs | Concluido (commits 345c497 + 4d977d7) | Lovable |
-| #38 | Edge function evaluate-audit-rules — alertas automaticos | Concluido (commits e44bd75 + 30c2775 + 7dbc62c) | Lovable |
-| #39 | fix: error states in ClientsPage and ClientDetailPage | Mergeado | Cursor |
-| #40 | fix: auth useMutation | Mergeado | Cursor |
-| #41 | fix: Audits empty state honesto | Mergeado | Cursor |
-| #42 | fix: NotFound React Router Link | Mergeado | Cursor |
-| #43 | feat: Settings priorities tab + jobStatusBadge dark mode | Mergeado | Cursor |
-| #44 | fix: dark mode tone/status colors, shimmer, layout padding | Mergeado | Cursor |
-| #45 | fix: accessibility aria-labels, focus-visible | Mergeado | Cursor |
-| #46 | feat: score column in ClientsPage | Mergeado | Cursor |
-| #47 | feat: Dashboard search + tier filter | Mergeado | Cursor |
-| #48 | feat: ClientDetail score card, remove Tasks tab | Mergeado | Cursor |
-| #49 | feat: recharts volume chart in ClientDetail | Mergeado | Cursor |
-| #50 | feat: Dashboard global KPIs and trend charts | Mergeado | Cursor |
-| #51 | feat: Audits page with real alerts from audit_alerts_summary | Mergeado | Cursor |
-| #52 | feat: global search page with search_interactions | Mergeado | Cursor |
-| #53 | feat: tone trend 7d chart in ClientDetailPage | Mergeado | Cursor |
-| #54 | feat(db): adicionar coluna status em clients | Concluido | Lovable |
-| #55 | feat(ui): filtro de status e badge na ClientsPage | Mergeado (PR #57) | Cursor |
-| #56 | feat(ui): badge de status no ClientDetailPage | Mergeado (PR #58) | Cursor |
-| #59 | feat(ui): edicao de cliente na tab Configuracoes | Mergeado (PR #61) | Cursor |
-| #60 | feat(ui): CRUD de audit_rules na pagina Auditorias | Mergeado (PR #62) | Cursor |
-| #63 | fix: busca server-side em ClientsPage, SearchPage e Dashboard | Mergeado (PR #64) | Cursor |
+| #37 | DB function global_stats_30d | Concluido | Lovable |
+| #38 | Edge function evaluate-audit-rules | Concluido | Lovable |
+| #39-#53 | Auditoria UX/UI — 15 PRs do Cursor | Mergeados | Cursor |
+| #54 | feat(db): coluna status em clients | Concluido | Lovable |
+| #55-#56 | feat(ui): filtro e badge de status | Mergeados (PRs #57-#58) | Cursor |
+| #59 | feat(ui): edicao de cliente | Mergeado (PR #61) | Cursor |
+| #60 | feat(ui): CRUD audit_rules | Mergeado (PR #62) | Cursor |
+| #63 | fix: busca server-side em 3 telas | Mergeado (PR #64) | Cursor |
+| #65 | fix: SearchPage TDZ | Corrigido | Lovable |
+| #66 | fix: edicao inline DemandDetailSheet | Fechada | Lovable |
+| #67 | fix: campo RFI nao clicavel | Fechada | Lovable |
 
 ---
 
@@ -174,21 +224,7 @@ AUDIT_BATCH_SIZE=20
 
 ## Problemas de UX identificados
 
-- ~~Dashboard mostra KPIs do Gist mas nao reflete dados de classificacao IA~~ — Resolvido (PR #35 + PR #50)
-- ~~Excesso de botoes "Em breve" — transmite produto inacabado~~ — Resolvido (PR #34)
-- ~~Pagina Auditorias e placeholder sem funcionalidade~~ — Resolvido: empty state (PR #41) + UI real com alertas (PR #51)
-- ~~Coluna "Saude" com semantica invertida~~ — Resolvido (PR #34)
-- ~~Marca inconsistente (Login diz "Hub Central", sidebar diz "uMode")~~ — Resolvido (PR #34)
-- ~~404 em ingles, app em PT-BR~~ — Resolvido (PR #31)
-- ~~Dark mode incompleto (TONE_CONFIG, badges, jobStatusBadge)~~ — Resolvido (PR #44 + PR #43)
-- ~~Skeletons sem shimmer~~ — Resolvido (PR #44)
-- ~~Layout padding fixo (sem responsivo)~~ — Resolvido (PR #44)
-- ~~Acessibilidade (aria-labels, focus-visible, keyboard nav)~~ — Resolvido (PR #45)
-- ~~Score nao visivel em ClientsPage~~ — Resolvido (PR #46)
-- ~~Dashboard sem busca/filtro~~ — Resolvido (PR #47)
-- ~~ClientDetail sem score card, com aba Tasks morta~~ — Resolvido (PR #48)
-- ~~Grafico de volume em divs manuais~~ — Resolvido com recharts (PR #49)
-- ~~Dashboard sem KPIs globais e graficos de tendencia~~ — Resolvido (PR #50)
+Todos resolvidos. Ver PRs #31, #34, #35, #41, #43-#50, #51 para detalhes.
 
 ---
 
@@ -203,22 +239,14 @@ AUDIT_BATCH_SIZE=20
 - **Modelo definitivo:** `gemini-2.5-pro` (custo ~$2/ano, qualidade superior)
 - **Fallback:** `claude-sonnet-4` via `CLAUDE_API_KEY`
 - **Unidade de classificacao:** conversa (thread completa), nao mensagem isolada
-- **Coluna `conversation_id`:** materializada, indexada
 - **Batch:** 10 conversas/batch (~200 msgs), propagacao para todas as mensagens
-- **Prompt Mega Agente:** contexto uMode (B2B textil/moda), rubrica de tom 4 niveis, 8 regras anti-vies, desambiguacao de 14 temas, 4 few-shot examples
-- **Filtro temporal:** 365 dias
-- **Safety filter:** marca defaults com `gemini-safety-default`
-- **Timeout:** 55s Gemini, 45s Claude
-- **JSON recovery:** `parseWithRecovery()`
+- **Prompt Mega Agente:** contexto uMode (B2B textil/moda), rubrica de tom 4 niveis, 8 regras anti-vies, 14 temas, 4 few-shot examples
 - **Auto-chain limit:** `MAX_BATCHES_PER_JOB = 50`
 
 ### Priority Score Engine (Fase 5)
 - **Edge Function:** `calculate-priority-scores` — modular, 6 funcoes, logica pura em `logic.ts`
 - **Score:** `Σ(user_count × severityWeight[worst_tone] × recencyWeight) × weight_multiplier`
-- **Sem cap no banco** — cap visual de 100 e responsabilidade do frontend
 - **Triggers:** manual (POST com JWT admin), pg_cron (2h), event-driven (apos classify_batch)
-- **Testes:** 9 unitarios para calculateScore e detectPatterns
-- **Env vars:** 9 variaveis `PRIORITY_*` configuradas no Supabase Dashboard
 - **Chain:** apos completar (!hasMore), dispara `evaluate-audit-rules` (fire-and-forget)
 
 ### Auditorias e Alertas (Fase 6 — backend completo)
@@ -229,131 +257,98 @@ AUDIT_BATCH_SIZE=20
 - `user_accessible_client_ids()` retorna `SETOF uuid` — nao requer `unnest()`
 
 #### Seed + Realtime + pg_cron (Lovable S2)
-- **Seed:** 39 regras (3 metricas x 13 clientes ativos): score_prioridade>=80, tom_critico_pct>=15, volume_periodo>=50
-- **Unique constraint:** `audit_rules_client_metric_unique` (client_id, metric)
-- **Realtime:** `audit_alerts` adicionado ao `supabase_realtime` publication
+- **Seed:** 39 regras (3 metricas x 13 clientes ativos)
+- **Realtime:** `audit_alerts` no `supabase_realtime` publication
 - **pg_cron:** `evaluate-audit-rules` a cada 2h (minuto :15)
 
-#### DB Function: `audit_alerts_summary` (Lovable S3)
-- **Retorna:** total_alerts_30d, unread_count, alerts (jsonb array, top 50)
-- **Coluna `read`:** adicionada a `audit_alerts` (bool, default false)
-- **Joins:** audit_alerts + audit_rules + clients (para nomes)
-- **Desbloqueia:** Auditorias UI real (Cursor)
-
-#### DB Function: `search_interactions` (Lovable S4)
-- **Full-text search:** `search_vector @@ plainto_tsquery('portuguese', p_query)` com `ts_rank`
-- **Filtros opcionais:** p_client_id, p_tone
-- **Paginacao:** `COUNT(*) OVER()`, p_limit=20, p_offset=0
-- **Desbloqueia:** Pagina de busca global (Cursor)
-
-#### DB Function: `client_tone_trend_7d` (Lovable S5)
-- **Retorna:** 7 rows (1 por dia), colunas ok/atencao/alerta/critico
-- **Index-friendly:** `occurred_at >= d.day AND occurred_at < d.day + interval '1 day'`
-- **Desbloqueia:** Grafico de tendencia na ClientDetailPage (Cursor)
-
-#### DB Function: `global_stats_30d` (Issue #37)
-- **Retorna:** total_interactions_30d, pct_critico, pct_alerta, total_clients_monitored, monthly_tone_evolution (6 meses), top_themes (top 5)
-- **SQL puro** (LANGUAGE sql, STABLE, SECURITY DEFINER)
-- **RLS:** filtra via `user_accessible_client_ids(p_user_id)`
-- **Janelas:** 30 dias para totais, 6 meses para evolucao
-- **Desbloqueia:** PR-H2 (Dashboard KPI cards + graficos) — Cursor
+#### DB Functions (Lovable S3-S5 + Issue #37)
+- `audit_alerts_summary` — total_alerts_30d, unread_count, alerts top 50
+- `search_interactions` — full-text search com ts_rank, filtros, paginacao
+- `client_tone_trend_7d` — 7 rows por dia, index-friendly
+- `global_stats_30d` — KPIs 30d, evolucao tom 6 meses, top themes
 
 #### Edge Function: `evaluate-audit-rules` (Issue #38)
-- **Estrutura modular:** index.ts (handler), logic.ts (funcoes puras), index.test.ts (9 testes), README.md
 - **Metricas:** score_prioridade, tom_critico_pct, tom_alerta_pct, volume_periodo
 - **Fluxo:** fetchActiveRules → calculateMetric → evaluateRule → checkCooldown → insertAlert
-- **Batch + auto-chain:** AUDIT_BATCH_SIZE=20, fire-and-forget
 - **Trigger:** encadeado apos calculate-priority-scores (!hasMore)
-- **Auth:** service_role_key only
-- **Desbloqueia:** Auditorias UI real (Cursor, futuro)
 
-### Campo `status` em `clients` (Fase 6.5 — Sessao 7)
+### Campo `status` em `clients` (Fase 6.5)
 - **Coluna:** `status TEXT NOT NULL DEFAULT 'ativo'` com CHECK `('ativo','inativo','trial')`
-- **Controle:** 100% manual (Operador). Nunca alterado por sync, edge function ou cron
-- **Independente de `active`:** `active` continua para uso interno do sync (process-jobs L343 seta `active=false` apos 90d stale em `auto_created`)
-- **Frontend:** filtro default `.in("status", ["ativo", "trial"])` com toggle "Incluir inativos"
-- **Badge:** ativo=emerald, trial=blue, inativo=slate (com dark mode pairs)
-- **Banner:** clientes inativos mostram "Este cliente esta inativo. Interacoes continuam sendo processadas normalmente."
-- **Arquivos alterados:** ClientsPage, SearchPage, SettingsPage, GistContactWizard, ClientDetailPage
-- **Populacao inicial:** active=true→ativo (104), active=false→inativo (130)
+- **Controle:** 100% manual (Operador). Independente de `active`.
+- **Frontend:** filtro default ativo/trial + toggle "Incluir inativos"
+
+### Modulo de Tickets / Kanban (Fase 7)
+
+Documentacao completa na secao "Fase 7" acima. Resumo:
+- **8 tabelas** com RLS, 2 ENUMs, 6 indexes, 1 trigger, 1 storage bucket
+- **7 componentes** React + **6 hooks** + DnD (@dnd-kit) + Realtime notifications
+- **Rota:** `/demands` com sidebar "Demandas"
+
+### Onboarding User Access (Fase 7.1)
+
+Documentacao completa na secao "Fase 7.1" acima. Resumo:
+- **Trigger** `on_client_created` — novo client → viewer para todos os users
+- **Edge Function** `bootstrap-user-access` — primeiro login → viewer em todos os clients
+- **ProtectedRoute** — chama bootstrap fire-and-forget + invalidateQueries
 
 ### Sprint P1: Edicao de cliente (Issue #59, PR #61)
 - **Tab Configuracoes** em ClientDetailPage: formulario com nome, status, scope, tier
-- **Admin:** campos editaveis + botao Salvar. **Viewer:** read-only
-- **saveClientMutation:** atualiza `clients` (name, status, metadata.scope) + upsert `client_priority_config` (tier)
-- **Scope movido** da tab "Regras de Negocio" para "Configuracoes"
-- **Invalida:** client_detail, clients_list, client_priority_config, priority-scores
+- **saveClientMutation:** atualiza clients + upsert client_priority_config
 
 ### Sprint P3: CRUD de audit_rules (Issue #60, PR #62)
-- **Tabs** em Audits.tsx: "Alertas" (conteudo existente) + "Regras" (novo)
-- **Hook:** `useAuditRules` — paginado (PAGE_SIZE=20), join `clients(name)`, staleTime 30s
-- **4 operacoes:** create, update, delete (AlertDialog), toggle active (Switch)
-- **Dialog** com 10 campos incluindo destinatarios dinamicos (adicionar/remover)
-- **METRIC_CONFIG:** 11 metricas com labels legiveis em pt-BR
-- **Constraint duplicata:** tratada com toast amigavel
-- **Admin:** todas as acoes. **Viewer:** tabela read-only
+- **Tabs** em Audits.tsx: "Alertas" + "Regras" (CRUD com 10 campos, admin-only)
 
 ### Sprint P4: Busca server-side (Issue #63, PR #64)
-- **Hook:** `useDebounce<T>(value, delay)` — novo, compartilhado entre 3 telas
-- **ClientsPage:** `.ilike("name")` server-side, queryKey com termo, reset page=0, staleTime dinamico
-- **SearchPage:** debounce inline substituido por hook + secao "Clientes" (max 5, com Link e badge status) acima de "Interacoes"
-- **Dashboard:** debounce 300ms no filtro existente (client-side mantido para ~13 registros)
-- **Regra:** minimo 3 chars para disparar busca, debounce 300ms em todas as telas
+- **Hook:** `useDebounce<T>` — compartilhado entre 3 telas
+- **Regra:** minimo 3 chars, debounce 300ms
 
 ### Design System (docs/DESIGN_SYSTEM.md)
-- **Paleta semantica:** tom (emerald/yellow/orange/red), tier (primary/blue/slate/gray), score (emerald/yellow/orange/red), severity (red/yellow/emerald), saude (emerald/yellow/orange/red)
-- **Motion patterns:** 5 keyframes custom no tailwind.config.ts + tailwindcss-animate ja instalado
-- **Regras de decisao:** overlay (AlertDialog/Dialog/Sheet), feedback (toast/Alert), listas (Cards/Table/Pagination)
-- **Proibicoes:** 10 regras explicitas no .cursor/rules
+- **Paleta semantica:** tom, tier, score, severity, saude
+- **Motion patterns:** 5 keyframes custom no tailwind.config.ts
 
 ### Auditoria de Qualidade (blind tests com 32 conversas)
 
 | Versao | Modelo | Prompt | Nota | Tom | Tema |
 |--------|--------|--------|------|-----|------|
-| v2 | Flash | Original | 7.9 | 52% | 79% |
-| v3 | Flash | Mega Agente | 8.8 | 75% | 84% |
-| v4 | Claude Sonnet (cego) | Mega Agente | 8.6 | 72% | 78% |
-| v5 | Pro | Mega Agente | 8.8 | 81% | 81% |
 | **v6** | **Pro** | **Mega Agente + few-shot** | **9.0** | **84%** | **84%** |
 
-**Conclusao:** Gemini Pro + Mega Agente v6 e a versao definitiva. Nota 9.0/10, primeiro acima de 9. Claude performou pior com o mesmo prompt (8.6). Custo mensal ~$0.16.
-
 ### Volume e Custos
-- **Backlog:** ~33k msgs em ~1.680 conversas (100% classificado dentro da janela de 365d)
-- **Volume mensal:** ~117 conversas/mes (media ultimos 6 meses, tendencia crescente)
-- **Custo Gemini Pro:** ~$2.22 backlog + ~$0.16/mes recorrente (~$2/ano)
+- **Backlog:** ~33k msgs em ~1.680 conversas (100% classificado)
+- **Volume mensal:** ~117 conversas/mes
+- **Custo Gemini Pro:** ~$2.22 backlog + ~$0.16/mes (~$2/ano)
 
 ---
 
 ## Colaboracao
 
-Papeis, restricoes, fluxos e checklist completos em AGENTS.md (v9).
+Papeis, restricoes, fluxos e checklist completos em AGENTS.md (v10).
 
 | Agente | Papel | Canal |
 |--------|-------|-------|
-| **Claude Code** | Revisao e Engenharia | Terminal / CLI |
-| **Cursor** | Desenvolvimento Frontend | Cursor IDE |
-| **Lovable** | Migrations e Edge Functions (escopo reduzido) | Interface Lovable |
+| **Claude Code** | Revisao, Engenharia e Coordenacao | Terminal / CLI |
+| **Lovable** | Frontend + Backend (escopo total desde 2026-03-17) | Interface Lovable |
 | **Cowork** | Guardiao de Documentacao | Claude Desktop (pasta do repo) |
 | **Projeto** | Auditoria e Estrategia | claude.ai |
 | **Operador** (Joao) | Orquestrador Humano | Supabase Dashboard / GitHub |
 
-### Mudanca de estrategia (2026-03-08)
-- **Cursor assumiu o frontend** para reduzir dependencia e custo do Lovable
-- **Lovable fica restrito** a migrations, edge functions e deploy no Supabase
-- **Claude Code revisa** todo codigo do Cursor contra Checklist do CTO
-- **Plano de independencia:** migrar ownership do Supabase project para conta propria (futuro)
+### Mudanca de estrategia (2026-03-17)
+- **Cursor DESCONTINUADO** — removido do projeto. PRs historicos preservados.
+- **Lovable assume escopo total** (frontend + backend + deploy)
+- **Claude Code** audita todo codigo do Lovable contra Checklist do CTO + Design System + Anti-padroes
+- **Claude Code NUNCA edita codigo fonte** — apenas gera prompts para Lovable
+- **Lovable sync bidirecional:** commits vao direto para `main` (sem PRs separados)
 
 ### Preferencias do Operador
 - Respostas diretas e concisas — sem enrolacao
 - Conteudo self-contained para copy-paste — nunca pedir para intermediar
 - Nao dar estimativas de tempo — focar no que precisa ser feito
-- Todos os outputs dentro do repo conforme estrutura de pastas (nunca `~/Desktop/CX HUB/`)
+- Todos os outputs dentro do repo conforme estrutura de pastas
+- Prompts para Lovable: salvar em `docs/prompts/` e enviar link publico do GitHub
 - Repo publico: github.com/HyTrackWater/gist-insights-hub
 
 ---
 
-## Estrutura de Pastas (desde 2026-03-08)
+## Estrutura de Pastas
 
 ```
 gist-insights-hub/
@@ -364,21 +359,18 @@ gist-insights-hub/
 │   ├── E2E_TEST_PLAN.md                           # Testes E2E
 │   ├── COWORK_GUARDIAN_INSTRUCTION_v2.md           # Instrucao do Cowork
 │   ├── mega-agente/                               # Prompt do Mega Agente
-│   ├── prompts/                                   # Prompts ativos Cursor + Lovable
+│   ├── prompts/                                   # Prompts ativos Lovable
 │   │   └── archive/                               # Prompts de fases anteriores
-│   ├── auditorias/                                # Auditorias MANUAIS (Claude Code, MA, UX)
-│   │   ├── blind-tests/                           # Blind tests de classificacao IA
-│   │   └── ux/                                    # Auditorias UX/UI
+│   ├── auditorias/                                # Auditorias MANUAIS
 │   └── plans/                                     # Planos executivos historicos
 ├── auditorias/                                    # Relatorios AUTOMATICOS do Cowork
-│   └── PENDENTES.md                               # Violacoes abertas — mantido pelo Cowork
+│   └── PENDENTES.md                               # Violacoes abertas
 ├── scripts/
-├── src/                                           # Frontend (Cursor) — NAO TOCAR
-└── supabase/                                      # Backend (Lovable) — NAO TOCAR
+├── src/                                           # Frontend + UI (Lovable)
+│   └── components/demands/                        # Modulo de Tickets (7 componentes)
+└── supabase/                                      # Backend (Lovable) — migrations, edge functions
+    └── functions/bootstrap-user-access/           # Onboarding automatico
 ```
-
-Regra: `auditorias/` (raiz) = Cowork automatico. `docs/auditorias/` = manuais.
-`~/Desktop/CX HUB/` descontinuada em 2026-03-08.
 
 ---
 
@@ -386,40 +378,26 @@ Regra: `auditorias/` (raiz) = Cowork automatico. `docs/auditorias/` = manuais.
 
 1. **Concluido:** Reclassificacao do backlog (100% da janela 365d, 6 jobs, ~$2.22)
 2. **Concluido:** Divida tecnica do Checklist CTO (m1, m3, m4, m5, m6, m9, m12) — 8 PRs mergeados
-3. **Concluido:** Fase 5 backend — Priority Score Engine (Issue #32, Lovable)
-4. **Concluido:** Fase 5 frontend — Priority Dashboard + UX cleanup (Issue #33, Cursor, PRs #34 e #35)
-5. **Concluido:** Fase 6 backend — global_stats_30d (Issue #37) + evaluate-audit-rules (Issue #38), Lovable
-6. **Concluido:** Auditoria UX/UI — 12 PRs do Cursor mergeados (#39-#50), organizados em 5 LOTEs
-   - LOTE 1: PR-A1 (#39), PR-C (#40), PR-D (#41), PR-E (#42), PR-F (#43)
-   - LOTE 2: PR-A2 (#44)
-   - LOTE 3: PR-B (#45)
-   - LOTE 4: PR-G (#46), PR-H1 (#47), PR-I (#48)
-   - LOTE 5: PR-J (#49), PR-H2 (#50)
-   - Frontend Contracts: regra adicionada ao AGENTS.md — Lovable inclui contratos tipados em Issues que desbloqueiam Cursor
-7. **Concluido:** Lovable Marathon — 5 sessoes executadas com sucesso (S1-S5)
-   - Sessao 1: RLS policies audit_rules + audit_alerts
-   - Sessao 2: 39 regras seedadas, unique constraint, realtime, pg_cron */2h
-   - Sessao 3: DB function audit_alerts_summary + coluna read
-   - Sessao 4: DB function search_interactions (full-text + paginacao)
-   - Sessao 5: DB function client_tone_trend_7d (7 dias, LEFT JOIN)
-   - Sessao 6: Edge function deliver-audit-alerts — adiada, baixa prioridade
-   - Nota tecnica: `user_accessible_client_ids()` retorna `SETOF uuid`, nao `uuid[]`
-8. **Concluido:** Fase 6 frontend — 3 PRs do Cursor mergeados (#51-#53)
-   - PR #51: Audits UI real (KPIs, tabela alertas, empty/loading/error states)
-   - PR #52: SearchPage (busca global full-text, filtros, paginacao, rota /search, sidebar)
-   - PR #53: Tone trend 7d chart em ClientDetailPage (stacked BarChart)
-9. **Concluido:** Sessao 7 — Campo `status` em `clients`
-   - Lovable S7: migration com coluna status + CHECK + populacao (Issue #54)
-   - Cursor PR #57: filtro `.in("status", ["ativo","trial"])` em 4 arquivos, toggle "Incluir inativos", badge STATUS_CONFIG (Issue #55)
-   - Cursor PR #58: badge + banner informativo em ClientDetailPage (Issue #56)
-10. **Concluido:** Checklist E2E v2 — 67 testes manuais cobrindo 8 rotas, 8 hooks, 5 RPCs, 2 perfis
-11. **Concluido:** Sprint P1 — Edicao de cliente na tab Configuracoes (Issue #59, PR #61)
-12. **Concluido:** Sprint P3 — CRUD de audit_rules na pagina Auditorias (Issue #60, PR #62)
-13. **Concluido:** Sprint P4 — Busca server-side em 3 telas (Issue #63, PR #64)
-14. **Concluido:** Cowork configurado como Guardiao de Documentacao (2026-03-08)
-15. **Concluido:** Estrutura de pastas unificada no repo (migracao de `~/Desktop/CX HUB/`)
-16. **Concluido:** `auditorias/PENDENTES.md` criado com violacoes A1 e A2
-17. **Pendente:** Lovable S6 — Edge function deliver-audit-alerts (baixa prioridade, depende de decisao sobre canal)
-18. **Fechado:** PR #36 (docs: Auditoria UX/UI) — auditoria concluida
-19. **Fechado:** Issue #13 — Banner reclassificacao (won't-fix, cenario ja passou)
-20. **Fase 7:** Insights IA avancados
+3. **Concluido:** Fase 5 — Priority Score Engine (backend + frontend)
+4. **Concluido:** Fase 6 — Auditorias e Alertas (backend S1-S5 + frontend PRs #51-#53)
+5. **Concluido:** Auditoria UX/UI — 12 PRs do Cursor (#39-#53)
+6. **Concluido:** Lovable Marathon — 5 sessoes de backend (S1-S5)
+7. **Concluido:** Fase 6.5 — Campo status em clients (Issue #54, PRs #57-#58)
+8. **Concluido:** Sprint P1+P3+P4 (Issues #59, #60, #63; PRs #61, #62, #64)
+9. **Concluido:** Cursor descontinuado (2026-03-17) — Lovable assume escopo total
+10. **Concluido:** Fase 7 — Modulo de Tickets / Kanban (Lovable S1-A/B/C)
+    - S1-A: 8 migrations (tabelas, ENUMs, indexes, trigger, storage bucket, RLS)
+    - S1-B: Kanban frontend (DemandsPage, DnD, filtros, settings tabs)
+    - S1-C: Areas, Assignees, Attachments, Notifications (6 hooks, 7 componentes)
+    - Validacao S1-C: 2 bugs corrigidos (Issues #66-#67)
+11. **Concluido:** Issue #65 — SearchPage TDZ fix
+12. **Concluido:** Fase 7.1 — Onboarding User Access
+    - Migration: trigger on_client_created + backfill (viewer para todos)
+    - Edge Function: bootstrap-user-access (primeiro login)
+    - ProtectedRoute: fire-and-forget + invalidateQueries apos bootstrap
+13. **Pendente:** Lovable S6 — Edge function deliver-audit-alerts (baixa prioridade)
+14. **Pendente:** Issue #65 — fechar no GitHub (fix ja aplicado)
+15. **Pendente:** Verificar RLS nas 4 tabelas novas do modulo de Tickets (Operador: query pg_tables)
+16. **Pendente:** Testar aba "Areas" visivel apenas para admin (Operador: conta viewer)
+17. **Pendente:** Testar notificacoes in-app com 2 usuarios simultaneos
+18. **Fase 8:** Insights IA avancados
