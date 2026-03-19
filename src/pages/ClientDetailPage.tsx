@@ -1295,7 +1295,9 @@ function ClientTokenSection({ clientId, isAdmin }: { clientId: string | undefine
   const generateToken = useGenerateClientToken(clientId);
   const [regenerateOpen, setRegenerateOpen] = useState(false);
 
-  const baseUrl = window.location.origin;
+  // Usa o domínio publicado para garantir que o link não exponha o ambiente de preview
+  const PUBLISHED_ORIGIN = "https://gist-sparkle.lovable.app";
+  const baseUrl = window.location.hostname === "localhost" ? window.location.origin : PUBLISHED_ORIGIN;
   const publicUrl = tokenData?.token ? `${baseUrl}/public/demands/${tokenData.token}` : null;
 
   const handleCopy = () => {
