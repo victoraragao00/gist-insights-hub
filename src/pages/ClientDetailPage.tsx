@@ -1094,6 +1094,7 @@ const ClientDetailPage = () => {
 
         {/* ── TAB 6: Configurações ── */}
         <TabsContent value="settings" className="space-y-6">
+          <ClientTokenSection clientId={clientId} isAdmin={isAdmin} />
           {/* Dados do cliente */}
           <Card className="border border-border rounded-xl">
             <CardHeader className="pb-3">
