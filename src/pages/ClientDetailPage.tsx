@@ -199,6 +199,9 @@ const ClientDetailPage = () => {
   const [editTier, setEditTier] = useState<string>("medium");
   const [pageInteractions, setPageInteractions] = useState(0);
   const [pageParticipants, setPageParticipants] = useState(0);
+  const [createDemandOpen, setCreateDemandOpen] = useState(false);
+  const [selectedDemand, setSelectedDemand] = useState<DemandRow | null>(null);
+  const [demandSheetOpen, setDemandSheetOpen] = useState(false);
 
   const thirtyDaysAgo = useMemo(
     () => new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(), []
