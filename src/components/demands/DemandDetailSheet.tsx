@@ -31,7 +31,7 @@ import {
   type DemandRow,
 } from "@/hooks/useDemands";
 import { useDemandAreas } from "@/hooks/useDemandAreas";
-import { useDemandAssignees } from "@/hooks/useDemandAssignees";
+import { useQuery } from "@tanstack/react-query";
 import {
   useDemandAttachments, useUploadAttachments, useAddLink, useDeleteAttachment,
 } from "@/hooks/useDemandAttachments";
