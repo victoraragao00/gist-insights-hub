@@ -101,6 +101,15 @@ function DemandDetailContent({ demand, onClose }: { demand: DemandRow; onClose: 
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [newLinkUrl, setNewLinkUrl] = useState("");
 
+  // Re-sync local state when demand prop updates (e.g. after refetch)
+  useEffect(() => {
+    setTitle(demand.title);
+    setDescription(demand.description ?? "");
+    setExpectedResult(demand.expected_result ?? "");
+    setNotes(demand.notes ?? "");
+    setRfiUrl(demand.rfi_url ?? "");
+  }, [demand.id, demand.title, demand.description, demand.expected_result, demand.notes, demand.rfi_url]);
+
   const saveField = useCallback((field: string, value: string, label: string) => {
     updateMutation.mutate({ id: demand.id, fields: { [field]: value || null }, fieldLabel: label });
   }, [demand.id, updateMutation]);
