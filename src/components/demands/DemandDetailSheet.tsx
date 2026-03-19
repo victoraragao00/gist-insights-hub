@@ -213,6 +213,7 @@ function CommentItem({
 
 function DemandDetailContent({ demand, onClose }: { demand: DemandRow; onClose: () => void }) {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const { data: columns = [] } = useTicketColumns();
   const { data: types = [] } = useDemandTypes();
   const { data: areas = [] } = useDemandAreas();
@@ -221,6 +222,8 @@ function DemandDetailContent({ demand, onClose }: { demand: DemandRow; onClose: 
   const { data: attachments = [] } = useDemandAttachments(demand.id);
   const { data: linkedInteractions = [] } = useDemandInteractions(demand.id);
   const { data: comments = [] } = useDemandComments(demand.id);
+  const { data: watchers = [] } = useDemandWatchers(demand.id);
+  const toggleWatcherMutation = useToggleWatcher(demand.id);
 
   const updateMutation = useUpdateDemand();
   const moveMutation = useMoveDemand();
@@ -240,6 +243,18 @@ function DemandDetailContent({ demand, onClose }: { demand: DemandRow; onClose: 
   const [rfiUrl, setRfiUrl] = useState(demand.rfi_url ?? "");
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [newLinkUrl, setNewLinkUrl] = useState("");
+  // Block dialog state
+  const [blockDialogOpen, setBlockDialogOpen] = useState(false);
+  const [blockerReason, setBlockerReason] = useState("");
+  const [blockedBy, setBlockedBy] = useState("");
+  const [blockLoading, setBlockLoading] = useState(false);
+  // Cancel dialog state
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelOther, setCancelOther] = useState("");
+  const [cancelLoading, setCancelLoading] = useState(false);
+
+  const isWatching = watchers.some((w) => w.user_id === user?.id);
   const [linkConvOpen, setLinkConvOpen] = useState(false);
   const [newComment, setNewComment] = useState("");
 
