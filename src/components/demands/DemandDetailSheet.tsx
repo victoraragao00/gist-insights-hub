@@ -491,7 +491,7 @@ function DemandDetailContent({ demand, onClose }: { demand: DemandRow; onClose: 
           >
             <SelectTrigger className="h-8"><SelectValue placeholder="—" /></SelectTrigger>
             <SelectContent>
-              {assignees.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+              {userProfiles.map((u) => <SelectItem key={u.id} value={u.id}>{u.full_name ?? u.email}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
