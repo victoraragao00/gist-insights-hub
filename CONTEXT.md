@@ -1,4 +1,4 @@
-# CONTEXT.md — Estado do Projeto (v20 — 2026-03-19)
+# CONTEXT.md — Estado do Projeto (v21 — 2026-03-19)
 
 > Mantido pelo Claude Code ao final de cada sessao. Lido por todos os agentes para manter contexto.
 >
@@ -24,6 +24,8 @@
 | 7.1 | Onboarding User Access | Concluido — Migration (trigger + backfill) + Edge Function + ProtectedRoute bootstrap |
 | 7.2 | Integracao Gist ↔ Ticket + Comentarios | Concluido — Sprint S2 (Issue #68): demand_interactions, demand_comments, LinkConversationDialog, tab Demandas na ClientDetailPage |
 | 7.3 | Dashboard Analitico + One-Page + Bloqueio | Concluido — Sprint S3 (Issue #69): DemandsDashboardPage, PublicDemandsPage, client-demands-public, tokens, watchers, bloqueio/cancelamento, CSV export |
+| 7.4 | Gestao de Usuarios e Permissionamento | Concluido — Sprint S4 (Issue #70): user_profiles, role global (admin/analyst/viewer), user_accessible_client_ids atualizada, aba Usuarios em Settings |
+| 7.5 | Unificacao Assignees | Concluido — Issue #71: assignee_id → user_profiles, aba Responsaveis removida, dropdowns listam usuarios reais |
 | 8 | Insights IA avancados | Placeholder |
 
 ---
@@ -174,6 +176,54 @@ Validacao feita pelo Vitor (triagem). 2 bugs identificados e corrigidos:
 
 ---
 
+## Fase 7.4 — Gestao de Usuarios e Permissionamento (Sprint S4 — Issue #70 — Concluido)
+
+### Migration
+- Tabela `user_profiles` (id UUID PK sem FK em auth.users, email, full_name, global_role CHECK admin/analyst/viewer, active)
+- RLS: `user_profiles_select_own` (id = auth.uid()), `user_profiles_select_admin` (scalar subquery sem recursao), `user_profiles_update` (admin only com WITH CHECK)
+- Backfill via `INSERT ... SELECT FROM auth.users ON CONFLICT DO NOTHING`
+- `user_accessible_client_ids` atualizada: admin global ve todos os clients ativos, outros via user_client_access
+- `get_users_with_permissions()` — agrega user_profiles + user_client_access + auth.users, admin-only (RAISE EXCEPTION)
+
+### Edge Function: bootstrap-user-access (estendida)
+- Cria `user_profiles` ANTES do check de `user_client_access` (ponto critico — users existentes ja com acesso tambem ganham perfil)
+- Usa `supaAdmin.auth.admin.getUserById()` para email/nome
+
+### Hooks
+- `useUserRole.ts` — expandido: le de `user_profiles.global_role` com fallback para `user_client_access`. `UserRole = "admin" | "analyst" | "viewer"`. Retorna `isAnalyst`.
+- `useUsers.ts` — RPC get_users_with_permissions
+- `useUserManagement.ts` — useUpdateUserRole (protecao auto-rebaixamento + ultimo admin), useUpdateClientAccess (UPSERT), useRemoveClientAccess, useToggleUserActive (protecao auto-desativacao)
+
+### Frontend
+- `UserManagementTab.tsx` — tabela com Select role inline, Switch ativo/inativo, busca, botao "Gerenciar"
+- `UserPermissionsSheet.tsx` — overrides por cliente (Herdar global / viewer / analyst / Sem acesso), auto-save no onChange, callout especial para admin global
+- `SettingsPage.tsx` — aba "Equipe & Acessos" (admin-only)
+
+### Acao manual pos-deploy
+```sql
+UPDATE user_profiles SET global_role = 'admin' WHERE email = '<email_do_operador>';
+```
+
+---
+
+## Fase 7.5 — Unificacao Assignees (Issue #71 — Concluido)
+
+**Problema:** `demand_assignees` (nomes livres) e `user_profiles` (usuarios reais) eram redundantes.
+
+### Migration
+- RLS `user_profiles_select_active` — qualquer autenticado le perfis ativos (necessario para dropdown de responsavel)
+- Nullify `assignee_id` orfaos (que apontavam para demand_assignees)
+- Tabela `demand_assignees` mantida no banco (nao dropada)
+
+### Mudancas
+- `useDemands.ts` e `useClientDemands.ts` — join troca de `demand_assignees(name)` para `user_profiles!assignee_id(full_name, email)`
+- `DemandCard.tsx` — exibe `full_name ?? email`
+- `CreateDemandDialog.tsx` e `DemandDetailSheet.tsx` — dropdown lista `user_profiles` ativos (query `user_profiles_active`)
+- `SettingsPage.tsx` — aba "Responsaveis de Tarefas" removida
+- **Fix adicional:** aba "Areas" havia sido removida acidentalmente junto com "Responsaveis" — restaurada
+
+---
+
 ## Fase 5 — Priority Score Engine
 
 ### Backend (Issue #32 — Lovable — Concluido)
@@ -260,6 +310,8 @@ AUDIT_BATCH_SIZE=20
 | #67 | fix: campo RFI nao clicavel | Fechada | Lovable |
 | #68 | Sprint S2: Gist ↔ Ticket + Comentarios | Fechada | Lovable |
 | #69 | Sprint S3: Dashboard + One-Page + Bloqueio | Fechada | Lovable |
+| #70 | Sprint S4: Gestao de Usuarios + Permissionamento | Fechada | Lovable |
+| #71 | Unificar assignees demand_assignees → user_profiles | Fechada | Lovable |
 
 ---
 
@@ -332,15 +384,17 @@ Todos resolvidos. Ver PRs #31, #34, #35, #41, #43-#50, #51 para detalhes.
 - **Controle:** 100% manual (Operador). Independente de `active`.
 - **Frontend:** filtro default ativo/trial + toggle "Incluir inativos"
 
-### Modulo de Tickets / Kanban (Fase 7 + 7.2 + 7.3)
+### Modulo de Tickets / Kanban (Fase 7 + 7.2 + 7.3 + 7.4 + 7.5)
 
-Documentacao completa nas secoes "Fase 7", "Fase 7.2" e "Fase 7.3" acima. Resumo:
-- **12 tabelas** com RLS (demands, activities, areas, assignees, attachments, notifications, interactions, comments, client_tokens, watchers + ticket_columns, demand_types)
-- **3 DB functions** (get_client_conversations, get_demand_analytics, get_client_public_demands)
-- **1 Edge Function** publica (client-demands-public)
+Documentacao completa nas secoes "Fase 7" a "Fase 7.5" acima. Resumo:
+- **13 tabelas** com RLS (demands, activities, areas, assignees[legado], attachments, notifications, interactions, comments, client_tokens, watchers, user_profiles + ticket_columns, demand_types)
+- **4 DB functions** (get_client_conversations, get_demand_analytics, get_client_public_demands, get_users_with_permissions)
+- **2 Edge Functions** (client-demands-public, bootstrap-user-access estendida)
 - **3 paginas** (DemandsPage/Kanban, DemandsDashboardPage, PublicDemandsPage)
-- **8 componentes** demands/ + **~15 hooks** + DnD + Realtime
+- **~8 componentes** demands/ + **~20 hooks** + DnD + Realtime
 - **Rotas:** `/demands`, `/demands/dashboard`, `/public/demands/:token`
+- **Permissionamento:** role global em user_profiles (admin/analyst/viewer), user_accessible_client_ids com bypass admin
+- **Assignees unificados:** demand_assignees desacoplada, assignee_id → user_profiles
 
 ### Onboarding User Access (Fase 7.1)
 
@@ -465,8 +519,13 @@ gist-insights-hub/
     - demand_client_tokens + demand_watchers + get_demand_analytics + get_client_public_demands
     - Edge Function client-demands-public + DemandsDashboardPage + PublicDemandsPage
     - Bloqueio/Cancelamento/Watchers no Sheet + token na ClientDetailPage + Export CSV
-15. **Pendente:** Lovable S6 — Edge function deliver-audit-alerts (baixa prioridade)
-16. **Pendente:** Issue #65 — fechar no GitHub (fix ja aplicado)
-17. **Pendente:** Verificar RLS nas tabelas novas do modulo de Tickets (Operador: query pg_tables)
-18. **Pendente:** Testar notificacoes in-app com 2 usuarios simultaneos
-19. **Fase 8:** Insights IA avancados
+15. **Concluido:** Fase 7.4 — Sprint S4: Gestao de Usuarios (Issue #70)
+    - user_profiles + role global (admin/analyst/viewer) + user_accessible_client_ids atualizada
+    - bootstrap-user-access estendida + useUserRole expandido + aba Equipe & Acessos
+16. **Concluido:** Fase 7.5 — Unificacao Assignees (Issue #71)
+    - assignee_id → user_profiles, aba Responsaveis removida, RLS permissiva para dropdown
+    - Fix: aba Areas restaurada (removida acidentalmente)
+17. **Pendente:** Lovable S6 — Edge function deliver-audit-alerts (baixa prioridade)
+18. **Pendente:** Issue #65 — fechar no GitHub (fix ja aplicado)
+19. **Pendente:** Testar notificacoes in-app com 2 usuarios simultaneos
+20. **Fase 8:** Insights IA avancados
