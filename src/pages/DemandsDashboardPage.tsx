@@ -109,16 +109,16 @@ const DemandsDashboardPage = () => {
         </div>
       ) : (
         <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-          <KPICard label="Total" value={String(totals?.total ?? 0)} sub={`últimos ${days} dias`} />
-          <KPICard label="Abertos" value={String(totals?.open ?? 0)} sub="em andamento" />
-          <KPICard label="Concluídos" value={String(totals?.completed ?? 0)} sub="finalizados" />
-          <KPICard label="Bloqueados" value={String(totals?.blocked ?? 0)} sub="com bloqueio" />
-          <KPICard
+          <DashKPICard label="Total" value={String(totals?.total ?? 0)} sub={`últimos ${days} dias`} />
+          <DashKPICard label="Abertos" value={String(totals?.open ?? 0)} sub="em andamento" />
+          <DashKPICard label="Concluídos" value={String(totals?.completed ?? 0)} sub="finalizados" />
+          <DashKPICard label="Bloqueados" value={String(totals?.blocked ?? 0)} sub="com bloqueio" />
+          <DashKPICard
             label="Lead Time médio"
             value={formatHours(totals?.avg_lead_time_hours)}
             sub="criação → conclusão"
           />
-          <KPICard
+          <DashKPICard
             label="Cycle Time médio"
             value={formatHours(totals?.avg_cycle_time_hours)}
             sub="início → conclusão"
