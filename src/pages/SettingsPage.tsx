@@ -652,6 +652,12 @@ const SettingsPage = () => {
                       {integ.connected ? "Conectado" : integ.enabled ? "Desconectado" : "Em breve"}
                     </Badge>
 
+                  {integ.enabled && integ.id === "gist" && !integ.connected && (
+                      <Button size="sm" variant="outline" onClick={() => setWizardOpen(true)}>
+                        Adicionar
+                      </Button>
+                    )}
+
                     {integ.enabled && integ.id === "gist" && integ.connected && (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -660,13 +666,13 @@ const SettingsPage = () => {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => setWizardOpen(true)}>
+                            <Users className="h-4 w-4 mr-2" />
+                            Adicionar / Gerenciar Contatos
+                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={handleImportHistory} disabled={syncing}>
                             <Download className="h-4 w-4 mr-2" />
                             Importar Histórico
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => setWizardOpen(true)}>
-                            <Users className="h-4 w-4 mr-2" />
-                            Gerenciar Contatos
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem disabled>
