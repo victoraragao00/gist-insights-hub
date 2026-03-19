@@ -200,7 +200,7 @@ const ClientDetailPage = () => {
   const [pageInteractions, setPageInteractions] = useState(0);
   const [pageParticipants, setPageParticipants] = useState(0);
   const [createDemandOpen, setCreateDemandOpen] = useState(false);
-  const [selectedDemand, setSelectedDemand] = useState<DemandRow | null>(null);
+  const [selectedDemandId, setSelectedDemandId] = useState<string | null>(null);
   const [demandSheetOpen, setDemandSheetOpen] = useState(false);
 
   const thirtyDaysAgo = useMemo(
