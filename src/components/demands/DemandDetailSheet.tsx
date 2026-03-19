@@ -110,6 +110,12 @@ function DemandDetailContent({ demand, onClose }: { demand: DemandRow; onClose: 
     setRfiUrl(demand.rfi_url ?? "");
   }, [demand.id, demand.title, demand.description, demand.expected_result, demand.notes, demand.rfi_url]);
 
+  const normalizeUrl = (url: string) => {
+    const trimmed = url.trim();
+    if (!trimmed) return trimmed;
+    return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  };
+
   const saveField = useCallback((field: string, value: string, label: string) => {
     updateMutation.mutate({ id: demand.id, fields: { [field]: value || null }, fieldLabel: label });
   }, [demand.id, updateMutation]);
