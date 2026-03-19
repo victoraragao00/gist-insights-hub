@@ -72,8 +72,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Use service role to invite
-    const adminClient = createClient(supabaseUrl, serviceRoleKey);
+    // Use service role to invite (adminClient already created above)
     const { data: inviteData, error: inviteErr } = await adminClient.auth.admin.inviteUserByEmail(
       email.toLowerCase().trim(),
       {
