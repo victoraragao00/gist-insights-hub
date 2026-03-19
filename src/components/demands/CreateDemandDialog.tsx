@@ -161,8 +161,8 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaul
               <Select value={assigneeId} onValueChange={setAssigneeId}>
                 <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                 <SelectContent>
-                  {assignees.map((a) => (
-                    <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                  {userProfiles.map((u) => (
+                    <SelectItem key={u.id} value={u.id}>{u.full_name ?? u.email}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
