@@ -24,25 +24,29 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-    // Verify caller is admin
+    // Use service role admin client (bypasses RLS for permission checks)
+    const adminClient = createClient(supabaseUrl, serviceRoleKey);
+
+    // Verify caller identity via anon client + JWT
     const callerClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
     });
-    const { data: { user: callerUser } } = await callerClient.auth.getUser();
-    if (!callerUser) {
+    const { data: { user: callerUser }, error: userErr } = await callerClient.auth.getUser();
+    if (userErr || !callerUser) {
       return new Response(JSON.stringify({ error: "Não autorizado" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const { data: profile } = await callerClient
+    // Check admin via service role (bypasses RLS — reliable)
+    const { data: profile } = await adminClient
       .from("user_profiles")
       .select("global_role")
       .eq("id", callerUser.id)
       .maybeSingle();
 
-    const { data: clientAccess } = await callerClient
+    const { data: clientAccess } = await adminClient
       .from("user_client_access")
       .select("role")
       .eq("user_id", callerUser.id)
