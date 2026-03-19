@@ -1295,8 +1295,8 @@ function ClientTokenSection({ clientId, isAdmin }: { clientId: string | undefine
   const generateToken = useGenerateClientToken(clientId);
   const [regenerateOpen, setRegenerateOpen] = useState(false);
 
-  // Usa o domínio publicado para garantir que o link não exponha o ambiente de preview
-  const PUBLISHED_ORIGIN = "https://gist-sparkle.lovable.app";
+  // Domínio customizado — nunca expõe o ambiente de preview ao cliente
+  const PUBLISHED_ORIGIN = "https://cxhub.umode.tech";
   const baseUrl = window.location.hostname === "localhost" ? window.location.origin : PUBLISHED_ORIGIN;
   const publicUrl = tokenData?.token ? `${baseUrl}/public/demands/${tokenData.token}` : null;
 
