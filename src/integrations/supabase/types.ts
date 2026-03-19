@@ -1028,6 +1028,36 @@ export type Database = {
           },
         ]
       }
+      user_profiles: {
+        Row: {
+          active: boolean | null
+          created_at: string | null
+          email: string | null
+          full_name: string | null
+          global_role: string
+          id: string
+          updated_at: string | null
+        }
+        Insert: {
+          active?: boolean | null
+          created_at?: string | null
+          email?: string | null
+          full_name?: string | null
+          global_role?: string
+          id: string
+          updated_at?: string | null
+        }
+        Update: {
+          active?: boolean | null
+          created_at?: string | null
+          email?: string | null
+          full_name?: string | null
+          global_role?: string
+          id?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -1112,6 +1142,18 @@ export type Database = {
       get_demand_analytics: {
         Args: { p_client_id?: string; p_days?: number }
         Returns: Json
+      }
+      get_users_with_permissions: {
+        Args: never
+        Returns: {
+          active: boolean
+          client_overrides: Json
+          email: string
+          full_name: string
+          global_role: string
+          last_sign_in: string
+          user_id: string
+        }[]
       }
       global_stats_30d: {
         Args: { p_user_id: string }
