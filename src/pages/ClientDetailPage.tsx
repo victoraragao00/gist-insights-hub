@@ -1094,6 +1094,7 @@ const ClientDetailPage = () => {
 
         {/* ── TAB 6: Configurações ── */}
         <TabsContent value="settings" className="space-y-6">
+          <ClientTokenSection clientId={clientId} isAdmin={isAdmin} />
           {/* Dados do cliente */}
           <Card className="border border-border rounded-xl">
             <CardHeader className="pb-3">
@@ -1284,6 +1285,92 @@ function KPICard({ label, value, sub }: { label: string; value: string; sub: str
         <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">{label}</p>
         <p className="text-2xl font-bold text-foreground mt-1">{value}</p>
         <p className="text-[11px] text-muted-foreground mt-0.5">{sub}</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ClientTokenSection({ clientId, isAdmin }: { clientId: string | undefined; isAdmin: boolean }) {
+  const { data: tokenData, isLoading } = useClientToken(clientId);
+  const generateToken = useGenerateClientToken(clientId);
+  const [regenerateOpen, setRegenerateOpen] = useState(false);
+
+  const baseUrl = window.location.origin;
+  const publicUrl = tokenData?.token ? `${baseUrl}/public/demands/${tokenData.token}` : null;
+
+  const handleCopy = () => {
+    if (!publicUrl) return;
+    navigator.clipboard.writeText(publicUrl);
+    toast.success("URL copiada!");
+  };
+
+  if (!isAdmin) return null;
+
+  return (
+    <Card className="border border-border rounded-xl">
+      <CardHeader className="pb-3">
+        <div className="flex items-center gap-2">
+          <Link2 className="h-4 w-4 text-muted-foreground" />
+          <CardTitle className="text-base font-semibold">One-Page do Cliente</CardTitle>
+        </div>
+        <p className="text-xs text-muted-foreground mt-1">
+          Gere um link público para o cliente visualizar suas demandas sem login.
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {isLoading ? (
+          <Skeleton className="h-10 w-full animate-shimmer" />
+        ) : publicUrl ? (
+          <>
+            <div className="flex items-center gap-2">
+              <Input
+                readOnly
+                value={publicUrl}
+                className="h-9 text-xs font-mono bg-muted/50"
+              />
+              <Button size="sm" variant="outline" onClick={handleCopy} className="shrink-0">
+                <Copy className="h-4 w-4 mr-1" /> Copiar
+              </Button>
+            </div>
+            <AlertDialog open={regenerateOpen} onOpenChange={setRegenerateOpen}>
+              <AlertDialogTrigger asChild>
+                <Button size="sm" variant="outline" className="text-muted-foreground">
+                  <RefreshCw className="h-4 w-4 mr-1" /> Regenerar link
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Regenerar link?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    O link atual deixará de funcionar. Um novo link será gerado e o cliente precisará do novo endereço.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => {
+                      generateToken.mutate();
+                      setRegenerateOpen(false);
+                    }}
+                    disabled={generateToken.isPending}
+                  >
+                    {generateToken.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
+                    Confirmar
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </>
+        ) : (
+          <Button
+            size="sm"
+            onClick={() => generateToken.mutate()}
+            disabled={generateToken.isPending}
+          >
+            {generateToken.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
+            Gerar link
+          </Button>
+        )}
       </CardContent>
     </Card>
   );
