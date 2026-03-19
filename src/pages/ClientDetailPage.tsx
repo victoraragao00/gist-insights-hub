@@ -778,6 +778,133 @@ const ClientDetailPage = () => {
           )}
         </TabsContent>
 
+        {/* ── TAB: Demandas ── */}
+        <TabsContent value="demands" className="space-y-6">
+          {/* KPI Row */}
+          {loadingDemands ? (
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-24 rounded-xl" />)}
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <KPICard label="Total" value={String(clientDemands.length)} sub="demandas" />
+              <KPICard
+                label="Abertos"
+                value={String(clientDemands.filter((d) => !d.ticket_columns?.triggers_finished_at).length)}
+                sub="em andamento"
+              />
+              <KPICard
+                label="Concluídos"
+                value={String(clientDemands.filter((d) => d.ticket_columns?.triggers_finished_at).length)}
+                sub="finalizados"
+              />
+              <KPICard
+                label="Bloqueados"
+                value={String(clientDemands.filter((d) => d.is_blocked).length)}
+                sub="com bloqueio"
+              />
+            </div>
+          )}
+
+          {/* Header + button */}
+          <div className="flex items-center justify-between">
+            <h3 className="text-base font-semibold text-foreground">Últimas 20 demandas</h3>
+            <Button
+              size="sm"
+              onClick={() => setCreateDemandOpen(true)}
+            >
+              <Plus className="h-4 w-4 mr-1" /> Nova demanda
+            </Button>
+          </div>
+
+          {loadingDemands && (
+            <div className="space-y-2">
+              {[1, 2, 3].map((i) => <Skeleton key={i} className="h-14 rounded-lg" />)}
+            </div>
+          )}
+
+          {!loadingDemands && clientDemands.length === 0 && (
+            <div className="text-center py-12 text-muted-foreground text-sm">
+              Nenhuma demanda para este cliente
+            </div>
+          )}
+
+          {clientDemands.map((d) => {
+            const PRIORITY_BADGE: Record<string, string> = {
+              urgent: "bg-red-50 text-red-600 dark:bg-red-950 dark:text-red-400",
+              high: "bg-orange-50 text-orange-600 dark:bg-orange-950 dark:text-orange-400",
+              medium: "bg-yellow-50 text-yellow-600 dark:bg-yellow-950 dark:text-yellow-400",
+              low: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400",
+            };
+            const PRIORITY_LABEL: Record<string, string> = {
+              urgent: "Urgente", high: "Alta", medium: "Média", low: "Baixa",
+            };
+            return (
+              <button
+                key={d.id}
+                onClick={() => {
+                  setSelectedDemand(d as unknown as DemandRow);
+                  setDemandSheetOpen(true);
+                }}
+                className="w-full text-left rounded-lg border border-border p-3 hover:bg-accent transition-colors space-y-1.5"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <span className="text-sm font-medium truncate flex-1">{d.title}</span>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {d.is_blocked && (
+                      <Badge variant="outline" className="text-xs border-destructive/30 text-destructive">Bloqueado</Badge>
+                    )}
+                    <span className={`inline-flex items-center rounded-sm px-1.5 py-0.5 text-xs font-medium ${PRIORITY_BADGE[d.priority] ?? ""}`}>
+                      {PRIORITY_LABEL[d.priority] ?? d.priority}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {d.demand_types && (
+                    <Badge
+                      variant="outline"
+                      className="text-xs border-0"
+                      style={d.demand_types.color ? { backgroundColor: d.demand_types.color + "20", color: d.demand_types.color } : undefined}
+                    >
+                      {d.demand_types.icon && <span className="mr-1">{d.demand_types.icon}</span>}
+                      {d.demand_types.name}
+                    </Badge>
+                  )}
+                  {d.ticket_columns && (
+                    <Badge
+                      variant="outline"
+                      className="text-xs border-0"
+                      style={d.ticket_columns.color ? { backgroundColor: d.ticket_columns.color + "20", color: d.ticket_columns.color } : undefined}
+                    >
+                      {d.ticket_columns.name}
+                    </Badge>
+                  )}
+                  {d.demand_assignees && (
+                    <span className="text-xs text-muted-foreground">{d.demand_assignees.name}</span>
+                  )}
+                  {d.created_at && (
+                    <span className="text-xs text-muted-foreground ml-auto">
+                      {new Date(d.created_at).toLocaleDateString("pt-BR")}
+                    </span>
+                  )}
+                </div>
+              </button>
+            );
+          })}
+
+          <CreateDemandDialog
+            open={createDemandOpen}
+            onOpenChange={setCreateDemandOpen}
+            defaultClientId={clientId}
+          />
+
+          <DemandDetailSheet
+            demand={selectedDemand}
+            open={demandSheetOpen}
+            onOpenChange={setDemandSheetOpen}
+          />
+        </TabsContent>
+
         {/* ── TAB: Interações ── */}
         <TabsContent value="interactions" className="min-h-[500px]">
           <InteractionsFeed clientId={client.id} />
