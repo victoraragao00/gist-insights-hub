@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate, Link, useNavigate as useNav } from "react-router-dom";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -24,7 +24,7 @@ import {
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ChevronRight, Pencil, MoreHorizontal, Loader2, Upload, AlertCircle } from "lucide-react";
+import { ChevronRight, MoreHorizontal, Loader2, AlertCircle, Plus } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { InteractionsFeed } from "@/components/InteractionsFeed";
 import { supabase } from "@/integrations/supabase/client";
@@ -33,8 +33,12 @@ import { useAuth } from "@/context/AuthContext";
 import { useUserRole } from "@/hooks/useUserRole";
 import { usePriorityScores } from "@/hooks/usePriorityScores";
 import { useClientToneTrend } from "@/hooks/useClientToneTrend";
+import { useClientDemands } from "@/hooks/useClientDemands";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { ChartContainer } from "@/components/ui/chart";
+import { CreateDemandDialog } from "@/components/demands/CreateDemandDialog";
+import { DemandDetailSheet } from "@/components/demands/DemandDetailSheet";
+import type { DemandRow } from "@/hooks/useDemands";
 
 // ── Types ──
 
