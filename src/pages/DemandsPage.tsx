@@ -182,11 +182,21 @@ const DemandsPage = () => {
   return (
     <div className="p-6 space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <h1 className="text-2xl font-bold text-foreground">Demandas</h1>
-        <Button onClick={() => { setCreateColumnId(undefined); setCreateOpen(true); }}>
-          <Plus className="h-4 w-4 mr-1" /> Nova demanda
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => exportCSVMutation.mutate(filters)}
+            disabled={exportCSVMutation.isPending}
+          >
+            <Download className="h-4 w-4 mr-1" /> Exportar CSV
+          </Button>
+          <Button onClick={() => { setCreateColumnId(undefined); setCreateOpen(true); }}>
+            <Plus className="h-4 w-4 mr-1" /> Nova demanda
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
