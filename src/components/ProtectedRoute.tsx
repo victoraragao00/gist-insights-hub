@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2 } from "lucide-react";
 
@@ -8,19 +9,24 @@ const BOOTSTRAP_KEY = "bootstrap-user-access-done";
 
 export function ProtectedRoute() {
   const { user, loading } = useAuth();
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     if (!user) return;
     if (sessionStorage.getItem(BOOTSTRAP_KEY)) return;
 
-    sessionStorage.setItem(BOOTSTRAP_KEY, "1");
-
     supabase.functions
       .invoke("bootstrap-user-access")
+      .then(({ data }) => {
+        sessionStorage.setItem(BOOTSTRAP_KEY, "1");
+        if (data?.bootstrapped) {
+          queryClient.invalidateQueries();
+        }
+      })
       .catch(() => {
-        // fire-and-forget — don't block the user
+        // Don't set flag — retries on next navigation
       });
-  }, [user]);
+  }, [user, queryClient]);
 
   if (loading) {
     return (
