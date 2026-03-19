@@ -21,21 +21,29 @@ import {
 } from "@/components/ui/select";
 import {
   Plus, ArrowRightLeft, User, Lock, Unlock, Edit, Trash2, Loader2,
-  FileText, Link2, Upload, ExternalLink, X,
+  FileText, Link2, Upload, ExternalLink, X, MessageSquare,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
   useTicketColumns, useDemandTypes, useDemandActivities,
   useUpdateDemand, useMoveDemand, useDeleteDemand,
-  type DemandRow, type DemandPriority,
+  type DemandRow,
 } from "@/hooks/useDemands";
 import { useDemandAreas } from "@/hooks/useDemandAreas";
 import { useDemandAssignees } from "@/hooks/useDemandAssignees";
 import {
   useDemandAttachments, useUploadAttachments, useAddLink, useDeleteAttachment,
-  type DemandAttachment,
 } from "@/hooks/useDemandAttachments";
+import {
+  useDemandInteractions, useUnlinkInteraction,
+} from "@/hooks/useDemandInteractions";
+import {
+  useDemandComments, useCreateComment, useUpdateComment, useDeleteComment,
+  type DemandComment,
+} from "@/hooks/useDemandComments";
+import { LinkConversationDialog } from "./LinkConversationDialog";
+import { useAuth } from "@/context/AuthContext";
 import type { Tables } from "@/integrations/supabase/types";
 
 const EVENT_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -45,9 +53,16 @@ const EVENT_ICONS: Record<string, React.ComponentType<{ className?: string }>> =
   blocked: Lock,
   unblocked: Unlock,
   edited: Edit,
+  linked_interaction: Link2,
+  commented: MessageSquare,
 };
 
 const ACCEPTED_FILE_TYPES = "image/*,application/pdf,.doc,.docx,.xls,.xlsx,.csv";
+
+const SIDE_BADGE: Record<string, string> = {
+  client: "bg-orange-50 text-orange-600 dark:bg-orange-950 dark:text-orange-400",
+  umode: "bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400",
+};
 
 interface DemandDetailSheetProps {
   demand: DemandRow | null;
@@ -77,19 +92,140 @@ function formatBytes(bytes: number | null): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+// ── CommentItem ──
+
+function CommentItem({
+  comment,
+  demandId,
+  currentUserId,
+}: {
+  comment: DemandComment;
+  demandId: string;
+  currentUserId: string | undefined;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [editContent, setEditContent] = useState(comment.content);
+  const updateMutation = useUpdateComment();
+  const deleteMutation = useDeleteComment();
+  const isOwner = comment.created_by === currentUserId;
+
+  const handleSave = () => {
+    if (!editContent.trim() || editContent === comment.content) {
+      setEditing(false);
+      return;
+    }
+    updateMutation.mutate(
+      { id: comment.id, demandId, content: editContent.trim() },
+      { onSuccess: () => setEditing(false) }
+    );
+  };
+
+  return (
+    <div className="flex gap-2 text-xs group">
+      <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary font-medium text-xs">
+        {(comment.created_by ?? "?")[0]?.toUpperCase()}
+      </div>
+      <div className="flex-1 min-w-0 space-y-0.5">
+        <div className="flex items-center gap-2">
+          <span className="font-medium text-foreground">
+            {isOwner ? "Você" : (comment.created_by?.slice(0, 8) ?? "Usuário")}
+          </span>
+          {comment.created_at && (
+            <span className="text-muted-foreground">
+              {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true, locale: ptBR })}
+            </span>
+          )}
+          {comment.edited && (
+            <Badge variant="outline" className="text-xs px-1 py-0 h-4 border-muted-foreground/30 text-muted-foreground">
+              editado
+            </Badge>
+          )}
+          {isOwner && !editing && (
+            <div className="ml-auto flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <Button
+                variant="ghost" size="icon" className="h-5 w-5"
+                onClick={() => { setEditContent(comment.content); setEditing(true); }}
+              >
+                <Edit className="h-3 w-3" />
+              </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-5 w-5">
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Excluir comentário?</AlertDialogTitle>
+                    <AlertDialogDescription>Esta ação é irreversível.</AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => deleteMutation.mutate({ id: comment.id, demandId })}
+                    >
+                      Excluir
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
+          )}
+        </div>
+        {editing ? (
+          <div className="space-y-1.5 mt-1">
+            <Textarea
+              value={editContent}
+              onChange={(e) => setEditContent(e.target.value)}
+              rows={2}
+              className="text-xs"
+            />
+            <div className="flex gap-1.5">
+              <Button
+                size="sm" className="h-6 text-xs px-2"
+                onClick={handleSave}
+                disabled={updateMutation.isPending || !editContent.trim()}
+              >
+                {updateMutation.isPending && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
+                Salvar
+              </Button>
+              <Button
+                variant="ghost" size="sm" className="h-6 text-xs px-2"
+                onClick={() => setEditing(false)}
+              >
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <p className="text-foreground whitespace-pre-wrap">{comment.content}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── DemandDetailContent ──
+
 function DemandDetailContent({ demand, onClose }: { demand: DemandRow; onClose: () => void }) {
+  const { user } = useAuth();
   const { data: columns = [] } = useTicketColumns();
   const { data: types = [] } = useDemandTypes();
   const { data: areas = [] } = useDemandAreas();
   const { data: assignees = [] } = useDemandAssignees();
   const { data: activities = [] } = useDemandActivities(demand.id);
   const { data: attachments = [] } = useDemandAttachments(demand.id);
+  const { data: linkedInteractions = [] } = useDemandInteractions(demand.id);
+  const { data: comments = [] } = useDemandComments(demand.id);
+
   const updateMutation = useUpdateDemand();
   const moveMutation = useMoveDemand();
   const deleteMutation = useDeleteDemand();
   const uploadMutation = useUploadAttachments();
   const addLinkMutation = useAddLink();
   const deleteAttachmentMutation = useDeleteAttachment();
+  const unlinkMutation = useUnlinkInteraction();
+  const createCommentMutation = useCreateComment();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -100,8 +236,10 @@ function DemandDetailContent({ demand, onClose }: { demand: DemandRow; onClose: 
   const [rfiUrl, setRfiUrl] = useState(demand.rfi_url ?? "");
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [newLinkUrl, setNewLinkUrl] = useState("");
+  const [linkConvOpen, setLinkConvOpen] = useState(false);
+  const [newComment, setNewComment] = useState("");
 
-  // Re-sync local state when demand prop updates (e.g. after refetch)
+  // Re-sync local state when demand prop updates
   useEffect(() => {
     setTitle(demand.title);
     setDescription(demand.description ?? "");
@@ -149,6 +287,22 @@ function DemandDetailContent({ demand, onClose }: { demand: DemandRow; onClose: 
       { onSuccess: () => { setNewLinkUrl(""); setLinkDialogOpen(false); } }
     );
   };
+
+  const handlePostComment = () => {
+    if (!newComment.trim() || createCommentMutation.isPending) return;
+    createCommentMutation.mutate(
+      { demandId: demand.id, content: newComment.trim() },
+      { onSuccess: () => setNewComment("") }
+    );
+  };
+
+  // Group linked interactions by conversation_id
+  const convGroups = linkedInteractions.reduce<Record<string, typeof linkedInteractions>>((acc, li) => {
+    const key = li.interactions?.conversation_id ?? "sem-conversa";
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(li);
+    return acc;
+  }, {});
 
   return (
     <div className="space-y-5 pt-2">
@@ -403,6 +557,142 @@ function DemandDetailContent({ demand, onClose }: { demand: DemandRow; onClose: 
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Separator />
+
+      {/* Conversas Vinculadas */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <Label className="text-xs text-muted-foreground">Conversas Vinculadas</Label>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 text-xs"
+            onClick={() => setLinkConvOpen(true)}
+          >
+            <Link2 className="h-3 w-3 mr-1" /> Vincular conversa
+          </Button>
+        </div>
+
+        {linkedInteractions.length === 0 ? (
+          <p className="text-xs text-muted-foreground">Nenhuma conversa vinculada</p>
+        ) : (
+          Object.entries(convGroups).map(([convId, items]) => {
+            const firstItem = items[0];
+            const firstOccurred = firstItem?.interactions?.occurred_at;
+            return (
+              <div key={convId} className="rounded-lg border border-border p-3 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-mono text-muted-foreground truncate">
+                    {convId === "sem-conversa" ? "Sem conversa" : convId.slice(0, 24) + "…"}
+                  </span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Badge variant="outline" className="text-xs">{items.length} msg</Badge>
+                    {firstOccurred && (
+                      <span className="text-xs text-muted-foreground">
+                        {formatDistanceToNow(new Date(firstOccurred), { addSuffix: true, locale: ptBR })}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                {items.map((li) => (
+                  <div key={li.id} className="flex items-start gap-2 text-xs group pl-2 border-l border-border">
+                    <div className="flex-1 min-w-0 space-y-0.5">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium truncate">{li.interactions?.sender_raw ?? "—"}</span>
+                        {li.interactions?.sender_side && (
+                          <span className={`inline-flex items-center rounded-sm px-1.5 py-0.5 text-xs font-medium ${SIDE_BADGE[li.interactions.sender_side] ?? "bg-muted text-muted-foreground"}`}>
+                            {li.interactions.sender_side === "client" ? "Cliente" : "uMode"}
+                          </span>
+                        )}
+                        {li.interactions?.occurred_at && (
+                          <span className="text-muted-foreground ml-auto shrink-0">
+                            {formatDistanceToNow(new Date(li.interactions.occurred_at), { addSuffix: true, locale: ptBR })}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-muted-foreground line-clamp-2">
+                        {li.interactions?.content ?? "—"}
+                      </p>
+                    </div>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-5 w-5 opacity-0 group-hover:opacity-100 shrink-0">
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Desvincular mensagem?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            A mensagem será removida do vínculo com este ticket.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => unlinkMutation.mutate({ id: li.id, demandId: demand.id })}
+                          >
+                            Desvincular
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                ))}
+              </div>
+            );
+          })
+        )}
+
+        <LinkConversationDialog
+          demand={demand}
+          open={linkConvOpen}
+          onOpenChange={setLinkConvOpen}
+        />
+      </div>
+
+      <Separator />
+
+      {/* Comentários */}
+      <div className="space-y-3">
+        <Label className="text-xs text-muted-foreground">Comentários</Label>
+
+        {comments.length === 0 && (
+          <p className="text-xs text-muted-foreground">Nenhum comentário ainda</p>
+        )}
+
+        <div className="space-y-3">
+          {comments.map((c) => (
+            <CommentItem
+              key={c.id}
+              comment={c}
+              demandId={demand.id}
+              currentUserId={user?.id}
+            />
+          ))}
+        </div>
+
+        {/* New comment input */}
+        <div className="space-y-1.5">
+          <Textarea
+            value={newComment}
+            onChange={(e) => setNewComment(e.target.value)}
+            placeholder="Adicionar comentário..."
+            rows={2}
+            className="text-xs"
+          />
+          <Button
+            size="sm"
+            className="h-7 text-xs"
+            onClick={handlePostComment}
+            disabled={!newComment.trim() || createCommentMutation.isPending}
+          >
+            {createCommentMutation.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />}
+            Comentar
+          </Button>
+        </div>
+      </div>
 
       <Separator />
 
