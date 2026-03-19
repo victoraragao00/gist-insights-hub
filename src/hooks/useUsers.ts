@@ -24,12 +24,23 @@ export function useUsers() {
     queryFn: async () => {
       const { data, error } = await supabase.rpc("get_users_with_permissions" as never) as {
         data: UserWithPermissions[] | null;
-        error: unknown;
+        error: { message?: string; code?: string } | null;
       };
-      if (error) throw error;
+      // RPC lança exceção se caller não é admin — retornar vazio sem quebrar UI
+      if (error) {
+        if (
+          error.message?.includes("Acesso negado") ||
+          error.code === "P0001" ||
+          error.code === "42501"
+        ) {
+          return [];
+        }
+        throw error;
+      }
       return (data ?? []) as UserWithPermissions[];
     },
     enabled: !!user?.id,
     staleTime: 60_000,
+    retry: false,
   });
 }
