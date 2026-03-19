@@ -10,7 +10,7 @@ export interface ClientDemand {
   demand_types: { name: string; color: string | null; icon: string | null } | null;
   ticket_columns: { name: string; color: string | null; triggers_finished_at: boolean | null } | null;
   demand_areas: { name: string; color: string | null } | null;
-  demand_assignees: { name: string } | null;
+  user_profiles: { full_name: string | null; email: string | null } | null;
 }
 
 export function useClientDemands(clientId: string | undefined) {
@@ -26,7 +26,7 @@ export function useClientDemands(clientId: string | undefined) {
            demand_types(name, color, icon),
            ticket_columns(name, color, triggers_finished_at),
            demand_areas(name, color),
-           demand_assignees(name)`
+           user_profiles!assignee_id(full_name, email)`
         )
         .eq("client_id", clientId!)
         .order("created_at", { ascending: false })

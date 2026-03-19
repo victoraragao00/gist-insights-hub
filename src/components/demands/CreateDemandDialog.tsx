@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
@@ -12,8 +13,8 @@ import {
 import { Loader2 } from "lucide-react";
 import { useCreateDemand, useTicketColumns, useDemandTypes, type DemandPriority } from "@/hooks/useDemands";
 import { useDemandAreas } from "@/hooks/useDemandAreas";
-import { useDemandAssignees } from "@/hooks/useDemandAssignees";
 import { useClient } from "@/context/ClientContext";
+import { supabase } from "@/integrations/supabase/client";
 
 interface CreateDemandDialogProps {
   open: boolean;
@@ -27,7 +28,19 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaul
   const { data: columns = [] } = useTicketColumns();
   const { data: types = [] } = useDemandTypes();
   const { data: areas = [] } = useDemandAreas();
-  const { data: assignees = [] } = useDemandAssignees();
+  const { data: userProfiles = [] } = useQuery({
+    queryKey: ["user_profiles_active"],
+    staleTime: 300_000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("user_profiles")
+        .select("id, full_name, email")
+        .eq("active", true)
+        .order("full_name", { ascending: true });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
   const createMutation = useCreateDemand();
 
   const [title, setTitle] = useState("");
@@ -148,8 +161,8 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaul
               <Select value={assigneeId} onValueChange={setAssigneeId}>
                 <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                 <SelectContent>
-                  {assignees.map((a) => (
-                    <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                  {userProfiles.map((u) => (
+                    <SelectItem key={u.id} value={u.id}>{u.full_name ?? u.email}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

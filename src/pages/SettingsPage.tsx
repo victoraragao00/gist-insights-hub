@@ -29,7 +29,6 @@ import { useClient, type SyncJobRecord } from "@/context/ClientContext";
 import { useUserRole } from "@/hooks/useUserRole";
 import { ColumnSettingsTab } from "@/components/demands/ColumnSettingsTab";
 import { AreaSettingsTab } from "@/components/demands/AreaSettingsTab";
-import { AssigneeSettingsTab } from "@/components/demands/AssigneeSettingsTab";
 import { UserManagementTab } from "@/components/settings/UserManagementTab";
 
 // ── Types ──────────────────────────────────────────────
@@ -626,7 +625,6 @@ const SettingsPage = () => {
           {isAdmin && <TabsTrigger value="priorities">Prioridades</TabsTrigger>}
           {isAdmin && <TabsTrigger value="columns">Colunas</TabsTrigger>}
           {isAdmin && <TabsTrigger value="areas">Áreas</TabsTrigger>}
-          {isAdmin && <TabsTrigger value="assignees">Responsáveis de Tarefas</TabsTrigger>}
           {isAdmin && <TabsTrigger value="users">Equipe & Acessos</TabsTrigger>}
         </TabsList>
 
@@ -1096,18 +1094,6 @@ const SettingsPage = () => {
         {isAdmin && (
           <TabsContent value="columns">
             <ColumnSettingsTab />
-          </TabsContent>
-        )}
-
-        {isAdmin && (
-          <TabsContent value="areas">
-            <AreaSettingsTab />
-          </TabsContent>
-        )}
-
-        {isAdmin && (
-          <TabsContent value="assignees">
-            <AssigneeSettingsTab />
           </TabsContent>
         )}
 
