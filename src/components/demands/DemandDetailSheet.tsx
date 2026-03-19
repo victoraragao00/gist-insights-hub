@@ -238,14 +238,16 @@ function DemandDetailContent({ demand, onClose }: { demand: DemandRow; onClose: 
               value={rfiUrl}
               onChange={(e) => setRfiUrl(e.target.value)}
               onBlur={() => {
-                if (rfiUrl !== (demand.rfi_url ?? "")) saveField("rfi_url", rfiUrl, "RFI");
+                const normalized = normalizeUrl(rfiUrl);
+                if (normalized !== rfiUrl) setRfiUrl(normalized);
+                if (normalized !== (demand.rfi_url ?? "")) saveField("rfi_url", normalized, "RFI");
               }}
               className="h-8 flex-1"
               type="url"
               placeholder="https://..."
             />
             {rfiUrl.trim() && (
-              <a href={rfiUrl.trim()} target="_blank" rel="noopener noreferrer" title="Abrir RFI">
+              <a href={normalizeUrl(rfiUrl)} target="_blank" rel="noopener noreferrer" title="Abrir RFI">
                 <ExternalLink className="h-4 w-4 text-muted-foreground hover:text-foreground transition-colors" />
               </a>
             )}
