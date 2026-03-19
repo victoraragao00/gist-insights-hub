@@ -78,8 +78,55 @@ function UserAvatar({ name, email }: { name: string | null; email: string }) {
 
 export function UserManagementTab() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const { data: users = [], isLoading } = useUsers();
   const updateRole = useUpdateUserRole();
+  const toggleActive = useToggleUserActive();
+
+  const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounce(search, 300);
+  const [permissionsUser, setPermissionsUser] = useState<UserWithPermissions | null>(null);
+  const [confirmDeactivate, setConfirmDeactivate] = useState<UserWithPermissions | null>(null);
+
+  // Invite dialog state
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteName, setInviteName] = useState("");
+  const [inviteRole, setInviteRole] = useState<UserRole>("viewer");
+
+  const inviteMutation = useMutation({
+    mutationFn: async ({ email, full_name, role }: { email: string; full_name: string; role: UserRole }) => {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) throw new Error("Sessão inválida");
+
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/invite-user`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ email, full_name: full_name || null, role }),
+        }
+      );
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Erro ao convidar usuário");
+      return json;
+    },
+    onSuccess: () => {
+      toast.success("Convite enviado com sucesso! O usuário receberá um e-mail de acesso.");
+      queryClient.invalidateQueries({ queryKey: ["users_with_permissions"] });
+      setInviteOpen(false);
+      setInviteEmail("");
+      setInviteName("");
+      setInviteRole("viewer");
+    },
+    onError: (err) => {
+      toast.error(err instanceof Error ? err.message : "Erro ao convidar");
+    },
+  });
   const toggleActive = useToggleUserActive();
 
   const [search, setSearch] = useState("");
