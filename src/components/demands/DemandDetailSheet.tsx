@@ -315,6 +315,85 @@ function DemandDetailContent({ demand, onClose }: { demand: DemandRow; onClose: 
     );
   };
 
+  const handleBlock = async () => {
+    if (!blockerReason.trim()) return;
+    setBlockLoading(true);
+    try {
+      const { error } = await supabase
+        .from("demands")
+        .update({ is_blocked: true, blocked_at: new Date().toISOString(), blocker_reason: blockerReason.trim(), blocked_by: blockedBy.trim() || null })
+        .eq("id", demand.id);
+      if (error) throw error;
+      await supabase.from("demand_activities").insert({
+        demand_id: demand.id,
+        event_type: "blocked",
+        description: `Bloqueado: ${blockerReason.trim()}`,
+        created_by: user?.id,
+      });
+      toast.success("Demanda marcada como bloqueada");
+      queryClient.invalidateQueries({ queryKey: ["demands"] });
+      queryClient.invalidateQueries({ queryKey: ["client_demands"] });
+      setBlockDialogOpen(false);
+      setBlockerReason("");
+      setBlockedBy("");
+    } catch (err) {
+      toast.error("Erro ao bloquear: " + (err instanceof Error ? err.message : "Erro"));
+    } finally {
+      setBlockLoading(false);
+    }
+  };
+
+  const handleUnblock = async () => {
+    try {
+      const { error } = await supabase
+        .from("demands")
+        .update({ is_blocked: false, blocked_at: null, blocker_reason: null, blocked_by: null })
+        .eq("id", demand.id);
+      if (error) throw error;
+      await supabase.from("demand_activities").insert({
+        demand_id: demand.id,
+        event_type: "unblocked",
+        description: "Desbloqueado",
+        created_by: user?.id,
+      });
+      toast.success("Demanda desbloqueada");
+      queryClient.invalidateQueries({ queryKey: ["demands"] });
+      queryClient.invalidateQueries({ queryKey: ["client_demands"] });
+    } catch (err) {
+      toast.error("Erro ao desbloquear: " + (err instanceof Error ? err.message : "Erro"));
+    }
+  };
+
+  const handleCancel = async () => {
+    const reason = cancelReason === "outro" ? cancelOther.trim() : cancelReason;
+    if (!reason) return;
+    setCancelLoading(true);
+    try {
+      // Find the "Cancelado" column
+      const cancelCol = columns.find((c) => c.name.toLowerCase().includes("cancelad"));
+      const { error } = await supabase
+        .from("demands")
+        .update({ cancellation_reason: reason, ...(cancelCol ? { column_id: cancelCol.id } : {}) })
+        .eq("id", demand.id);
+      if (error) throw error;
+      await supabase.from("demand_activities").insert({
+        demand_id: demand.id,
+        event_type: "cancelled",
+        description: `Cancelado: ${reason}`,
+        created_by: user?.id,
+      });
+      toast.success("Demanda cancelada");
+      queryClient.invalidateQueries({ queryKey: ["demands"] });
+      queryClient.invalidateQueries({ queryKey: ["client_demands"] });
+      setCancelDialogOpen(false);
+      onClose();
+    } catch (err) {
+      toast.error("Erro ao cancelar: " + (err instanceof Error ? err.message : "Erro"));
+    } finally {
+      setCancelLoading(false);
+    }
+  };
+
   // Group linked interactions by conversation_id
   const convGroups = linkedInteractions.reduce<Record<string, typeof linkedInteractions>>((acc, li) => {
     const key = li.interactions?.conversation_id ?? "sem-conversa";
