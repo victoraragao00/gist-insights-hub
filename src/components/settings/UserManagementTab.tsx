@@ -333,6 +333,72 @@ export function UserManagementTab() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Invite user dialog */}
+      <Dialog open={inviteOpen} onOpenChange={(open) => { if (!open) setInviteOpen(false); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Convidar usuário</DialogTitle>
+            <DialogDescription>
+              O usuário receberá um e-mail com link de acesso. Você pode definir a role inicial agora.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="invite-email">E-mail *</Label>
+              <Input
+                id="invite-email"
+                type="email"
+                placeholder="usuario@empresa.com"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && inviteEmail.trim()) {
+                    inviteMutation.mutate({ email: inviteEmail.trim(), full_name: inviteName.trim(), role: inviteRole });
+                  }
+                }}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="invite-name">Nome completo</Label>
+              <Input
+                id="invite-name"
+                placeholder="João Silva (opcional)"
+                value={inviteName}
+                onChange={(e) => setInviteName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Role inicial</Label>
+              <Select value={inviteRole} onValueChange={(v) => setInviteRole(v as UserRole)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="admin">admin — acesso total</SelectItem>
+                  <SelectItem value="analyst">analyst — leitura + demandas</SelectItem>
+                  <SelectItem value="viewer">viewer — somente leitura</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setInviteOpen(false)} disabled={inviteMutation.isPending}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => inviteMutation.mutate({ email: inviteEmail.trim(), full_name: inviteName.trim(), role: inviteRole })}
+              disabled={!inviteEmail.trim() || inviteMutation.isPending}
+            >
+              {inviteMutation.isPending ? (
+                <><Loader2 className="h-4 w-4 animate-spin mr-1" /> Enviando...</>
+              ) : (
+                <><UserPlus className="h-4 w-4 mr-1" /> Enviar convite</>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
