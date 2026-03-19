@@ -11,9 +11,8 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Authenticate caller
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
+    if (!authHeader?.startsWith("Bearer ")) {
       return new Response(JSON.stringify({ error: "Não autorizado" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -22,16 +21,16 @@ Deno.serve(async (req) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-    // Use service role admin client (bypasses RLS for permission checks)
-    const adminClient = createClient(supabaseUrl, serviceRoleKey);
-
-    // Verify caller identity via anon client + JWT
-    const callerClient = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: authHeader } },
+    // Admin client (service role) — bypasses RLS for all checks
+    const adminClient = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
     });
-    const { data: { user: callerUser }, error: userErr } = await callerClient.auth.getUser();
+
+    // Extract JWT and verify caller identity
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user: callerUser }, error: userErr } = await adminClient.auth.getUser(token);
+
     if (userErr || !callerUser) {
       return new Response(JSON.stringify({ error: "Não autorizado" }), {
         status: 401,
@@ -72,7 +71,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Use service role to invite (adminClient already created above)
     const { data: inviteData, error: inviteErr } = await adminClient.auth.admin.inviteUserByEmail(
       email.toLowerCase().trim(),
       {
@@ -82,7 +80,6 @@ Deno.serve(async (req) => {
     );
 
     if (inviteErr) {
-      // If user already exists, that's okay — return a friendly message
       if (inviteErr.message?.toLowerCase().includes("already been registered")) {
         return new Response(
           JSON.stringify({ error: "Este e-mail já está cadastrado no sistema." }),
@@ -92,7 +89,6 @@ Deno.serve(async (req) => {
       throw inviteErr;
     }
 
-    // Create/update user_profile with desired role
     if (inviteData?.user?.id) {
       await adminClient.from("user_profiles").upsert(
         {
