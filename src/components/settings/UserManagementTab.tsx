@@ -162,6 +162,9 @@ export function UserManagementTab() {
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
+            <Button size="sm" onClick={() => setInviteOpen(true)}>
+              <UserPlus className="h-4 w-4 mr-1" /> Convidar usuário
+            </Button>
           </div>
         </CardHeader>
         <CardContent className="p-0">
