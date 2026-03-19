@@ -13,14 +13,18 @@ export function ProtectedRoute() {
     if (!user) return;
     if (sessionStorage.getItem(BOOTSTRAP_KEY)) return;
 
-    sessionStorage.setItem(BOOTSTRAP_KEY, "1");
-
     supabase.functions
       .invoke("bootstrap-user-access")
+      .then(({ data }) => {
+        sessionStorage.setItem(BOOTSTRAP_KEY, "1");
+        if (data?.bootstrapped) {
+          queryClient.invalidateQueries();
+        }
+      })
       .catch(() => {
-        // fire-and-forget — don't block the user
+        // Don't set flag — retries on next navigation
       });
-  }, [user]);
+  }, [user, queryClient]);
 
   if (loading) {
     return (
