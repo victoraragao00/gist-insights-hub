@@ -166,7 +166,7 @@ const DemandsPage = () => {
   }, [demands, columns, moveMutation]);
 
   const handleCardClick = (demand: DemandRow) => {
-    setSelectedDemand(demand);
+    setSelectedDemandId(demand.id);
     setSheetOpen(true);
   };
 
