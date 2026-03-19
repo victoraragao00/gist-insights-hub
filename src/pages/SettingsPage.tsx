@@ -1110,6 +1110,12 @@ const SettingsPage = () => {
             <AssigneeSettingsTab />
           </TabsContent>
         )}
+
+        {isAdmin && (
+          <TabsContent value="users">
+            <UserManagementTab />
+          </TabsContent>
+        )}
       </Tabs>
 
       {/* ── Contact Wizard ── */}
