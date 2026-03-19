@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
@@ -12,8 +13,8 @@ import {
 import { Loader2 } from "lucide-react";
 import { useCreateDemand, useTicketColumns, useDemandTypes, type DemandPriority } from "@/hooks/useDemands";
 import { useDemandAreas } from "@/hooks/useDemandAreas";
-import { useDemandAssignees } from "@/hooks/useDemandAssignees";
 import { useClient } from "@/context/ClientContext";
+import { supabase } from "@/integrations/supabase/client";
 
 interface CreateDemandDialogProps {
   open: boolean;
