@@ -11,6 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Label } from "@/components/ui/label";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -27,9 +28,20 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Search, Settings2 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Search, Settings2, UserPlus, Loader2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import type { UserRole } from "@/hooks/useUserRole";
 import type { UserWithPermissions } from "@/hooks/useUsers";
 
@@ -66,6 +78,7 @@ function UserAvatar({ name, email }: { name: string | null; email: string }) {
 
 export function UserManagementTab() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const { data: users = [], isLoading } = useUsers();
   const updateRole = useUpdateUserRole();
   const toggleActive = useToggleUserActive();
@@ -74,6 +87,46 @@ export function UserManagementTab() {
   const debouncedSearch = useDebounce(search, 300);
   const [permissionsUser, setPermissionsUser] = useState<UserWithPermissions | null>(null);
   const [confirmDeactivate, setConfirmDeactivate] = useState<UserWithPermissions | null>(null);
+
+  // Invite dialog state
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteName, setInviteName] = useState("");
+  const [inviteRole, setInviteRole] = useState<UserRole>("viewer");
+
+  const inviteMutation = useMutation({
+    mutationFn: async ({ email, full_name, role }: { email: string; full_name: string; role: UserRole }) => {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) throw new Error("Sessão inválida");
+
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/invite-user`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ email, full_name: full_name || null, role }),
+        }
+      );
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Erro ao convidar usuário");
+      return json;
+    },
+    onSuccess: () => {
+      toast.success("Convite enviado com sucesso! O usuário receberá um e-mail de acesso.");
+      queryClient.invalidateQueries({ queryKey: ["users_with_permissions"] });
+      setInviteOpen(false);
+      setInviteEmail("");
+      setInviteName("");
+      setInviteRole("viewer");
+    },
+    onError: (err) => {
+      toast.error(err instanceof Error ? err.message : "Erro ao convidar");
+    },
+  });
 
   const filtered = useMemo(() => {
     if (!debouncedSearch) return users;
@@ -109,6 +162,9 @@ export function UserManagementTab() {
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
+            <Button size="sm" onClick={() => setInviteOpen(true)}>
+              <UserPlus className="h-4 w-4 mr-1" /> Convidar usuário
+            </Button>
           </div>
         </CardHeader>
         <CardContent className="p-0">
@@ -277,6 +333,72 @@ export function UserManagementTab() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Invite user dialog */}
+      <Dialog open={inviteOpen} onOpenChange={(open) => { if (!open) setInviteOpen(false); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Convidar usuário</DialogTitle>
+            <DialogDescription>
+              O usuário receberá um e-mail com link de acesso. Você pode definir a role inicial agora.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="invite-email">E-mail *</Label>
+              <Input
+                id="invite-email"
+                type="email"
+                placeholder="usuario@empresa.com"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && inviteEmail.trim()) {
+                    inviteMutation.mutate({ email: inviteEmail.trim(), full_name: inviteName.trim(), role: inviteRole });
+                  }
+                }}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="invite-name">Nome completo</Label>
+              <Input
+                id="invite-name"
+                placeholder="João Silva (opcional)"
+                value={inviteName}
+                onChange={(e) => setInviteName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Role inicial</Label>
+              <Select value={inviteRole} onValueChange={(v) => setInviteRole(v as UserRole)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="admin">admin — acesso total</SelectItem>
+                  <SelectItem value="analyst">analyst — leitura + demandas</SelectItem>
+                  <SelectItem value="viewer">viewer — somente leitura</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setInviteOpen(false)} disabled={inviteMutation.isPending}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => inviteMutation.mutate({ email: inviteEmail.trim(), full_name: inviteName.trim(), role: inviteRole })}
+              disabled={!inviteEmail.trim() || inviteMutation.isPending}
+            >
+              {inviteMutation.isPending ? (
+                <><Loader2 className="h-4 w-4 animate-spin mr-1" /> Enviando...</>
+              ) : (
+                <><UserPlus className="h-4 w-4 mr-1" /> Enviar convite</>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
