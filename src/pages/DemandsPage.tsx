@@ -101,9 +101,13 @@ const DemandsPage = () => {
   const { data: demands = [], isLoading: demandsLoading } = useDemands(filters);
   const moveMutation = useMoveDemand();
 
-  // Sheet state
-  const [selectedDemand, setSelectedDemand] = useState<DemandRow | null>(null);
+  // Sheet state — store only ID to avoid stale object
+  const [selectedDemandId, setSelectedDemandId] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const selectedDemand = useMemo(
+    () => (selectedDemandId ? demands.find((d) => d.id === selectedDemandId) ?? null : null),
+    [selectedDemandId, demands]
+  );
 
   // Create dialog
   const [createOpen, setCreateOpen] = useState(false);
@@ -162,7 +166,7 @@ const DemandsPage = () => {
   }, [demands, columns, moveMutation]);
 
   const handleCardClick = (demand: DemandRow) => {
-    setSelectedDemand(demand);
+    setSelectedDemandId(demand.id);
     setSheetOpen(true);
   };
 

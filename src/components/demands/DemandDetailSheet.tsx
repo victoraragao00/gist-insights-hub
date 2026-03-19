@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle,
 } from "@/components/ui/sheet";
@@ -100,6 +100,15 @@ function DemandDetailContent({ demand, onClose }: { demand: DemandRow; onClose: 
   const [rfiUrl, setRfiUrl] = useState(demand.rfi_url ?? "");
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [newLinkUrl, setNewLinkUrl] = useState("");
+
+  // Re-sync local state when demand prop updates (e.g. after refetch)
+  useEffect(() => {
+    setTitle(demand.title);
+    setDescription(demand.description ?? "");
+    setExpectedResult(demand.expected_result ?? "");
+    setNotes(demand.notes ?? "");
+    setRfiUrl(demand.rfi_url ?? "");
+  }, [demand.id, demand.title, demand.description, demand.expected_result, demand.notes, demand.rfi_url]);
 
   const saveField = useCallback((field: string, value: string, label: string) => {
     updateMutation.mutate({ id: demand.id, fields: { [field]: value || null }, fieldLabel: label });
@@ -218,16 +227,23 @@ function DemandDetailContent({ demand, onClose }: { demand: DemandRow; onClose: 
         </div>
         <div className="space-y-1">
           <Label className="text-xs text-muted-foreground">RFI</Label>
-          <Input
-            value={rfiUrl}
-            onChange={(e) => setRfiUrl(e.target.value)}
-            onBlur={() => {
-              if (rfiUrl !== (demand.rfi_url ?? "")) saveField("rfi_url", rfiUrl, "RFI");
-            }}
-            className="h-8"
-            type="url"
-            placeholder="https://..."
-          />
+          <div className="flex items-center gap-1.5">
+            <Input
+              value={rfiUrl}
+              onChange={(e) => setRfiUrl(e.target.value)}
+              onBlur={() => {
+                if (rfiUrl !== (demand.rfi_url ?? "")) saveField("rfi_url", rfiUrl, "RFI");
+              }}
+              className="h-8 flex-1"
+              type="url"
+              placeholder="https://..."
+            />
+            {rfiUrl.trim() && (
+              <a href={rfiUrl.trim()} target="_blank" rel="noopener noreferrer" title="Abrir RFI">
+                <ExternalLink className="h-4 w-4 text-muted-foreground hover:text-foreground transition-colors" />
+              </a>
+            )}
+          </div>
         </div>
       </div>
 
