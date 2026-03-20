@@ -26,7 +26,7 @@ export function useClientDemands(clientId: string | undefined) {
            demand_types(name, color, icon),
            ticket_columns(name, color, triggers_finished_at),
            demand_areas(name, color),
-           user_profiles!assignee_id(full_name, email)`
+           demand_assignees(name)`
         )
         .eq("client_id", clientId!)
         .order("created_at", { ascending: false })
