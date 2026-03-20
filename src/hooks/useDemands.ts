@@ -68,7 +68,7 @@ export function useDemands(filters?: DemandFilters) {
     queryFn: async () => {
       let query = supabase
         .from("demands")
-        .select("*, clients(name), demand_types(name, color, icon), ticket_columns(name, color), demand_areas(name, color), user_profiles!assignee_id(full_name, email)")
+        .select("*, clients(name), demand_types(name, color, icon), ticket_columns(name, color), demand_areas(name, color), demand_assignees(name)")
         .order("column_id")
         .order("position", { ascending: true })
         .limit(200);
