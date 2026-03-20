@@ -1167,6 +1167,7 @@ export type Database = {
           total_interactions_30d: number
         }[]
       }
+      is_admin: { Args: never; Returns: boolean }
       search_interactions: {
         Args: {
           p_client_id?: string
