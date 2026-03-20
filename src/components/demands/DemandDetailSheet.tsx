@@ -75,15 +75,15 @@ interface DemandDetailSheetProps {
 }
 
 export function DemandDetailSheet({ demand, open, onOpenChange }: DemandDetailSheetProps) {
-  if (!demand) return null;
-
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
         <SheetHeader>
           <SheetTitle className="sr-only">Detalhes da Demanda</SheetTitle>
         </SheetHeader>
-        <DemandDetailContent demand={demand} onClose={() => onOpenChange(false)} />
+        {open && demand && (
+          <DemandDetailContent demand={demand} onClose={() => onOpenChange(false)} />
+        )}
       </SheetContent>
     </Sheet>
   );
