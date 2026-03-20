@@ -124,8 +124,8 @@ export function DemandCard({ demand, onClick }: DemandCardProps) {
         )}
       </div>
 
-      {demand.demand_assignees?.name && (
-        <p className="text-xs text-muted-foreground mt-1 truncate">→ {demand.demand_assignees.name}</p>
+      {(demand.user_profiles?.full_name ?? demand.user_profiles?.email) && (
+        <p className="text-xs text-muted-foreground mt-1 truncate">→ {demand.user_profiles?.full_name ?? demand.user_profiles?.email}</p>
       )}
     </div>
   );

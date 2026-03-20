@@ -91,7 +91,7 @@ export function useExportDemandsCSV() {
           escapeCsvField(PRIORITY_LABEL[demand.priority] ?? demand.priority),
           escapeCsvField(demand.ticket_columns?.name),
           escapeCsvField(demand.demand_areas?.name),
-          escapeCsvField(demand.demand_assignees?.name),
+          escapeCsvField(demand.user_profiles?.full_name ?? demand.user_profiles?.email),
           escapeCsvField(demand.clients?.name),
           escapeCsvField(formatDateSafe(demand.created_at)),
           escapeCsvField(formatDateSafe(demand.started_at)),
