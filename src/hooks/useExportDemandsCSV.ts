@@ -81,7 +81,7 @@ export function useExportDemandsCSV() {
           demand_types: { name: string } | null;
           ticket_columns: { name: string } | null;
           demand_areas: { name: string } | null;
-          demand_assignees: { name: string } | null;
+          user_profiles: { full_name: string | null; email: string | null } | null;
           clients: { name: string } | null;
         };
         return [
