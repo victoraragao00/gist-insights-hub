@@ -36,7 +36,7 @@ export function useExportDemandsCSV() {
           demand_types!inner(name),
           ticket_columns!inner(name),
           demand_areas(name),
-          demand_assignees(name),
+          user_profiles!assignee_id(full_name, email),
           clients!inner(name)
         `)
         .order("created_at", { ascending: false })
@@ -81,7 +81,7 @@ export function useExportDemandsCSV() {
           demand_types: { name: string } | null;
           ticket_columns: { name: string } | null;
           demand_areas: { name: string } | null;
-          demand_assignees: { name: string } | null;
+          user_profiles: { full_name: string | null; email: string | null } | null;
           clients: { name: string } | null;
         };
         return [
@@ -91,7 +91,7 @@ export function useExportDemandsCSV() {
           escapeCsvField(PRIORITY_LABEL[demand.priority] ?? demand.priority),
           escapeCsvField(demand.ticket_columns?.name),
           escapeCsvField(demand.demand_areas?.name),
-          escapeCsvField(demand.demand_assignees?.name),
+          escapeCsvField(demand.user_profiles?.full_name ?? demand.user_profiles?.email),
           escapeCsvField(demand.clients?.name),
           escapeCsvField(formatDateSafe(demand.created_at)),
           escapeCsvField(formatDateSafe(demand.started_at)),

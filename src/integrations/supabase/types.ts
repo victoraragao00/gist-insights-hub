@@ -696,10 +696,10 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "demands_assignee_id_fkey"
+            foreignKeyName: "demands_assignee_id_user_profiles_fkey"
             columns: ["assignee_id"]
             isOneToOne: false
-            referencedRelation: "demand_assignees"
+            referencedRelation: "user_profiles"
             referencedColumns: ["id"]
           },
           {
