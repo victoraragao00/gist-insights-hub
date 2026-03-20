@@ -36,7 +36,7 @@ export function useExportDemandsCSV() {
           demand_types!inner(name),
           ticket_columns!inner(name),
           demand_areas(name),
-          demand_assignees(name),
+          user_profiles!assignee_id(full_name, email),
           clients!inner(name)
         `)
         .order("created_at", { ascending: false })
