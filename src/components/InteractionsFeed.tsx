@@ -104,6 +104,26 @@ const humanizeTheme = (slug: string) => slug.replace(/_/g, " ").replace(/\b\w/g,
 const sanitizeHtml = (html: string) =>
   html.replace(/<script[\s\S]*?<\/script>/gi, "").replace(/<style[\s\S]*?<\/style>/gi, "").replace(/<iframe[\s\S]*?<\/iframe>/gi, "");
 
+const IMAGE_EXTENSIONS = /\.(png|jpe?g|gif|webp|bmp|svg)(\?|$)/i;
+const URL_ENCODED_PATTERN = /^https?%3A%2F%2F/i;
+
+/** Decode URL-encoded content and detect if it's a standalone image URL */
+function extractInlineImageUrl(content: string | null): string | null {
+  if (!content) return null;
+  let text = content.trim();
+  // Strip HTML tags to get raw text
+  text = text.replace(/<[^>]*>/g, "").trim();
+  // Check if it's URL-encoded
+  if (URL_ENCODED_PATTERN.test(text)) {
+    try { text = decodeURIComponent(text); } catch { /* keep as-is */ }
+  }
+  // Check if the entire content is a single image URL
+  if (/^https?:\/\/\S+$/i.test(text) && IMAGE_EXTENSIONS.test(text)) {
+    return text;
+  }
+  return null;
+}
+
 function extractContactName(senderRaw: string | null): string {
   if (!senderRaw) return "Desconhecido";
   if (!senderRaw.includes("@")) return senderRaw;
@@ -231,7 +251,10 @@ function ConversationRow({
   isSelected: boolean;
   onClick: () => void;
 }) {
-  const preview = conversation.lastMessage.content
+  const hasInlineImage = !!extractInlineImageUrl(conversation.lastMessage.content);
+  const preview = hasInlineImage
+    ? "📷 Imagem"
+    : conversation.lastMessage.content
     ? truncate(stripHtml(conversation.lastMessage.content), 80)
     : "—";
 
@@ -317,14 +340,30 @@ function MessageBubble({ interaction }: { interaction: Interaction }) {
       <div className={cn("flex items-end gap-2", inbound ? "flex-row" : "flex-row-reverse")}>
         <Avatar name={senderName} size={26} />
         <div className={cn("max-w-[75%] px-3 py-2 border border-border", bubbleBg, bubbleText, borderRadius)}>
-          {interaction.content ? (
-            <div
-              className="text-sm leading-relaxed prose prose-sm max-w-none [&_a]:underline break-words"
-              dangerouslySetInnerHTML={{ __html: sanitizeHtml(interaction.content) }}
-            />
-          ) : (
-            <p className="text-sm text-muted-foreground">—</p>
-          )}
+          {(() => {
+            const inlineImg = extractInlineImageUrl(interaction.content);
+            if (inlineImg) {
+              return (
+                <a href={inlineImg} target="_blank" rel="noopener noreferrer">
+                  <img
+                    src={inlineImg}
+                    alt="Imagem enviada"
+                    className="max-h-64 rounded-lg object-cover hover:opacity-90 transition-opacity"
+                    loading="lazy"
+                  />
+                </a>
+              );
+            }
+            if (interaction.content) {
+              return (
+                <div
+                  className="text-sm leading-relaxed prose prose-sm max-w-none [&_a]:underline break-words"
+                  dangerouslySetInnerHTML={{ __html: sanitizeHtml(interaction.content) }}
+                />
+              );
+            }
+            return <p className="text-sm text-muted-foreground">—</p>;
+          })()}
 
           {/* Attachments */}
           {attachments.length > 0 && (
