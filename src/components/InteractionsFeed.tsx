@@ -251,7 +251,10 @@ function ConversationRow({
   isSelected: boolean;
   onClick: () => void;
 }) {
-  const preview = conversation.lastMessage.content
+  const hasInlineImage = !!extractInlineImageUrl(conversation.lastMessage.content);
+  const preview = hasInlineImage
+    ? "📷 Imagem"
+    : conversation.lastMessage.content
     ? truncate(stripHtml(conversation.lastMessage.content), 80)
     : "—";
 
