@@ -337,14 +337,30 @@ function MessageBubble({ interaction }: { interaction: Interaction }) {
       <div className={cn("flex items-end gap-2", inbound ? "flex-row" : "flex-row-reverse")}>
         <Avatar name={senderName} size={26} />
         <div className={cn("max-w-[75%] px-3 py-2 border border-border", bubbleBg, bubbleText, borderRadius)}>
-          {interaction.content ? (
-            <div
-              className="text-sm leading-relaxed prose prose-sm max-w-none [&_a]:underline break-words"
-              dangerouslySetInnerHTML={{ __html: sanitizeHtml(interaction.content) }}
-            />
-          ) : (
-            <p className="text-sm text-muted-foreground">—</p>
-          )}
+          {(() => {
+            const inlineImg = extractInlineImageUrl(interaction.content);
+            if (inlineImg) {
+              return (
+                <a href={inlineImg} target="_blank" rel="noopener noreferrer">
+                  <img
+                    src={inlineImg}
+                    alt="Imagem enviada"
+                    className="max-h-64 rounded-lg object-cover hover:opacity-90 transition-opacity"
+                    loading="lazy"
+                  />
+                </a>
+              );
+            }
+            if (interaction.content) {
+              return (
+                <div
+                  className="text-sm leading-relaxed prose prose-sm max-w-none [&_a]:underline break-words"
+                  dangerouslySetInnerHTML={{ __html: sanitizeHtml(interaction.content) }}
+                />
+              );
+            }
+            return <p className="text-sm text-muted-foreground">—</p>;
+          })()}
 
           {/* Attachments */}
           {attachments.length > 0 && (
