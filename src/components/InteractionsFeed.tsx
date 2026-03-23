@@ -104,6 +104,26 @@ const humanizeTheme = (slug: string) => slug.replace(/_/g, " ").replace(/\b\w/g,
 const sanitizeHtml = (html: string) =>
   html.replace(/<script[\s\S]*?<\/script>/gi, "").replace(/<style[\s\S]*?<\/style>/gi, "").replace(/<iframe[\s\S]*?<\/iframe>/gi, "");
 
+const IMAGE_EXTENSIONS = /\.(png|jpe?g|gif|webp|bmp|svg)(\?|$)/i;
+const URL_ENCODED_PATTERN = /^https?%3A%2F%2F/i;
+
+/** Decode URL-encoded content and detect if it's a standalone image URL */
+function extractInlineImageUrl(content: string | null): string | null {
+  if (!content) return null;
+  let text = content.trim();
+  // Strip HTML tags to get raw text
+  text = text.replace(/<[^>]*>/g, "").trim();
+  // Check if it's URL-encoded
+  if (URL_ENCODED_PATTERN.test(text)) {
+    try { text = decodeURIComponent(text); } catch { /* keep as-is */ }
+  }
+  // Check if the entire content is a single image URL
+  if (/^https?:\/\/\S+$/i.test(text) && IMAGE_EXTENSIONS.test(text)) {
+    return text;
+  }
+  return null;
+}
+
 function extractContactName(senderRaw: string | null): string {
   if (!senderRaw) return "Desconhecido";
   if (!senderRaw.includes("@")) return senderRaw;
