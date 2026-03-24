@@ -1,8 +1,8 @@
-# CONTEXT.md — Estado do Projeto (v21 — 2026-03-19)
+# CONTEXT.md — Estado do Projeto (v22 — 2026-03-24)
 
 > Mantido pelo Claude Code ao final de cada sessao. Lido por todos os agentes para manter contexto.
 >
-> last_updated: 2026-03-19
+> last_updated: 2026-03-24
 > last_updated_by: Claude Code
 
 ---
@@ -295,23 +295,51 @@ AUDIT_BATCH_SIZE=20
 | #16 | Gemini Pro definitivo + prompt v6 com few-shot examples | Resolvido | Lovable |
 | #17-#22 | Divida tecnica CTO (m1,m3,m4,m5,m6,m9,m12) | Resolvidos (PRs #23-#28) | Cursor |
 | #29-#30 | m9 handleToggleRule + UX NotFound | Resolvido (PR #31) | Cursor |
-| #32 | Fase 5: Priority Score Engine backend | Concluido | Lovable |
+| #32 | Fase 5: Priority Score Engine backend | Concluido (Fechada 2026-03-24) | Lovable |
 | #33 | Fase 5: Priority Dashboard + UX cleanup | Concluido (PR #34 + PR #35) | Cursor |
-| #37 | DB function global_stats_30d | Concluido | Lovable |
-| #38 | Edge function evaluate-audit-rules | Concluido | Lovable |
+| #37 | DB function global_stats_30d | Concluido (Fechada 2026-03-24) | Lovable |
+| #38 | Edge function evaluate-audit-rules | Concluido (Fechada 2026-03-24) | Lovable |
 | #39-#53 | Auditoria UX/UI — 15 PRs do Cursor | Mergeados | Cursor |
 | #54 | feat(db): coluna status em clients | Concluido | Lovable |
 | #55-#56 | feat(ui): filtro e badge de status | Mergeados (PRs #57-#58) | Cursor |
 | #59 | feat(ui): edicao de cliente | Mergeado (PR #61) | Cursor |
 | #60 | feat(ui): CRUD audit_rules | Mergeado (PR #62) | Cursor |
 | #63 | fix: busca server-side em 3 telas | Mergeado (PR #64) | Cursor |
-| #65 | fix: SearchPage TDZ | Corrigido | Lovable |
+| #65 | fix: SearchPage TDZ | Corrigido (Fechada 2026-03-24) | Lovable |
 | #66 | fix: edicao inline DemandDetailSheet | Fechada | Lovable |
 | #67 | fix: campo RFI nao clicavel | Fechada | Lovable |
 | #68 | Sprint S2: Gist ↔ Ticket + Comentarios | Fechada | Lovable |
 | #69 | Sprint S3: Dashboard + One-Page + Bloqueio | Fechada | Lovable |
 | #70 | Sprint S4: Gestao de Usuarios + Permissionamento | Fechada | Lovable |
 | #71 | Unificar assignees demand_assignees → user_profiles | Fechada | Lovable |
+
+---
+
+## Auditoria Completa (Claude Code — 2026-03-24)
+
+Relatorio: `auditorias/AUDITORIA_20260322_1500.md`
+Pendencias: `auditorias/PENDENTES.md`
+
+**Resultado:** 9/13 itens CTO limpos. 4 criticos, 9 medios, 3 baixos.
+
+### Criticos (corrigir imediatamente)
+- **SEC1/SEC2:** `gist-discover` e `gist-proxy` sem validacao JWT + CORS aberto
+- **AP1:** `process-jobs/index.ts:380` DELETE sem filtro `auto_created`
+
+### Altos
+- **AP2:** `evaluate-audit-rules` INSERT sem ON CONFLICT
+- **AP3:** `gist-confirm-mapping` INSERTs sem conflict handling
+- **M12:** `InteractionsFeed.tsx:463-477` query sem paginacao
+
+### Medios
+- **M1:** 7x `as unknown as Type` em hooks (bypass tipagem)
+- **M9:** `GistContactWizard.tsx:304` useState manual em vez de useMutation
+- **DS1-DS3:** Cores HSL hardcoded + green-500 em vez de emerald-500
+- **O2:** TONE_CONFIG duplicado em 3 paginas
+
+### Baixos
+- **M13:** Sem testes para process-jobs, classify-batch, ClientContext
+- **DS4/DS5:** Skeleton animate-pulse + falta motion-safe prefix
 
 ---
 
@@ -433,7 +461,7 @@ Documentacao completa na secao "Fase 7.1" acima. Resumo:
 
 ## Colaboracao
 
-Papeis, restricoes, fluxos e checklist completos em AGENTS.md (v10).
+Papeis, restricoes, fluxos e checklist completos em AGENTS.md (v9).
 
 | Agente | Papel | Canal |
 |--------|-------|-------|
@@ -525,7 +553,12 @@ gist-insights-hub/
 16. **Concluido:** Fase 7.5 — Unificacao Assignees (Issue #71)
     - assignee_id → user_profiles, aba Responsaveis removida, RLS permissiva para dropdown
     - Fix: aba Areas restaurada (removida acidentalmente)
-17. **Pendente:** Lovable S6 — Edge function deliver-audit-alerts (baixa prioridade)
-18. **Pendente:** Issue #65 — fechar no GitHub (fix ja aplicado)
-19. **Pendente:** Testar notificacoes in-app com 2 usuarios simultaneos
-20. **Fase 8:** Insights IA avancados
+17. **Pendente — CRITICO:** Corrigir SEC1/SEC2 — adicionar JWT a gist-discover e gist-proxy (Issue para Lovable)
+18. **Pendente — CRITICO:** Corrigir AP1 — filtro auto_created no DELETE de process-jobs:380 (Issue para Lovable)
+19. **Pendente — ALTO:** Corrigir AP2/AP3 — ON CONFLICT em evaluate-audit-rules e gist-confirm-mapping (Issue para Lovable)
+20. **Pendente — ALTO:** Corrigir M12 — paginacao em InteractionsFeed.tsx (Issue para Lovable)
+21. **Concluido:** Issues #32, #37, #38, #65 fechadas no GitHub (2026-03-24)
+22. **Pendente:** Lovable S6 — Edge function deliver-audit-alerts (baixa prioridade)
+23. **Pendente:** Testar notificacoes in-app com 2 usuarios simultaneos
+24. **Pendente:** Correcoes medias da auditoria (m1, m9, DS1-DS3, TONE_CONFIG) — ver PENDENTES.md
+25. **Fase 8:** Insights IA avancados
