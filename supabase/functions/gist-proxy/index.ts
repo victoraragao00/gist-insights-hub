@@ -1,5 +1,5 @@
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': Deno.env.get('ALLOWED_ORIGIN') ?? '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
@@ -22,10 +22,36 @@ Deno.serve(async (req) => {
 
   try {
     const apiKey = Deno.env.get('GIST_API_KEY');
-    if (!apiKey) {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
+
+    if (!apiKey || !supabaseUrl || !anonKey) {
       return new Response(
-        JSON.stringify({ error: 'GIST_API_KEY not configured' }),
+        JSON.stringify({ error: 'Missing environment variables' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // JWT validation — identify the caller before forwarding to Gist API
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+
+    const supaAuth = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+
+    const { data: authData, error: authError } = await supaAuth.auth.getUser();
+    if (authError || !authData.user) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -38,7 +64,17 @@ Deno.serve(async (req) => {
       );
     }
 
-    const queryString = params ? '?' + new URLSearchParams(params).toString() : '';
+    // Sanitize params — only allow string/number values to prevent injection
+    const safeParams: Record<string, string> = {};
+    if (params && typeof params === 'object') {
+      for (const [k, v] of Object.entries(params as Record<string, unknown>)) {
+        if (typeof v === 'string' || typeof v === 'number') {
+          safeParams[String(k)] = String(v);
+        }
+      }
+    }
+
+    const queryString = Object.keys(safeParams).length > 0 ? '?' + new URLSearchParams(safeParams).toString() : '';
     const gistUrl = `${GIST_BASE_URL}/${endpoint}${queryString}`;
 
     const gistResponse = await fetch(gistUrl, {
