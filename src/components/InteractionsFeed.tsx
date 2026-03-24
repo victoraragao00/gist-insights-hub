@@ -602,6 +602,13 @@ export const InteractionsFeed = ({ clientId }: { clientId: string }) => {
         </div>
       </div>
 
+      {/* Limit warning banner */}
+      {isLimitReached && (
+        <div className="mx-1 mt-1 mb-1 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300">
+          Exibindo as {PAGE_SIZE} mensagens mais recentes do período. Reduza o período para ver todas.
+        </div>
+      )}
+
       {/* Counter */}
       <div className="px-1 pb-2 text-xs text-muted-foreground">
         {isLoading ? (
