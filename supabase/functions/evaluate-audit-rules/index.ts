@@ -172,7 +172,14 @@ async function insertAlert(
       delivery_status: 'pending',
     });
 
-  if (error) throw new Error(`insertAlert failed: ${error.message}`);
+  if (error) {
+    // Ignore duplicate — cooldown should prevent, but be defensive against race conditions
+    if (error.code === '23505') {
+      console.log(`[evaluate-audit] rule=${rule.id} duplicate alert ignored (race condition)`);
+      return;
+    }
+    throw new Error(`insertAlert failed: ${error.message}`);
+  }
 }
 
 function handleAutoChain(selfUrl: string, serviceRoleKey: string, nextOffset: number): void {
