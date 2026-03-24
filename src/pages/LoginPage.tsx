@@ -9,8 +9,9 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
+import umodeLogo from "@/assets/umode-logo-full.png";
 
 const loginSchema = z.object({
   email: z.string().email("Email inválido"),
@@ -47,12 +48,15 @@ const LoginPage = () => {
   return (
     <div className="flex items-center justify-center min-h-screen bg-background px-4">
       <Card className="w-full max-w-sm">
-        <CardHeader className="text-center">
-          <div className="flex h-12 w-12 mx-auto items-center justify-center rounded-xl bg-primary text-primary-foreground font-bold text-lg mb-2">
-            H
+        <CardHeader className="text-center pb-2">
+          <div className="flex justify-center mb-4">
+            <img
+              src={umodeLogo}
+              alt="uMode CX Hub"
+              className="h-10 object-contain"
+            />
           </div>
-          <CardTitle className="text-xl">CX Hub</CardTitle>
-          <CardDescription>Entre com suas credenciais</CardDescription>
+          <p className="text-sm text-muted-foreground">Entre com suas credenciais</p>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
