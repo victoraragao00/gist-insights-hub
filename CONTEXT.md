@@ -320,11 +320,11 @@ AUDIT_BATCH_SIZE=20
 Relatorio: `auditorias/AUDITORIA_20260322_1500.md`
 Pendencias: `auditorias/PENDENTES.md`
 
-**Resultado:** 9/13 itens CTO limpos. 4 criticos, 9 medios, 3 baixos.
+**Resultado:** 9/13 itens CTO limpos. ~~4 criticos~~, 9 medios, 3 baixos.
 
-### Criticos (corrigir imediatamente)
-- **SEC1/SEC2:** `gist-discover` e `gist-proxy` sem validacao JWT + CORS aberto
-- **AP1:** `process-jobs/index.ts:380` DELETE sem filtro `auto_created`
+### Criticos — RESOLVIDOS (2026-03-24, Lovable, auditado pelo Claude Code)
+- **SEC1/SEC2:** ~~sem JWT + CORS aberto~~ → JWT via `auth.getUser()` + CORS via `ALLOWED_ORIGIN` env var + safeParams em gist-proxy ✅
+- **AP1:** ~~DELETE sem filtro~~ → `.eq('metadata->>auto_created', 'true')` adicionado ✅
 
 ### Altos
 - **AP2:** `evaluate-audit-rules` INSERT sem ON CONFLICT
@@ -553,8 +553,8 @@ gist-insights-hub/
 16. **Concluido:** Fase 7.5 — Unificacao Assignees (Issue #71)
     - assignee_id → user_profiles, aba Responsaveis removida, RLS permissiva para dropdown
     - Fix: aba Areas restaurada (removida acidentalmente)
-17. **Pendente — CRITICO:** Corrigir SEC1/SEC2 — adicionar JWT a gist-discover e gist-proxy (Issue para Lovable)
-18. **Pendente — CRITICO:** Corrigir AP1 — filtro auto_created no DELETE de process-jobs:380 (Issue para Lovable)
+17. **Concluido:** SEC1/SEC2 — JWT + CORS em gist-discover e gist-proxy (Lovable, auditado 2026-03-24)
+18. **Concluido:** AP1 — filtro auto_created no DELETE de process-jobs (Lovable, auditado 2026-03-24)
 19. **Pendente — ALTO:** Corrigir AP2/AP3 — ON CONFLICT em evaluate-audit-rules e gist-confirm-mapping (Issue para Lovable)
 20. **Pendente — ALTO:** Corrigir M12 — paginacao em InteractionsFeed.tsx (Issue para Lovable)
 21. **Concluido:** Issues #32, #37, #38, #65 fechadas no GitHub (2026-03-24)

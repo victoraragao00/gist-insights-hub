@@ -1,15 +1,15 @@
 # PENDENTES — Violações em Aberto
 
-> Atualizado por: Claude Code (Auditoria Completa 2026-03-22)
-> Última atualização: 2026-03-22
+> Atualizado por: Claude Code
+> Última atualização: 2026-03-24
 
 ## Críticas
 
 | ID | Data | Severidade | Arquivo | Descrição | Status |
 |----|------|-----------|---------|-----------|--------|
-| SEC1 | 2026-03-22 | CRÍTICO | gist-discover/index.ts:46 | Sem validação JWT + CORS aberto — endpoint exposto com service_role | ABERTO |
-| SEC2 | 2026-03-22 | CRÍTICO | gist-proxy/index.ts:1,32 | Sem validação JWT + CORS aberto + params sem sanitização | ABERTO |
-| AP1 | 2026-03-22 | CRÍTICO | process-jobs/index.ts:380 | DELETE sem filtro `auto_created` — risco de apagar dados reais | ABERTO |
+| SEC1 | 2026-03-22 | CRÍTICO | gist-discover/index.ts | ~~Sem validação JWT + CORS aberto~~ → JWT via auth.getUser() + CORS via ALLOWED_ORIGIN | RESOLVIDO 2026-03-24 |
+| SEC2 | 2026-03-22 | CRÍTICO | gist-proxy/index.ts | ~~Sem JWT + CORS aberto + params sem sanitização~~ → JWT + CORS + safeParams | RESOLVIDO 2026-03-24 |
+| AP1 | 2026-03-22 | CRÍTICO | process-jobs/index.ts:380 | ~~DELETE sem filtro auto_created~~ → .eq('metadata->>auto_created', 'true') | RESOLVIDO 2026-03-24 |
 
 ## Altas
 
