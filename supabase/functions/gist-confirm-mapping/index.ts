@@ -74,7 +74,7 @@ Deno.serve(async (req) => {
       const slug = clientName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
       const { data: newClient, error: insertError } = await supaAdmin
         .from('clients')
-        .insert({ name: clientName, slug })
+        .upsert({ name: clientName, slug }, { onConflict: 'slug' })
         .select('id')
         .single();
 
@@ -88,11 +88,11 @@ Deno.serve(async (req) => {
 
       // Grant caller access to new client
       if (callerUserId) {
-        await supaAdmin.from('user_client_access').insert({
+        await supaAdmin.from('user_client_access').upsert({
           user_id: callerUserId,
           client_id: newClient.id,
           role: 'admin',
-        });
+        }, { onConflict: 'user_id,client_id', ignoreDuplicates: true });
       }
     }
 
@@ -113,11 +113,11 @@ Deno.serve(async (req) => {
           .limit(1);
 
         if (!hasAccess || hasAccess.length === 0) {
-          await supaAdmin.from('user_client_access').insert({
+          await supaAdmin.from('user_client_access').upsert({
             user_id: callerUserId,
             client_id: clientId,
             role: 'admin',
-          });
+          }, { onConflict: 'user_id,client_id', ignoreDuplicates: true });
         }
       }
     }
@@ -238,15 +238,15 @@ Deno.serve(async (req) => {
 
       const { error: bindInsertError } = await supaAdmin
         .from('channel_bindings')
-        .insert({
+        .upsert({
           client_id: clientId,
           channel: 'gist',
           channel_identifier: 'gist-workspace',
           label: 'Gist',
-        });
+        }, { onConflict: 'client_id,channel', ignoreDuplicates: true });
 
       if (bindInsertError) {
-        console.error(`Binding insert error for client ${clientId}:`, bindInsertError.message);
+        console.error(`Binding upsert error for client ${clientId}:`, bindInsertError.message);
         continue;
       }
 

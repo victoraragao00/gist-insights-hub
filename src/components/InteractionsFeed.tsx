@@ -498,7 +498,9 @@ export const InteractionsFeed = ({ clientId }: { clientId: string }) => {
 
   const dateFrom = subDays(new Date(), Math.min(parseInt(period), 30)).toISOString();
 
-  // Single query — all interactions for period
+  const PAGE_SIZE = 500;
+
+  // Single query — most recent PAGE_SIZE interactions for period
   const { data: rawInteractions, isLoading } = useQuery({
     queryKey: ["conversations", clientId, period],
     enabled: !!clientId,
@@ -509,11 +511,15 @@ export const InteractionsFeed = ({ clientId }: { clientId: string }) => {
         .select("id, content, occurred_at, sender_raw, sender_side, tone, theme, classified_at, raw_payload, attachments")
         .eq("client_id", clientId)
         .gte("occurred_at", dateFrom)
-        .order("occurred_at", { ascending: true });
+        .order("occurred_at", { ascending: false })
+        .limit(PAGE_SIZE);
       if (error) throw error;
-      return (data ?? []) as Interaction[];
+      // Reverse to restore chronological order for display
+      return (data ?? []).reverse() as Interaction[];
     },
   });
+
+  const isLimitReached = (rawInteractions?.length ?? 0) >= PAGE_SIZE;
 
   // Build & filter conversations
   const allConversations = useMemo(
@@ -595,6 +601,13 @@ export const InteractionsFeed = ({ clientId }: { clientId: string }) => {
           />
         </div>
       </div>
+
+      {/* Limit warning banner */}
+      {isLimitReached && (
+        <div className="mx-1 mt-1 mb-1 rounded-md border border-border bg-muted px-3 py-2 text-xs text-muted-foreground">
+          Exibindo as {PAGE_SIZE} mensagens mais recentes do período. Reduza o período para ver todas.
+        </div>
+      )}
 
       {/* Counter */}
       <div className="px-1 pb-2 text-xs text-muted-foreground">
