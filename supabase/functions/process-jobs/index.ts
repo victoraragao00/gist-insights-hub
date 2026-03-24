@@ -376,8 +376,13 @@ async function handleIngestHistorical(
   const deleteClientId = (job.payload as any)?.delete_client_id;
 
   // Optional: delete interactions for a client before ingestion
+  // IMPORTANT: only delete auto_created interactions — never delete manual/real data
   if (deleteClientId && startPage === 1) {
-    const { error: delErr } = await supaAdmin.from('interactions').delete().eq('client_id', deleteClientId);
+    const { error: delErr } = await supaAdmin
+      .from('interactions')
+      .delete()
+      .eq('client_id', deleteClientId)
+      .eq('metadata->>auto_created', 'true');
     if (delErr) return { has_more: false, progress, error: 'Delete failed: ' + delErr.message };
   }
 
