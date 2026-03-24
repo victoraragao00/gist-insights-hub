@@ -15,9 +15,9 @@
 
 | ID | Data | Severidade | Arquivo | Descrição | Status |
 |----|------|-----------|---------|-----------|--------|
-| AP2 | 2026-03-22 | ALTO | evaluate-audit-rules/index.ts:166 | INSERT audit_alerts sem ON CONFLICT — falha em duplicata | ABERTO |
-| AP3 | 2026-03-22 | ALTO | gist-confirm-mapping/index.ts:77+ | Múltiplos INSERTs sem conflict handling — duplicatas em re-execução | ABERTO |
-| M12 | 2026-03-22 | ALTO | InteractionsFeed.tsx:463-477 | Query sem .range()/.limit() — pode retornar milhares de linhas | ABERTO |
+| AP2 | 2026-03-22 | ALTO | evaluate-audit-rules/index.ts | ~~INSERT sem ON CONFLICT~~ → error.code 23505 ignorado | RESOLVIDO 2026-03-24 |
+| AP3 | 2026-03-22 | ALTO | gist-confirm-mapping/index.ts | ~~INSERTs sem conflict~~ → upsert com onConflict em 3 tabelas | RESOLVIDO 2026-03-24 |
+| M12 | 2026-03-22 | ALTO | InteractionsFeed.tsx | ~~Query sem limit~~ → .limit(500) + order desc + reverse + banner | RESOLVIDO 2026-03-24 |
 
 ## Médias
 

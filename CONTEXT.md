@@ -326,10 +326,10 @@ Pendencias: `auditorias/PENDENTES.md`
 - **SEC1/SEC2:** ~~sem JWT + CORS aberto~~ → JWT via `auth.getUser()` + CORS via `ALLOWED_ORIGIN` env var + safeParams em gist-proxy ✅
 - **AP1:** ~~DELETE sem filtro~~ → `.eq('metadata->>auto_created', 'true')` adicionado ✅
 
-### Altos
-- **AP2:** `evaluate-audit-rules` INSERT sem ON CONFLICT
-- **AP3:** `gist-confirm-mapping` INSERTs sem conflict handling
-- **M12:** `InteractionsFeed.tsx:463-477` query sem paginacao
+### Altos — RESOLVIDOS (2026-03-24, Lovable, auditado pelo Claude Code)
+- **AP2:** ~~INSERT sem ON CONFLICT~~ → error.code 23505 tratado graciosamente ✅
+- **AP3:** ~~INSERTs sem conflict~~ → upsert com onConflict em clients, user_client_access, channel_bindings ✅
+- **M12:** ~~query sem paginacao~~ → .limit(500) + order desc + reverse + banner de aviso ✅
 
 ### Medios
 - **M1:** 7x `as unknown as Type` em hooks (bypass tipagem)
@@ -555,8 +555,8 @@ gist-insights-hub/
     - Fix: aba Areas restaurada (removida acidentalmente)
 17. **Concluido:** SEC1/SEC2 — JWT + CORS em gist-discover e gist-proxy (Lovable, auditado 2026-03-24)
 18. **Concluido:** AP1 — filtro auto_created no DELETE de process-jobs (Lovable, auditado 2026-03-24)
-19. **Pendente — ALTO:** Corrigir AP2/AP3 — ON CONFLICT em evaluate-audit-rules e gist-confirm-mapping (Issue para Lovable)
-20. **Pendente — ALTO:** Corrigir M12 — paginacao em InteractionsFeed.tsx (Issue para Lovable)
+19. **Concluido:** AP2/AP3 — ON CONFLICT em evaluate-audit-rules e gist-confirm-mapping (Lovable, auditado 2026-03-24)
+20. **Concluido:** M12 — paginacao em InteractionsFeed.tsx com .limit(500) (Lovable, auditado 2026-03-24)
 21. **Concluido:** Issues #32, #37, #38, #65 fechadas no GitHub (2026-03-24)
 22. **Pendente:** Lovable S6 — Edge function deliver-audit-alerts (baixa prioridade)
 23. **Pendente:** Testar notificacoes in-app com 2 usuarios simultaneos
