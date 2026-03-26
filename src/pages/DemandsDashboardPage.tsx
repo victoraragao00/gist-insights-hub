@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useClient } from "@/context/ClientContext";
 import { useDemandAnalytics } from "@/hooks/useDemandAnalytics";
+import { PRIORITY_CHART_COLORS as PRIORITY_COLORS, PRIORITY_LABELS } from "@/lib/colorPalette";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 

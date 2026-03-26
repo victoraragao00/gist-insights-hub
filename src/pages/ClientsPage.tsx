@@ -18,6 +18,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 import { useDebounce } from "@/hooks/useDebounce";
+import { TONE_CONFIG } from "@/lib/colorPalette";
 import { usePriorityScores } from "@/hooks/usePriorityScores";
 
 // ── Types ──
