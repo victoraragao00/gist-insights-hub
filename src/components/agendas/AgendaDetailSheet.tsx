@@ -545,8 +545,3 @@ function CreateDemandDialogWithCallback({
   );
 }
 
-// Need to import these at the top level for the inner component
-import { useClient } from "@/context/ClientContext";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
-} from "@/components/ui/dialog";
