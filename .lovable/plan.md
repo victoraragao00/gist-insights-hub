@@ -1,49 +1,59 @@
 
 
-## Plan: SA-4 — Agenda Settings Tab + End-to-End Verification
+## Dívida Técnica Completa (DT-1) — 8 Blocos
 
-### What exists
-- SA-1 (tables, RLS, seed): Done
-- SA-2 (CRUD, routes, sidebar): Done
-- SA-3 (Edge Function, AI processing, homework-to-ticket): Done
-- `useAgendaFieldConfig.ts` hook: Done (reads from `app_settings`)
-- `CreateAgendaDialog` already uses `fieldConfig` for visibility/required checks
+Prompt verificado contra o código atual. Todas as 13 pendências confirmadas. Nenhuma divergência encontrada.
 
-### What's missing
-1. **SA-4: Admin settings tab** — No UI to edit `agenda_required_fields` in `app_settings`
+### Resumo dos 8 blocos
 
-### Implementation
+1. **Paleta centralizada** — Criar `src/lib/colorPalette.ts` com TONE_CONFIG, TONE_CHART_COLORS, TONE_BAR_COLORS, PRIORITY_CHART_COLORS, SCORE_BUCKET_COLORS, SATISFACTION_CONFIG. Remover duplicatas em ClientDetailPage (L123-128), ClientsPage (L71-76), SearchPage (L35-40). Substituir HSL hardcoded em Index.tsx (L129-134), DemandsDashboardPage (L26-31). Substituir SATISFACTION_OPTIONS em SatisfactionPicker.
 
-#### 1. New component: `src/components/settings/AgendaSettingsTab.tsx`
-- Card with title "Pautas de Reuniao"
-- Table with rows for each field (title, meeting_date, client_id, objective, context_notes, satisfaction_score, next_steps, transcription, location)
-- Each row: field label + RadioGroup with 3 options (obrigatorio / opcional / oculto)
-- Field labels read from a const map (never hardcoded inline)
-- Reads current config via `useAgendaFieldConfig()`
-- Saves via `useMutation` → `supabase.from("app_settings").update(...)` where key = `agenda_required_fields`
-- Only admin can access (parent already guards with `isAdmin`)
-- Uses `sonner` toast on success/error
+2. **10x `as unknown as`** — Simplificar casts em useDemands, useClientDemands, useDemandAnalytics, useDemandInteractions, useMeetingAgendas (2x), useMeetingHomework, ColumnSettingsTab (2x — manter `as unknown as` se TS reclamar pois `err` vem de catch), ClientDetailPage (L329).
 
-#### 2. Edit `src/pages/SettingsPage.tsx`
-- Import `AgendaSettingsTab`
-- Add tab trigger: `{isAdmin && <TabsTrigger value="agendas">Pautas</TabsTrigger>}` (after "areas")
-- Add tab content: `{isAdmin && <TabsContent value="agendas"><AgendaSettingsTab /></TabsContent>}`
+3. **GistContactWizard → useMutation** — Remover `useState(false)` para saving (L97). Criar `saveMutation` com `useMutation`. Substituir `handleSave` manual por `saveMutation.mutate()`. Usar `saveMutation.isPending` no botão.
 
-#### 3. Hardcoded audit
-- `CreateAgendaDialog`: Already uses `fieldConfig` — no hardcoded values
-- `AgendaDetailSheet`: Satisfaction labels "uMode"/"Cliente" come from DB `responsible_label` — not hardcoded
-- `SatisfactionPicker`: Emoji picker 1-5 — inherent UI, not a config concern
-- `AgendasPage`: Filter uses `clients` from context — dynamic
-- Edge Function: Gemini prompt has fixed structure (expected — it's an AI instruction, not user-facing config)
+4. **Imports não usados** — Remover `useQuery` de AgendasPage.tsx (L2) e CreateAgendaDialog.tsx (L2).
 
-#### 4. End-to-end flow verification (post-implementation)
-- Test creating a pauta with all field visibility combos
-- Test AI processing with a sample transcription
-- Test homework item creation (manual + AI)
-- Test converting homework to ticket
-- Test admin settings tab saving
+5. **Skeleton shimmer** — Em `skeleton.tsx`, trocar `animate-pulse` por `animate-shimmer` (já registrado em tailwind.config.ts).
 
-### Files changed
-- **New:** `src/components/settings/AgendaSettingsTab.tsx`
-- **Edit:** `src/pages/SettingsPage.tsx` (2 lines: tab trigger + tab content)
+6. **Stagger animation** — Em AgendasPage.tsx (L73), adicionar classe `animate-fade-in-up` ao Card que tem `style={{ animationDelay, opacity: 0 }}` mas sem classe de animação.
+
+7. **Tipagem alert_recipients** — Em useAuditRules.ts (L16), trocar `unknown` por `string[]`.
+
+8. **key={i}** — Em Audits.tsx (L627), trocar `key={i}` por `key={\`recipient-${r || i}\`}`.
+
+### Arquivos alterados
+
+| Arquivo | Ação |
+|---------|------|
+| `src/lib/colorPalette.ts` | Novo |
+| `src/pages/ClientDetailPage.tsx` | Import paleta + remover TONE_CONFIG local + usar TONE_CHART_COLORS/TONE_BAR_COLORS + simplificar cast L329 |
+| `src/pages/ClientsPage.tsx` | Import paleta + remover TONE_CONFIG local |
+| `src/pages/SearchPage.tsx` | Import paleta + remover TONE_CONFIG local |
+| `src/pages/DemandsDashboardPage.tsx` | Import PRIORITY_CHART_COLORS + remover PRIORITY_COLORS local |
+| `src/pages/Index.tsx` | Import SCORE_BUCKET_COLORS + substituir array hardcoded |
+| `src/components/agendas/SatisfactionPicker.tsx` | Import SATISFACTION_CONFIG + remover array local (nota: SatisfactionPicker usa lucide icons, não emojis — adaptar SATISFACTION_CONFIG para manter icons) |
+| `src/components/GistContactWizard.tsx` | useState → useMutation |
+| `src/pages/AgendasPage.tsx` | Remover import useQuery + adicionar animate-fade-in-up |
+| `src/components/agendas/CreateAgendaDialog.tsx` | Remover import useQuery |
+| `src/components/ui/skeleton.tsx` | animate-pulse → animate-shimmer |
+| `src/hooks/useAuditRules.ts` | alert_recipients: string[] |
+| `src/pages/Audits.tsx` | key baseada em conteúdo |
+| `src/hooks/useDemands.ts` | Simplificar cast |
+| `src/hooks/useClientDemands.ts` | Simplificar cast |
+| `src/hooks/useDemandAnalytics.ts` | Simplificar cast |
+| `src/hooks/useDemandInteractions.ts` | Simplificar cast |
+| `src/hooks/useMeetingAgendas.ts` | Simplificar 2 casts |
+| `src/hooks/useMeetingHomework.ts` | Simplificar cast |
+| `src/components/demands/ColumnSettingsTab.tsx` | Simplificar 2 casts (manter `as unknown as` se TS falhar) |
+
+### Nota importante: SatisfactionPicker
+
+O prompt sugere usar emojis (😡😟😐🙂😍) do `SATISFACTION_CONFIG`, mas o componente atual usa **lucide icons** (Skull, Frown, Meh, Smile). Para manter compatibilidade, o `SATISFACTION_CONFIG` no colorPalette.ts terá apenas `color` e `label` — os icons continuam no componente. Não vou trocar icons por emojis.
+
+### Sem alterações em
+- Edge Functions
+- Migrations/RLS
+- Lógica de queries ou mutations
+- `src/integrations/supabase/*`
 
