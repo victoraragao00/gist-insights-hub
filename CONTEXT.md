@@ -266,7 +266,7 @@ Migration com 3 tabelas + RLS + indexes + trigger + seed:
 
 Relatorio: `auditorias/AUDITORIA_20260326_SA1_SA4.md`
 
-**Criticos (2):** Edge Function sem JWT + CORS wildcard → prompt gerado para Lovable
+**Criticos (2):** ~~Edge Function sem JWT + CORS wildcard~~ → RESOLVIDOS (Lovable, auditado 2026-03-26)
 **Medios (5):** DELETE sem error handling, rawText em log, 3x as unknown as, 2x imports nao usados
 **Baixos (4):** Cores hardcoded, stagger animation, as never cast
 **PASS:** m2, m3, m4, m5, m7, m8 (hooks), m9, m10, m11 (exceto 2), RLS, indexes, trigger, seed, Gemini, DELETE protege convertidos
@@ -618,7 +618,7 @@ gist-insights-hub/
 20. **Concluido:** M12 — paginacao em InteractionsFeed.tsx com .limit(500) (Lovable, auditado 2026-03-24)
 21. **Concluido:** Issues #32, #37, #38, #65 fechadas no GitHub (2026-03-24)
 22. **Concluido:** Fase 9 — Modulo de Pautas de Reuniao (SA-1 a SA-4, Lovable, auditado 2026-03-26)
-23. **Pendente — CRITICO:** Fix seguranca Edge Function process-meeting-transcription (JWT + CORS + error handling + log) — prompt gerado
+23. **Concluido:** Fix seguranca process-meeting-transcription (JWT + CORS + DELETE error + log sanitizado, Lovable, auditado 2026-03-26)
 24. **Pendente:** Lovable S6 — Edge function deliver-audit-alerts (baixa prioridade)
 25. **Pendente:** Testar notificacoes in-app com 2 usuarios simultaneos
 26. **Pendente:** Correcoes medias da auditoria (m1 10x, m9 1x, m11 2x, DS1-DS3, TONE_CONFIG) — ver PENDENTES.md

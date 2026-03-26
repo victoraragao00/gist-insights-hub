@@ -23,7 +23,7 @@
 
 | ID | Data | Severidade | Arquivo | Descrição | Status |
 |----|------|-----------|---------|-----------|--------|
-| M1a | 2026-03-22 | MÉDIO | 4 hooks + 2 componentes | 7x `as unknown as Type` — bypass de tipagem (m1) | ABERTO |
+| M1a | 2026-03-22 | MÉDIO | 7 hooks + 2 componentes | 10x `as unknown as Type` — bypass de tipagem (m1). +3 em SA-2/SA-3 hooks | ABERTO |
 | M9a | 2026-03-22 | MÉDIO | GistContactWizard.tsx:304-354 | useState manual para escrita em vez de useMutation (m9) | ABERTO |
 | DS1 | 2026-03-22 | MÉDIO | DemandsDashboardPage.tsx:26-31 | HSL hardcoded em PRIORITY_COLORS | ABERTO |
 | DS2 | 2026-03-22 | MÉDIO | ClientDetailPage.tsx:668-671,698 | HSL hardcoded + green-500 em vez de emerald-500 | ABERTO |
@@ -38,6 +38,9 @@
 | DS5 | 2026-03-22 | BAIXO | Múltiplos | Zero uso de motion-safe: prefix | ABERTO |
 | A2 | 2026-03-08 | BAIXO | Audits.tsx:626 | `key={i}` em lista dinâmica de recipients | ABERTO |
 | O1 | 2026-03-08 | BAIXO | useAuditRules.ts:16 | `alert_recipients: unknown` — poderia ser tipado | ABERTO |
+| M11b | 2026-03-26 | BAIXO | AgendasPage.tsx:2, CreateAgendaDialog.tsx:2 | 2x `useQuery` importado mas não usado | ABERTO |
+| DSb1 | 2026-03-26 | BAIXO | SatisfactionPicker.tsx:7-11 | Cores hardcoded (red/orange/yellow/emerald) — usar paleta semântica | ABERTO |
+| DSb2 | 2026-03-26 | BAIXO | AgendasPage.tsx:75 | Stagger animation sem classe animate-fade-in-up — itens invisíveis | ABERTO |
 
 ## Resolvidas (desde última auditoria)
 
