@@ -48,7 +48,7 @@ export function useConvertHomeworkToTicket() {
     }) => {
       const { error } = await supabase
         .from("meeting_homework_items")
-        .update({ converted_to_demand_id: demandId, status: "converted" } as Record<string, unknown>)
+        .update({ converted_to_demand_id: demandId, status: "converted" })
         .eq("id", homeworkItemId);
       if (error) throw error;
     },

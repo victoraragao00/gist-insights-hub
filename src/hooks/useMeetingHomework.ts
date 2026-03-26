@@ -66,7 +66,7 @@ export function useUpdateHomeworkItem() {
     mutationFn: async ({ id, ...updates }: { id: string; converted_to_demand_id?: string; status?: string; description?: string }) => {
       const { error } = await supabase
         .from("meeting_homework_items")
-        .update(updates as Record<string, unknown>)
+        .update(updates)
         .eq("id", id);
       if (error) throw error;
     },
