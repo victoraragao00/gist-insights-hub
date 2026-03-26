@@ -13,7 +13,7 @@ export interface AuditRule {
   threshold: number;
   window_hours: number | null;
   alert_channel: "email" | "whatsapp" | "both" | null;
-  alert_recipients: unknown;
+  alert_recipients: string[];
   cooldown_hours: number | null;
   active: boolean | null;
   created_at: string | null;

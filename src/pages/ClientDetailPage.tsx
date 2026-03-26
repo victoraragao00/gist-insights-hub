@@ -120,12 +120,7 @@ interface AuditRule {
 
 // ── Helpers ──
 
-const TONE_CONFIG: Record<string, { label: string; className: string }> = {
-  ok: { label: "✓ Ok", className: "bg-emerald-50 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400" },
-  atencao: { label: "⚠ Atenção", className: "bg-yellow-50 text-yellow-600 dark:bg-yellow-950 dark:text-yellow-400" },
-  alerta: { label: "🔶 Alerta", className: "bg-orange-50 text-orange-600 dark:bg-orange-950 dark:text-orange-400" },
-  critico: { label: "🔴 Crítico", className: "bg-red-50 text-red-600 dark:bg-red-950 dark:text-red-400" },
-};
+// TONE_CONFIG imported from colorPalette
 
 const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
   ativo: { label: "Ativo", className: "bg-emerald-50 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400" },
