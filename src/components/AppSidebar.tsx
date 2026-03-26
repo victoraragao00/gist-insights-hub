@@ -24,6 +24,7 @@ const modules = [
   { title: "Analytics de Demandas", url: "/demands/dashboard", icon: BarChart2 },
   { title: "Pautas", url: "/agendas", icon: ClipboardList },
   { title: "Busca", url: "/search", icon: Search },
+  { title: "Auditorias", url: "/audits", icon: ShieldAlert },
 ];
 
 const bottomItems = [
