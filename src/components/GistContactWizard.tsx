@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useMutation } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
@@ -94,7 +95,7 @@ export function GistContactWizard({ open, onClose, mode, clientId }: GistContact
   const [selectedTeammates, setSelectedTeammates] = useState<Map<number, boolean>>(new Map());
   const [clients, setClients] = useState<ClientOption[]>([]);
   const [confirmed, setConfirmed] = useState(false);
-  const [saving, setSaving] = useState(false);
+  // saving handled by saveMutation below
 
   // ── Load clients list ──
   useEffect(() => {
