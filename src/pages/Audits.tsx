@@ -216,7 +216,7 @@ const Audits = () => {
     setFormWindowHours(rule.window_hours ?? 24);
     setFormChannel(rule.alert_channel ?? "email");
     setFormRecipients(
-      Array.isArray(rule.alert_recipients) ? (rule.alert_recipients as Array<{ type: string; value: string }>) : []
+      Array.isArray(rule.alert_recipients) ? (rule.alert_recipients as unknown as Array<{ type: string; value: string }>) : []
     );
     setFormCooldownHours(rule.cooldown_hours ?? 24);
     setDialogOpen(true);

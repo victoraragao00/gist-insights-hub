@@ -662,12 +662,7 @@ const ClientDetailPage = () => {
                 <p className="text-sm text-muted-foreground py-8 text-center">Sem interações classificadas nos últimos 7 dias</p>
               ) : toneTrendChartData.length > 0 ? (
                 <ChartContainer
-                  config={{
-                    ok: { label: "Ok", color: "hsl(160, 84%, 39%)" },
-                    atencao: { label: "Atenção", color: "hsl(48, 96%, 53%)" },
-                    alerta: { label: "Alerta", color: "hsl(25, 95%, 53%)" },
-                    critico: { label: "Crítico", color: "hsl(0, 84%, 60%)" },
-                  }}
+                  config={TONE_CHART_COLORS}
                   className="h-48 w-full"
                 >
                   <BarChart data={toneTrendChartData} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
