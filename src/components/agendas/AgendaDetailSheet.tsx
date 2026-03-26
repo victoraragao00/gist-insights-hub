@@ -1,5 +1,6 @@
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useClient } from "@/context/ClientContext";
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle,
 } from "@/components/ui/sheet";
@@ -16,6 +17,9 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { Loader2, Sparkles, Trash2, Plus, ArrowRight, ExternalLink, Check, Building2, Users } from "lucide-react";
 import { toast } from "sonner";
@@ -415,7 +419,6 @@ function HomeworkItemRow({
 
 import { useCreateDemand, useTicketColumns, useDemandTypes } from "@/hooks/useDemands";
 import { useDemandAreas } from "@/hooks/useDemandAreas";
-
 function CreateDemandDialogWithCallback({
   open,
   onOpenChange,
