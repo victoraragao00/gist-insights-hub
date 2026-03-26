@@ -1,91 +1,49 @@
 
-## Fixes: SEC1, SEC2 (JWT + CORS) and AP1 (DELETE sem auto_created)
 
-### Current State
+## Plan: SA-4 — Agenda Settings Tab + End-to-End Verification
 
-**SEC1 — gist-discover/index.ts**: Sem validação JWT. Qualquer pessoa pode chamar e consumir `GIST_API_KEY` + usar `service_role` para consultar `clients`.
+### What exists
+- SA-1 (tables, RLS, seed): Done
+- SA-2 (CRUD, routes, sidebar): Done
+- SA-3 (Edge Function, AI processing, homework-to-ticket): Done
+- `useAgendaFieldConfig.ts` hook: Done (reads from `app_settings`)
+- `CreateAgendaDialog` already uses `fieldConfig` for visibility/required checks
 
-**SEC2 — gist-proxy/index.ts**: Sem validação JWT. `GIST_API_KEY` exposta publicamente. `params` sem sanitização — valores não-string passados diretamente para `URLSearchParams`.
+### What's missing
+1. **SA-4: Admin settings tab** — No UI to edit `agenda_required_fields` in `app_settings`
 
-**AP1 — process-jobs/index.ts (linha 380)**: DELETE apaga TODAS as interactions do `client_id` sem filtrar `auto_created`. Risco de perda irreversível de dados manuais.
+### Implementation
 
-**config.toml**: `gist-proxy` tem `verify_jwt = false`. `gist-discover` não está listado (já será protegido via código). Nenhuma mudança necessária no toml — JWT será validado em código como já ocorre em `bootstrap-user-access`.
+#### 1. New component: `src/components/settings/AgendaSettingsTab.tsx`
+- Card with title "Pautas de Reuniao"
+- Table with rows for each field (title, meeting_date, client_id, objective, context_notes, satisfaction_score, next_steps, transcription, location)
+- Each row: field label + RadioGroup with 3 options (obrigatorio / opcional / oculto)
+- Field labels read from a const map (never hardcoded inline)
+- Reads current config via `useAgendaFieldConfig()`
+- Saves via `useMutation` → `supabase.from("app_settings").update(...)` where key = `agenda_required_fields`
+- Only admin can access (parent already guards with `isAdmin`)
+- Uses `sonner` toast on success/error
 
----
+#### 2. Edit `src/pages/SettingsPage.tsx`
+- Import `AgendaSettingsTab`
+- Add tab trigger: `{isAdmin && <TabsTrigger value="agendas">Pautas</TabsTrigger>}` (after "areas")
+- Add tab content: `{isAdmin && <TabsContent value="agendas"><AgendaSettingsTab /></TabsContent>}`
 
-### Mudanças Planejadas
+#### 3. Hardcoded audit
+- `CreateAgendaDialog`: Already uses `fieldConfig` — no hardcoded values
+- `AgendaDetailSheet`: Satisfaction labels "uMode"/"Cliente" come from DB `responsible_label` — not hardcoded
+- `SatisfactionPicker`: Emoji picker 1-5 — inherent UI, not a config concern
+- `AgendasPage`: Filter uses `clients` from context — dynamic
+- Edge Function: Gemini prompt has fixed structure (expected — it's an AI instruction, not user-facing config)
 
-**1. `supabase/functions/gist-discover/index.ts`**
+#### 4. End-to-end flow verification (post-implementation)
+- Test creating a pauta with all field visibility combos
+- Test AI processing with a sample transcription
+- Test homework item creation (manual + AI)
+- Test converting homework to ticket
+- Test admin settings tab saving
 
-Adicionar bloco de auth logo após o check de variáveis de ambiente (antes de qualquer lógica Gist):
+### Files changed
+- **New:** `src/components/settings/AgendaSettingsTab.tsx`
+- **Edit:** `src/pages/SettingsPage.tsx` (2 lines: tab trigger + tab content)
 
-```typescript
-// Extrair e validar JWT do chamador
-const authHeader = req.headers.get('Authorization');
-if (!authHeader) {
-  return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-    status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  });
-}
-const supaAuth = createClient(supabaseUrl, anonKey, {
-  global: { headers: { Authorization: authHeader } },
-});
-const { data: authData, error: authError } = await supaAuth.auth.getUser();
-if (authError || !authData.user) {
-  return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-    status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  });
-}
-```
-
-Também adicionar `SUPABASE_ANON_KEY` ao check de variáveis de ambiente.
-
-**2. `supabase/functions/gist-proxy/index.ts`**
-
-Adicionar o mesmo bloco JWT antes do `const { endpoint, params } = await req.json()`.
-
-Substituir `params` por `safeParams` após sanitização:
-```typescript
-const safeParams: Record<string, string> = {};
-if (params && typeof params === 'object') {
-  for (const [k, v] of Object.entries(params as Record<string, unknown>)) {
-    if (typeof v === 'string' || typeof v === 'number') {
-      safeParams[String(k)] = String(v);
-    }
-  }
-}
-```
-
-**3. `supabase/functions/process-jobs/index.ts` (linha 380)**
-
-Alterar apenas a linha de DELETE para adicionar o filtro `auto_created`:
-
-```typescript
-// ANTES:
-const { error: delErr } = await supaAdmin.from('interactions').delete().eq('client_id', deleteClientId);
-
-// DEPOIS:
-const { error: delErr } = await supaAdmin
-  .from('interactions')
-  .delete()
-  .eq('client_id', deleteClientId)
-  .eq('metadata->>auto_created', 'true');
-```
-
-**4. `supabase/config.toml`**
-
-Adicionar `[functions.gist-discover]` com `verify_jwt = false` para consistência com o padrão do projeto (JWT validado em código, não pelo gateway).
-
----
-
-### Arquivos alterados
-- `supabase/functions/gist-discover/index.ts` — JWT validation
-- `supabase/functions/gist-proxy/index.ts` — JWT validation + params sanitization
-- `supabase/functions/process-jobs/index.ts` — filtro `auto_created` no DELETE
-- `supabase/config.toml` — adicionar entrada `gist-discover`
-
-### Sem alterações em
-- Lógica de negócio (agrupamento, matching, fetch Gist)
-- Outras Edge Functions
-- `ALLOWED_ENDPOINTS` whitelist
-- Migrations ou RLS policies
