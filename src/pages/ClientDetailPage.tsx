@@ -39,6 +39,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recha
 import { ChartContainer } from "@/components/ui/chart";
 import { CreateDemandDialog } from "@/components/demands/CreateDemandDialog";
 import { DemandDetailSheet } from "@/components/demands/DemandDetailSheet";
+import { ClientAgendasTab } from "@/components/agendas/ClientAgendasTab";
 import type { DemandRow } from "@/hooks/useDemands";
 
 // ── Types ──
@@ -600,6 +601,7 @@ const ClientDetailPage = () => {
         <TabsList className="bg-muted/50 flex-wrap h-auto">
           <TabsTrigger value="overview">Visão Geral</TabsTrigger>
           <TabsTrigger value="demands">Demandas ({clientDemands.length})</TabsTrigger>
+          <TabsTrigger value="agendas">Pautas</TabsTrigger>
           <TabsTrigger value="interactions">Interações</TabsTrigger>
           <TabsTrigger value="participants">Participantes ({participantsTotalCount})</TabsTrigger>
           <TabsTrigger value="channels">Canais ({bindings.length})</TabsTrigger>
@@ -911,6 +913,11 @@ const ClientDetailPage = () => {
               if (!open) setSelectedDemandId(null);
             }}
           />
+        </TabsContent>
+
+        {/* ── TAB: Pautas ── */}
+        <TabsContent value="agendas" className="space-y-4">
+          <ClientAgendasTab clientId={client.id} />
         </TabsContent>
 
         {/* ── TAB: Interações ── */}

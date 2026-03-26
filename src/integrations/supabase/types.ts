@@ -837,6 +837,171 @@ export type Database = {
           },
         ]
       }
+      meeting_agendas: {
+        Row: {
+          ai_processed: boolean | null
+          ai_processed_at: string | null
+          client_id: string
+          context_notes: string | null
+          created_at: string | null
+          created_by: string
+          executive_summary: string | null
+          id: string
+          location: string | null
+          meeting_date: string
+          next_steps: string | null
+          objective: string | null
+          satisfaction_score: number | null
+          title: string
+          transcription: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          ai_processed?: boolean | null
+          ai_processed_at?: string | null
+          client_id: string
+          context_notes?: string | null
+          created_at?: string | null
+          created_by: string
+          executive_summary?: string | null
+          id?: string
+          location?: string | null
+          meeting_date: string
+          next_steps?: string | null
+          objective?: string | null
+          satisfaction_score?: number | null
+          title: string
+          transcription?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          ai_processed?: boolean | null
+          ai_processed_at?: string | null
+          client_id?: string
+          context_notes?: string | null
+          created_at?: string | null
+          created_by?: string
+          executive_summary?: string | null
+          id?: string
+          location?: string | null
+          meeting_date?: string
+          next_steps?: string | null
+          objective?: string | null
+          satisfaction_score?: number | null
+          title?: string
+          transcription?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meeting_agendas_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      meeting_homework_items: {
+        Row: {
+          agenda_id: string
+          converted_to_demand_id: string | null
+          created_at: string | null
+          description: string
+          due_date: string | null
+          id: string
+          responsible_label: string | null
+          responsible_side: string
+          status: string
+        }
+        Insert: {
+          agenda_id: string
+          converted_to_demand_id?: string | null
+          created_at?: string | null
+          description: string
+          due_date?: string | null
+          id?: string
+          responsible_label?: string | null
+          responsible_side?: string
+          status?: string
+        }
+        Update: {
+          agenda_id?: string
+          converted_to_demand_id?: string | null
+          created_at?: string | null
+          description?: string
+          due_date?: string | null
+          id?: string
+          responsible_label?: string | null
+          responsible_side?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meeting_homework_items_agenda_id_fkey"
+            columns: ["agenda_id"]
+            isOneToOne: false
+            referencedRelation: "meeting_agendas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meeting_homework_items_converted_to_demand_id_fkey"
+            columns: ["converted_to_demand_id"]
+            isOneToOne: false
+            referencedRelation: "demands"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      meeting_participants: {
+        Row: {
+          agenda_id: string
+          created_at: string | null
+          id: string
+          participant_id: string | null
+          present: boolean | null
+          user_profile_id: string | null
+        }
+        Insert: {
+          agenda_id: string
+          created_at?: string | null
+          id?: string
+          participant_id?: string | null
+          present?: boolean | null
+          user_profile_id?: string | null
+        }
+        Update: {
+          agenda_id?: string
+          created_at?: string | null
+          id?: string
+          participant_id?: string | null
+          present?: boolean | null
+          user_profile_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meeting_participants_agenda_id_fkey"
+            columns: ["agenda_id"]
+            isOneToOne: false
+            referencedRelation: "meeting_agendas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meeting_participants_participant_id_fkey"
+            columns: ["participant_id"]
+            isOneToOne: false
+            referencedRelation: "participants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meeting_participants_user_profile_id_fkey"
+            columns: ["user_profile_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       participants: {
         Row: {
           active: boolean | null
