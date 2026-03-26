@@ -600,6 +600,7 @@ const ClientDetailPage = () => {
         <TabsList className="bg-muted/50 flex-wrap h-auto">
           <TabsTrigger value="overview">Visão Geral</TabsTrigger>
           <TabsTrigger value="demands">Demandas ({clientDemands.length})</TabsTrigger>
+          <TabsTrigger value="agendas">Pautas</TabsTrigger>
           <TabsTrigger value="interactions">Interações</TabsTrigger>
           <TabsTrigger value="participants">Participantes ({participantsTotalCount})</TabsTrigger>
           <TabsTrigger value="channels">Canais ({bindings.length})</TabsTrigger>
