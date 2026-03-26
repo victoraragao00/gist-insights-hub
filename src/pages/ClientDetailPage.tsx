@@ -39,6 +39,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recha
 import { ChartContainer } from "@/components/ui/chart";
 import { CreateDemandDialog } from "@/components/demands/CreateDemandDialog";
 import { DemandDetailSheet } from "@/components/demands/DemandDetailSheet";
+import { ClientAgendasTab } from "@/components/agendas/ClientAgendasTab";
 import type { DemandRow } from "@/hooks/useDemands";
 
 // ── Types ──
