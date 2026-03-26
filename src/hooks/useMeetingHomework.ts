@@ -30,7 +30,7 @@ export function useMeetingHomework(agendaId: string | null) {
         .order("created_at", { ascending: true })
         .limit(100);
       if (error) throw error;
-      return (data ?? []) as unknown as HomeworkItem[];
+      return (data ?? []) as HomeworkItem[];
     },
   });
 }

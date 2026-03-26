@@ -46,7 +46,7 @@ export function useMeetingAgendas(clientId?: string) {
 
       const { data, error } = await query;
       if (error) throw error;
-      return (data ?? []) as unknown as MeetingAgendaWithClient[];
+      return (data ?? []) as MeetingAgendaWithClient[];
     },
   });
 }
@@ -65,7 +65,7 @@ export function useMeetingAgenda(agendaId: string | null) {
         .eq("id", agendaId!)
         .maybeSingle();
       if (error) throw error;
-      return data as unknown as MeetingAgenda | null;
+      return data as MeetingAgenda | null;
     },
   });
 }

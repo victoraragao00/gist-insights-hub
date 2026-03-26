@@ -32,7 +32,7 @@ export function useClientDemands(clientId: string | undefined) {
         .order("created_at", { ascending: false })
         .limit(20);
       if (error) throw error;
-      return (data ?? []) as unknown as ClientDemand[];
+      return (data ?? []) as ClientDemand[];
     },
   });
 }
