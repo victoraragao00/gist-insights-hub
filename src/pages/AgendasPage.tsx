@@ -69,7 +69,7 @@ const AgendasPage = () => {
           {agendas.map((agenda, i) => (
             <Card
               key={agenda.id}
-              className="cursor-pointer transition-shadow duration-200 hover:shadow-md border border-border"
+              className="cursor-pointer transition-shadow duration-200 hover:shadow-md border border-border animate-fade-in-up"
               onClick={() => handleOpen(agenda)}
               style={{ animationDelay: `${i * 40}ms`, opacity: 0 }}
               // Limit stagger to 10 items per design system

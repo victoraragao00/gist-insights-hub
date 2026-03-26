@@ -624,7 +624,7 @@ const Audits = () => {
             <div className="space-y-2">
               <Label className="text-sm font-medium">Destinatários</Label>
               {formRecipients.map((r, i) => (
-                <div key={i} className="flex gap-2 items-center">
+                <div key={`recipient-${r.value || i}`} className="flex gap-2 items-center">
                   <Select
                     value={r.type}
                     onValueChange={(v) => {
