@@ -724,8 +724,8 @@ export function GistContactWizard({ open, onClose, mode, clientId }: GistContact
               <Button variant="outline" onClick={() => setStep("contacts")}>
                 <ArrowLeft className="h-4 w-4 mr-1" /> Voltar
               </Button>
-              <Button onClick={handleSave} disabled={!confirmed || saving}>
-                {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              <Button onClick={() => saveMutation.mutate()} disabled={!confirmed || saveMutation.isPending}>
+                {saveMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
                 Salvar Vínculos <Check className="h-4 w-4 ml-1" />
               </Button>
             </>
