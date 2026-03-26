@@ -302,10 +302,10 @@ export function GistContactWizard({ open, onClose, mode, clientId }: GistContact
 
   // ── Confirm / Save ──
 
-  const handleSave = async () => {
-    if (!discoveryData) return;
-    setSaving(true);
-    try {
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      if (!discoveryData) throw new Error("Sem dados de descoberta");
+
       const mappings = activeGroups.flatMap((group) => {
         const m = groupMappings.get(group.domain);
         if (!m) return [];
@@ -335,9 +335,9 @@ export function GistContactWizard({ open, onClose, mode, clientId }: GistContact
       });
 
       if (error) throw new Error(typeof error === "string" ? error : "Erro ao salvar vínculos");
-
-      const result = data as { participants_created: number; clients_created: number } | null;
-
+      return data as { participants_created: number; clients_created: number } | null;
+    },
+    onSuccess: (result) => {
       if (mode === "update-contacts") {
         toast.success(
           `✓ Vínculos atualizados. ${result?.participants_created ?? 0} participantes cadastrados, ${result?.clients_created ?? 0} clientes criados.`,
@@ -346,13 +346,12 @@ export function GistContactWizard({ open, onClose, mode, clientId }: GistContact
       } else {
         setStep("import");
       }
-    } catch (err) {
+    },
+    onError: (err) => {
       const message = err instanceof Error ? err.message : "Erro desconhecido";
       toast.error("Falha ao salvar vínculos: " + message);
-    } finally {
-      setSaving(false);
-    }
-  };
+    },
+  });
 
   // ── Can advance? ──
 
