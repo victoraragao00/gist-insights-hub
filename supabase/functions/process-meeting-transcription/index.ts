@@ -2,7 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": Deno.env.get('ALLOWED_ORIGIN') ?? '*',
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
 };
@@ -12,6 +12,30 @@ serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
 
   try {
+    // JWT validation — identify the caller before using service_role
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+
+    const supaAuth = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+
+    const { data: authData, error: authError } = await supaAuth.auth.getUser();
+    if (authError || !authData.user) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const { agenda_id, transcription } = await req.json();
 
     if (!agenda_id || !transcription?.trim()) {
@@ -92,12 +116,11 @@ ${transcription}`,
       const clean = rawText.replace(/```json|```/g, "").trim();
       parsed = JSON.parse(clean);
     } catch {
-      console.error("Gemini returned invalid format:", rawText);
+      console.error("Gemini returned invalid format, length:", rawText.length);
       throw new Error("Gemini retornou formato inválido");
     }
 
     // Save to DB
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceKey);
 
@@ -116,11 +139,12 @@ ${transcription}`,
     if (agendaError) throw agendaError;
 
     // Delete previous AI-generated items (never delete converted ones)
-    await supabase
+    const { error: deleteError } = await supabase
       .from("meeting_homework_items")
       .delete()
       .eq("agenda_id", agenda_id)
       .is("converted_to_demand_id", null);
+    if (deleteError) throw deleteError;
 
     // Insert homework items
     const umodeItems = parsed.homework_umode
