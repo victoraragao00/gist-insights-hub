@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
 import { useCreateAgenda } from "@/hooks/useMeetingAgendas";
-import { useAgendaFieldConfig, type FieldVisibility } from "@/hooks/useAgendaFieldConfig";
+import { useAgendaFieldConfig, type FieldVisibility, type AgendaFieldConfig } from "@/hooks/useAgendaFieldConfig";
 import { useClient } from "@/context/ClientContext";
 import { SatisfactionPicker } from "./SatisfactionPicker";
 
