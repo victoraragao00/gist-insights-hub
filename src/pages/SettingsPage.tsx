@@ -30,6 +30,7 @@ import { useUserRole } from "@/hooks/useUserRole";
 import { ColumnSettingsTab } from "@/components/demands/ColumnSettingsTab";
 import { AreaSettingsTab } from "@/components/demands/AreaSettingsTab";
 import { UserManagementTab } from "@/components/settings/UserManagementTab";
+import { AgendaSettingsTab } from "@/components/settings/AgendaSettingsTab";
 
 // ── Types ──────────────────────────────────────────────
 
@@ -625,6 +626,7 @@ const SettingsPage = () => {
           {isAdmin && <TabsTrigger value="priorities">Prioridades</TabsTrigger>}
           {isAdmin && <TabsTrigger value="columns">Colunas</TabsTrigger>}
           {isAdmin && <TabsTrigger value="areas">Áreas</TabsTrigger>}
+          {isAdmin && <TabsTrigger value="agendas">Pautas</TabsTrigger>}
           {isAdmin && <TabsTrigger value="users">Equipe & Acessos</TabsTrigger>}
         </TabsList>
 
@@ -1106,6 +1108,12 @@ const SettingsPage = () => {
         {isAdmin && (
           <TabsContent value="areas">
             <AreaSettingsTab />
+          </TabsContent>
+        )}
+
+        {isAdmin && (
+          <TabsContent value="agendas">
+            <AgendaSettingsTab />
           </TabsContent>
         )}
 
