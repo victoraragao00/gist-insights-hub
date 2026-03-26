@@ -1,8 +1,8 @@
-# CONTEXT.md — Estado do Projeto (v22 — 2026-03-24)
+# CONTEXT.md — Estado do Projeto (v23 — 2026-03-26)
 
 > Mantido pelo Claude Code ao final de cada sessao. Lido por todos os agentes para manter contexto.
 >
-> last_updated: 2026-03-24
+> last_updated: 2026-03-26
 > last_updated_by: Claude Code
 
 ---
@@ -26,6 +26,7 @@
 | 7.3 | Dashboard Analitico + One-Page + Bloqueio | Concluido — Sprint S3 (Issue #69): DemandsDashboardPage, PublicDemandsPage, client-demands-public, tokens, watchers, bloqueio/cancelamento, CSV export |
 | 7.4 | Gestao de Usuarios e Permissionamento | Concluido — Sprint S4 (Issue #70): user_profiles, role global (admin/analyst/viewer), user_accessible_client_ids atualizada, aba Usuarios em Settings |
 | 7.5 | Unificacao Assignees | Concluido — Issue #71: assignee_id → user_profiles, aba Responsaveis removida, dropdowns listam usuarios reais |
+| 9 | Modulo de Pautas de Reuniao | Concluido — SA-1 (tabelas) + SA-2 (CRUD) + SA-3 (IA + homework→tickets) + SA-4 (settings) |
 | 8 | Insights IA avancados | Placeholder |
 
 ---
@@ -221,6 +222,54 @@ UPDATE user_profiles SET global_role = 'admin' WHERE email = '<email_do_operador
 - `CreateDemandDialog.tsx` e `DemandDetailSheet.tsx` — dropdown lista `user_profiles` ativos (query `user_profiles_active`)
 - `SettingsPage.tsx` — aba "Responsaveis de Tarefas" removida
 - **Fix adicional:** aba "Areas" havia sido removida acidentalmente junto com "Responsaveis" — restaurada
+
+---
+
+## Fase 9 — Modulo de Pautas de Reuniao (SA-1 a SA-4 — Concluido)
+
+### SA-1: Backend Schema (2026-03-26)
+
+Migration com 3 tabelas + RLS + indexes + trigger + seed:
+
+**Tabelas criadas:**
+- `meeting_agendas` — pauta principal (client_id, title, meeting_date, objective, context_notes, satisfaction_score 1-5, next_steps, location, transcription TEXT, executive_summary TEXT, ai_processed BOOLEAN, ai_processed_at TIMESTAMPTZ)
+- `meeting_participants` — participantes (agenda_id, participant_id FK, user_profile_id FK, role, name)
+- `meeting_homework_items` — licoes de casa (agenda_id, description, responsible_side client/umode, responsible_label, due_date, status pending/done/cancelled, converted_to_demand_id FK demands)
+
+**RLS:** Todas via `user_accessible_client_ids()` no client_id da agenda
+**Indexes:** idx_meeting_agendas_client, idx_meeting_agendas_date (DESC), idx_meeting_homework_agenda, idx_meeting_participants_agenda
+**Trigger:** `update_meeting_agenda_updated_at` — atualiza updated_at automaticamente
+**Seed:** `app_settings.agenda_required_fields` com ON CONFLICT DO NOTHING
+**Realtime:** Habilitado para as 3 tabelas
+
+### SA-2: CRUD Frontend (2026-03-26)
+
+**Pagina:** `AgendasPage.tsx` — rota `/agendas`, sidebar "Pautas" com icone Calendar
+**Componentes:** CreateAgendaDialog, AgendaDetailSheet (inline editing + satisfaction + homework + transcription), SatisfactionPicker (5 emojis), ClientAgendasTab (aba "Pautas" na ClientDetailPage)
+**Hooks:** useMeetingAgendas (CRUD), useMeetingParticipants (add/remove), useMeetingHomework (CRUD), useAgendaFieldConfig (visibilidade de campos)
+**staleTime:** 5min em todas as queries
+
+### SA-3: IA + Homework → Tickets (2026-03-26)
+
+**Edge Function:** `process-meeting-transcription` — recebe agenda_id + transcription, chama Gemini 2.0 Flash, extrai resumo executivo + licoes de casa uMode + licoes de casa cliente. Salva no banco e marca ai_processed = true.
+**Hook:** useMeetingAI — useProcessTranscription (mutation) + useConvertHomeworkToTicket (vincula homework → demand)
+**Frontend:** Secao transcricao com textarea + botao "Processar com IA" (isPending guard), resumo executivo editavel (save onBlur), lista de licoes de casa separadas por lado (uMode/Cliente), botao "→ Ticket" abre CreateDemandDialog pre-preenchido, "Ver ticket" para itens ja convertidos.
+**DELETE seguro:** Reprocessamento deleta apenas itens com `converted_to_demand_id IS NULL` — protege itens ja convertidos.
+
+### SA-4: Settings (2026-03-26)
+
+**Componente:** AgendaSettingsTab — aba "Pautas" em Settings (admin-only)
+**Funcionalidade:** RadioGroup para cada campo (Obrigatorio/Opcional/Oculto), salva em `app_settings.agenda_required_fields` via useMutation
+**Guard:** isDirty check + isPending disable no botao Salvar
+
+### Auditoria (Claude Code — 2026-03-26)
+
+Relatorio: `auditorias/AUDITORIA_20260326_SA1_SA4.md`
+
+**Criticos (2):** Edge Function sem JWT + CORS wildcard → prompt gerado para Lovable
+**Medios (5):** DELETE sem error handling, rawText em log, 3x as unknown as, 2x imports nao usados
+**Baixos (4):** Cores hardcoded, stagger animation, as never cast
+**PASS:** m2, m3, m4, m5, m7, m8 (hooks), m9, m10, m11 (exceto 2), RLS, indexes, trigger, seed, Gemini, DELETE protege convertidos
 
 ---
 
@@ -442,6 +491,16 @@ Documentacao completa na secao "Fase 7.1" acima. Resumo:
 - **Hook:** `useDebounce<T>` — compartilhado entre 3 telas
 - **Regra:** minimo 3 chars, debounce 300ms
 
+### Modulo de Pautas de Reuniao (Fase 9)
+
+Documentacao completa na secao "Fase 9" acima. Resumo:
+- **3 tabelas** com RLS (meeting_agendas, meeting_participants, meeting_homework_items)
+- **1 Edge Function** (process-meeting-transcription — Gemini 2.0 Flash)
+- **1 pagina** (AgendasPage) + **4 componentes** agendas/ + **5 hooks** + tab na ClientDetailPage
+- **Settings:** AgendaSettingsTab (visibilidade de campos)
+- **Rotas:** `/agendas`
+- **Homework → Ticket:** CreateDemandDialog pre-preenchido, converted_to_demand_id vincula
+
 ### Design System (docs/DESIGN_SYSTEM.md)
 - **Paleta semantica:** tom, tier, score, severity, saude
 - **Motion patterns:** 5 keyframes custom no tailwind.config.ts
@@ -558,7 +617,9 @@ gist-insights-hub/
 19. **Concluido:** AP2/AP3 — ON CONFLICT em evaluate-audit-rules e gist-confirm-mapping (Lovable, auditado 2026-03-24)
 20. **Concluido:** M12 — paginacao em InteractionsFeed.tsx com .limit(500) (Lovable, auditado 2026-03-24)
 21. **Concluido:** Issues #32, #37, #38, #65 fechadas no GitHub (2026-03-24)
-22. **Pendente:** Lovable S6 — Edge function deliver-audit-alerts (baixa prioridade)
-23. **Pendente:** Testar notificacoes in-app com 2 usuarios simultaneos
-24. **Pendente:** Correcoes medias da auditoria (m1, m9, DS1-DS3, TONE_CONFIG) — ver PENDENTES.md
-25. **Fase 8:** Insights IA avancados
+22. **Concluido:** Fase 9 — Modulo de Pautas de Reuniao (SA-1 a SA-4, Lovable, auditado 2026-03-26)
+23. **Pendente — CRITICO:** Fix seguranca Edge Function process-meeting-transcription (JWT + CORS + error handling + log) — prompt gerado
+24. **Pendente:** Lovable S6 — Edge function deliver-audit-alerts (baixa prioridade)
+25. **Pendente:** Testar notificacoes in-app com 2 usuarios simultaneos
+26. **Pendente:** Correcoes medias da auditoria (m1 10x, m9 1x, m11 2x, DS1-DS3, TONE_CONFIG) — ver PENDENTES.md
+27. **Fase 8:** Insights IA avancados
