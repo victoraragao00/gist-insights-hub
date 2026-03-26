@@ -43,7 +43,7 @@ export function AgendaSettingsTab() {
     mutationFn: async (config: AgendaFieldConfig) => {
       const { error } = await supabase
         .from("app_settings")
-        .update({ value: config as unknown as Record<string, unknown>, updated_at: new Date().toISOString() })
+        .update({ value: config as unknown as Record<string, string>, updated_at: new Date().toISOString() } as never)
         .eq("key", "agenda_required_fields");
       if (error) throw error;
     },
