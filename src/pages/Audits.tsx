@@ -216,7 +216,7 @@ const Audits = () => {
     setFormWindowHours(rule.window_hours ?? 24);
     setFormChannel(rule.alert_channel ?? "email");
     setFormRecipients(
-      Array.isArray(rule.alert_recipients) ? (rule.alert_recipients as Array<{ type: string; value: string }>) : []
+      Array.isArray(rule.alert_recipients) ? (rule.alert_recipients as unknown as Array<{ type: string; value: string }>) : []
     );
     setFormCooldownHours(rule.cooldown_hours ?? 24);
     setDialogOpen(true);
@@ -624,7 +624,7 @@ const Audits = () => {
             <div className="space-y-2">
               <Label className="text-sm font-medium">Destinatários</Label>
               {formRecipients.map((r, i) => (
-                <div key={i} className="flex gap-2 items-center">
+                <div key={`recipient-${r.value || i}`} className="flex gap-2 items-center">
                   <Select
                     value={r.type}
                     onValueChange={(v) => {

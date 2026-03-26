@@ -41,6 +41,7 @@ import { CreateDemandDialog } from "@/components/demands/CreateDemandDialog";
 import { DemandDetailSheet } from "@/components/demands/DemandDetailSheet";
 import { ClientAgendasTab } from "@/components/agendas/ClientAgendasTab";
 import type { DemandRow } from "@/hooks/useDemands";
+import { TONE_CONFIG, TONE_CHART_COLORS } from "@/lib/colorPalette";
 
 // ── Types ──
 
@@ -120,12 +121,7 @@ interface AuditRule {
 
 // ── Helpers ──
 
-const TONE_CONFIG: Record<string, { label: string; className: string }> = {
-  ok: { label: "✓ Ok", className: "bg-emerald-50 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400" },
-  atencao: { label: "⚠ Atenção", className: "bg-yellow-50 text-yellow-600 dark:bg-yellow-950 dark:text-yellow-400" },
-  alerta: { label: "🔶 Alerta", className: "bg-orange-50 text-orange-600 dark:bg-orange-950 dark:text-orange-400" },
-  critico: { label: "🔴 Crítico", className: "bg-red-50 text-red-600 dark:bg-red-950 dark:text-red-400" },
-};
+// TONE_CONFIG imported from colorPalette
 
 const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
   ativo: { label: "Ativo", className: "bg-emerald-50 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400" },
@@ -666,12 +662,7 @@ const ClientDetailPage = () => {
                 <p className="text-sm text-muted-foreground py-8 text-center">Sem interações classificadas nos últimos 7 dias</p>
               ) : toneTrendChartData.length > 0 ? (
                 <ChartContainer
-                  config={{
-                    ok: { label: "Ok", color: "hsl(160, 84%, 39%)" },
-                    atencao: { label: "Atenção", color: "hsl(48, 96%, 53%)" },
-                    alerta: { label: "Alerta", color: "hsl(25, 95%, 53%)" },
-                    critico: { label: "Crítico", color: "hsl(0, 84%, 60%)" },
-                  }}
+                  config={TONE_CHART_COLORS}
                   className="h-48 w-full"
                 >
                   <BarChart data={toneTrendChartData} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>

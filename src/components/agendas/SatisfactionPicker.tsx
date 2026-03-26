@@ -1,15 +1,9 @@
-import { useState } from "react";
 import { Smile, Meh, Frown, ThumbsDown, Skull } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { SATISFACTION_CONFIG } from "@/lib/colorPalette";
 
-const SATISFACTION_OPTIONS = [
-  { value: 1, icon: Skull, label: "Muito insatisfeito", color: "text-red-500 hover:text-red-600" },
-  { value: 2, icon: Frown, label: "Insatisfeito", color: "text-orange-500 hover:text-orange-600" },
-  { value: 3, icon: Meh, label: "Neutro", color: "text-yellow-500 hover:text-yellow-600" },
-  { value: 4, icon: Smile, label: "Satisfeito", color: "text-emerald-500 hover:text-emerald-600" },
-  { value: 5, icon: Smile, label: "Muito satisfeito", color: "text-emerald-600 hover:text-emerald-700" },
-];
+const ICONS = [Skull, Frown, Meh, Smile, Smile] as const;
 
 interface SatisfactionPickerProps {
   value: number | null;
@@ -20,8 +14,8 @@ interface SatisfactionPickerProps {
 export function SatisfactionPicker({ value, onChange, disabled }: SatisfactionPickerProps) {
   return (
     <div className="flex items-center gap-2">
-      {SATISFACTION_OPTIONS.map((opt) => {
-        const Icon = opt.icon;
+      {SATISFACTION_CONFIG.map((opt, idx) => {
+        const Icon = ICONS[idx];
         const isSelected = value === opt.value;
         return (
           <Tooltip key={opt.value}>
@@ -56,9 +50,10 @@ export function SatisfactionPicker({ value, onChange, disabled }: SatisfactionPi
 
 export function SatisfactionDisplay({ score }: { score: number | null }) {
   if (!score) return <span className="text-muted-foreground text-xs">—</span>;
-  const opt = SATISFACTION_OPTIONS.find((o) => o.value === score);
-  if (!opt) return <span className="text-xs">{score}/5</span>;
-  const Icon = opt.icon;
+  const idx = SATISFACTION_CONFIG.findIndex((o) => o.value === score);
+  if (idx < 0) return <span className="text-xs">{score}/5</span>;
+  const opt = SATISFACTION_CONFIG[idx];
+  const Icon = ICONS[idx];
   return (
     <span className={cn("inline-flex items-center gap-1", opt.color)}>
       <Icon className="h-4 w-4" />

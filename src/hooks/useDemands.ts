@@ -84,7 +84,7 @@ export function useDemands(filters?: DemandFilters) {
 
       const { data, error } = await query;
       if (error) throw error;
-      return (data as unknown) as DemandRow[];
+      return data as DemandRow[];
     },
   });
 }

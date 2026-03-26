@@ -53,7 +53,7 @@ export function useDemandInteractions(demandId: string | undefined) {
         .eq("demand_id", demandId!)
         .order("created_at", { ascending: true });
       if (error) throw error;
-      return (data ?? []) as unknown as LinkedInteraction[];
+      return (data ?? []) as LinkedInteraction[];
     },
   });
 }

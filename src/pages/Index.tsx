@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useDebounce } from "@/hooks/useDebounce";
+import { SCORE_BUCKET_COLORS } from "@/lib/colorPalette";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
@@ -127,10 +128,10 @@ const Index = () => {
       else buckets.ok++;
     });
     return [
-      { name: "0-39", value: buckets.ok, fill: "hsl(160, 84%, 39%)" },
-      { name: "40-59", value: buckets.atencao, fill: "hsl(48, 96%, 53%)" },
-      { name: "60-79", value: buckets.alerta, fill: "hsl(25, 95%, 53%)" },
-      { name: "80+", value: buckets.critico, fill: "hsl(0, 84%, 60%)" },
+      { name: "0-39", value: buckets.ok, fill: SCORE_BUCKET_COLORS.ok },
+      { name: "40-59", value: buckets.atencao, fill: SCORE_BUCKET_COLORS.atencao },
+      { name: "60-79", value: buckets.alerta, fill: SCORE_BUCKET_COLORS.alerta },
+      { name: "80+", value: buckets.critico, fill: SCORE_BUCKET_COLORS.critico },
     ];
   }, [list]);
   const tierCounts = useMemo(() => {

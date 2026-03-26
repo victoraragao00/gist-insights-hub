@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useClient } from "@/context/ClientContext";
 import { useDemandAnalytics } from "@/hooks/useDemandAnalytics";
+import { PRIORITY_CHART_COLORS as PRIORITY_COLORS, PRIORITY_LABELS } from "@/lib/colorPalette";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -23,16 +24,7 @@ import {
   PieChart, Pie, Cell, LineChart, Line, CartesianGrid, Legend,
 } from "recharts";
 
-const PRIORITY_COLORS: Record<string, string> = {
-  urgent: "hsl(0, 84%, 60%)",
-  high: "hsl(25, 95%, 53%)",
-  medium: "hsl(48, 96%, 53%)",
-  low: "hsl(160, 84%, 39%)",
-};
-
-const PRIORITY_LABELS: Record<string, string> = {
-  urgent: "Urgente", high: "Alta", medium: "Média", low: "Baixa",
-};
+// PRIORITY_CHART_COLORS and PRIORITY_LABELS imported from colorPalette
 
 function formatHours(hours: number | null | undefined): string {
   if (hours == null) return "—";
