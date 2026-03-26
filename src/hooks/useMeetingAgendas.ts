@@ -87,12 +87,13 @@ export function useCreateAgenda() {
 
   return useMutation({
     mutationFn: async (payload: CreateAgendaPayload) => {
+      const insertPayload = {
+        ...payload,
+        created_by: user!.id,
+      };
       const { data, error } = await supabase
         .from("meeting_agendas")
-        .insert({
-          ...payload,
-          created_by: user!.id,
-        } as Record<string, unknown>)
+        .insert(insertPayload)
         .select()
         .single();
       if (error) throw error;

@@ -54,7 +54,7 @@ export function useAddMeetingParticipant() {
     }) => {
       const { error } = await supabase
         .from("meeting_participants")
-        .insert(payload as Record<string, unknown>);
+        .insert(payload);
       if (error) throw error;
     },
     onSuccess: (_, vars) => {

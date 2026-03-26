@@ -48,7 +48,7 @@ export function useCreateHomeworkItem() {
     }) => {
       const { error } = await supabase
         .from("meeting_homework_items")
-        .insert(payload as Record<string, unknown>);
+        .insert(payload);
       if (error) throw error;
     },
     onSuccess: () => {
