@@ -36,14 +36,14 @@ export function CreateAgendaDialog({ open, onOpenChange, defaultClientId }: Crea
   const [satisfactionScore, setSatisfactionScore] = useState<number | null>(null);
   const [nextSteps, setNextSteps] = useState("");
 
-  const isVisible = (field: string) => {
+  const isVisible = (field: keyof AgendaFieldConfig) => {
     if (!fieldConfig) return true;
-    return (fieldConfig as Record<string, FieldVisibility>)[field] !== "hidden";
+    return fieldConfig[field] !== "hidden";
   };
 
-  const isRequired = (field: string) => {
+  const isRequired = (field: keyof AgendaFieldConfig) => {
     if (!fieldConfig) return false;
-    return (fieldConfig as Record<string, FieldVisibility>)[field] === "required";
+    return fieldConfig[field] === "required";
   };
 
   const canSubmit =
