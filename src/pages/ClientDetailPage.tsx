@@ -914,6 +914,11 @@ const ClientDetailPage = () => {
           />
         </TabsContent>
 
+        {/* ── TAB: Pautas ── */}
+        <TabsContent value="agendas" className="space-y-4">
+          <ClientAgendasTab clientId={client.id} />
+        </TabsContent>
+
         {/* ── TAB: Interações ── */}
         <TabsContent value="interactions" className="min-h-[500px]">
           <InteractionsFeed clientId={client.id} />
