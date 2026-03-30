@@ -882,12 +882,24 @@ function DemandDetailContent({ demand, onClose }: { demand: DemandRow; onClose: 
           </Button>
         </div>
         {watchers.length > 0 && (
-          <div className="flex gap-1 flex-wrap">
-            {watchers.map((w) => (
-              <div key={w.id} className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-medium" title={w.user_id}>
-                {w.user_id.slice(0, 1).toUpperCase()}
-              </div>
-            ))}
+          <div className="flex gap-2 flex-wrap">
+            {watchers.map((w) => {
+              const displayName = w.full_name || w.email || w.user_id.slice(0, 8);
+              const initials = (w.full_name ?? w.email ?? "?")
+                .split(/\s+/)
+                .map((p) => p[0])
+                .slice(0, 2)
+                .join("")
+                .toUpperCase();
+              return (
+                <div key={w.id} className="flex items-center gap-1.5">
+                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-medium" title={displayName}>
+                    {initials}
+                  </div>
+                  <span className="text-xs text-muted-foreground">{displayName}</span>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
