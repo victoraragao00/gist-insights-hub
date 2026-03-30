@@ -1,35 +1,49 @@
 
 
-## DT-1 Residuais — 6 Correções Cirúrgicas
+## Plan: Fix RLS Recursion + Build Error
 
-### FIX 1 — Index.tsx: HSL hardcoded → TONE_CHART_COLORS
-- **File:** `src/pages/Index.tsx` line 273
-- Add `TONE_CHART_COLORS` to existing import from `@/lib/colorPalette` (line 3)
-- Replace inline HSL config object with `config={TONE_CHART_COLORS}`
+### 1. Migration — Fix `user_client_access` infinite recursion
 
-### FIX 2 — ClientDetailPage.tsx: bg-green-500 → TONE_BAR_COLORS
-- **File:** `src/pages/ClientDetailPage.tsx` lines 712-714
-- Add `TONE_BAR_COLORS` to existing import (line 44)
-- Replace Tailwind `bg-*` classes with inline `style={{ backgroundColor: TONE_BAR_COLORS[tone] }}` since `TONE_BAR_COLORS` contains HSL strings, not Tailwind classes
+Drop 4 recursive policies and recreate using `is_admin()`:
 
-### FIX 3 — ClientDetailPage.tsx: simplify cast
-- **File:** `src/pages/ClientDetailPage.tsx` line 344
-- `(clientDemands as unknown as DemandRow[])` → `(clientDemands as DemandRow[])`
+```sql
+DROP POLICY IF EXISTS user_client_access_admin_select ON user_client_access;
+DROP POLICY IF EXISTS user_client_access_admin_insert ON user_client_access;
+DROP POLICY IF EXISTS user_client_access_admin_update ON user_client_access;
+DROP POLICY IF EXISTS user_client_access_admin_delete ON user_client_access;
 
-### FIX 4 — useDemandAnalytics.ts: simplify cast
-- **File:** `src/hooks/useDemandAnalytics.ts` line 53
-- `data as unknown as DemandAnalyticsData` → `data as DemandAnalyticsData`
+CREATE POLICY user_client_access_admin_select
+  ON user_client_access FOR SELECT
+  USING (is_admin() OR user_id = auth.uid());
 
-### FIX 5 — AppSidebar.tsx: add onError to logoutMutation
-- **File:** `src/components/AppSidebar.tsx` line 50-56
-- Add `onError` handler with `toast.error("Erro ao sair. Tente novamente.")`
-- Add `import { toast } from "sonner"` at top
+CREATE POLICY user_client_access_admin_insert
+  ON user_client_access FOR INSERT
+  WITH CHECK (is_admin());
 
-### FIX 6 — DemandsDashboardPage.tsx: error handling on blocked_demands
-- **File:** `src/pages/DemandsDashboardPage.tsx` lines 50-76
-- Add `useEffect` to show `toast.error("Erro ao carregar tickets bloqueados")` when query errors
-- Add `import { toast } from "sonner"` and `useEffect` import
+CREATE POLICY user_client_access_admin_update
+  ON user_client_access FOR UPDATE
+  USING (is_admin());
+
+CREATE POLICY user_client_access_admin_delete
+  ON user_client_access FOR DELETE
+  USING (is_admin());
+```
+
+### 2. Build fix — `process-jobs/index.ts` line 588
+
+The `Set` constructor infers `unknown[]` because Supabase returns untyped rows. Fix by adding explicit type annotation to the `.map()` callback return and the `filter` predicate — the line already has the right logic, but TS needs the `Set<string>` generic:
+
+```typescript
+const distinctConvIds: string[] = [...new Set<string>(
+  (convRows ?? []).map((r: { conversation_id: string }) => r.conversation_id)
+    .filter((id: string | null): id is string => typeof id === 'string' && id.length > 0)
+)];
+```
+
+### Files changed
+- **New migration** via migration tool (RLS fix)
+- **Edit:** `supabase/functions/process-jobs/index.ts` line 588 (type fix)
 
 ### No changes to
-- Edge Functions, migrations, RLS, `src/integrations/supabase/*`, `.env`
+- Frontend code, other edge functions, `src/integrations/supabase/*`, `.env`
 
