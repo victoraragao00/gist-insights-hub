@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useDebounce } from "@/hooks/useDebounce";
-import { SCORE_BUCKET_COLORS } from "@/lib/colorPalette";
+import { SCORE_BUCKET_COLORS, TONE_CHART_COLORS } from "@/lib/colorPalette";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
