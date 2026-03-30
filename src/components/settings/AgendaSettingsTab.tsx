@@ -28,6 +28,8 @@ const VISIBILITY_OPTIONS: { value: FieldVisibility; label: string }[] = [
   { value: "hidden", label: "Oculto" },
 ];
 
+const LOCKED_FIELDS: (keyof AgendaFieldConfig)[] = ["title", "client_id", "meeting_date"];
+
 export function AgendaSettingsTab() {
   const { data: fieldConfig, isLoading } = useAgendaFieldConfig();
   const [draft, setDraft] = useState<AgendaFieldConfig | null>(null);
