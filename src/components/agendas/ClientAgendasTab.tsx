@@ -9,7 +9,7 @@ import { AgendaDetailSheet } from "@/components/agendas/AgendaDetailSheet";
 import { SatisfactionDisplay } from "@/components/agendas/SatisfactionPicker";
 
 export function ClientAgendasTab({ clientId }: { clientId: string }) {
-  const { data: agendas = [], isLoading } = useMeetingAgendas(clientId);
+  const { data: agendas = [], isLoading } = useMeetingAgendas({ clientId });
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
