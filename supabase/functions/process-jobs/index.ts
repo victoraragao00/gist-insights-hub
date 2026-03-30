@@ -585,7 +585,7 @@ async function handleClassifyBatch(
     return { has_more: false, progress: {}, error: `Fetch error: ${convErr.message}` };
   }
 
-  const distinctConvIds: string[] = [...new Set((convRows ?? []).map((r: { conversation_id: string }) => r.conversation_id).filter((id: unknown): id is string => typeof id === 'string' && id.length > 0))];
+  const distinctConvIds: string[] = [...new Set((convRows ?? []).map((r: { conversation_id: string }) => r.conversation_id).filter((id): id is string => typeof id === 'string' && id.length > 0))];
   const batchConvIds = distinctConvIds.slice(0, CLASSIFY_CONV_BATCH_SIZE);
 
   if (batchConvIds.length === 0) {
