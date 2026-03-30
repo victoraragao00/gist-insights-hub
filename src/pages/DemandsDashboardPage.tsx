@@ -1,8 +1,13 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useClient } from "@/context/ClientContext";
+import { useAuth } from "@/context/AuthContext";
 import { useDemandAnalytics } from "@/hooks/useDemandAnalytics";
+import { supabase } from "@/integrations/supabase/client";
 import { PRIORITY_CHART_COLORS as PRIORITY_COLORS, PRIORITY_LABELS } from "@/lib/colorPalette";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 
 function DashKPICard({ label, value, sub }: { label: string; value: string; sub: string }) {
