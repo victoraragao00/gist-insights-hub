@@ -341,7 +341,7 @@ const ClientDetailPage = () => {
   const { data: toneTrend, isLoading: toneTrendLoading } = useClientToneTrend(clientId ?? undefined);
   const { data: clientDemands = [], isLoading: loadingDemands } = useClientDemands(clientId);
   const selectedDemand = useMemo(
-    () => (clientDemands as DemandRow[]).find((d) => d.id === selectedDemandId) ?? null,
+    () => (clientDemands as unknown as DemandRow[]).find((d) => d.id === selectedDemandId) ?? null,
     [clientDemands, selectedDemandId]
   );
   const toneTrendChartData = useMemo(
