@@ -170,6 +170,7 @@ export function AgendaDetailSheet({ agendaId, open, onOpenChange }: AgendaDetail
                   }}
                   className="w-32"
                 />
+              </div>
 
               {/* Satisfaction */}
               <div className="space-y-1.5">
