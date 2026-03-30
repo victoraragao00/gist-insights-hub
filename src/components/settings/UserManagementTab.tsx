@@ -36,7 +36,7 @@ import {
   DialogFooter,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { Search, Settings2, UserPlus, Loader2 } from "lucide-react";
+import { Search, Settings2, UserPlus, Loader2, Shield } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
