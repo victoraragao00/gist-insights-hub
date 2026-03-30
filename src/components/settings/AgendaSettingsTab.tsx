@@ -86,19 +86,30 @@ export function AgendaSettingsTab() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {fields.map((field) => (
+              {fields.map((field) => {
+                const isLocked = LOCKED_FIELDS.includes(field);
+                return (
                 <TableRow key={field}>
-                  <TableCell className="font-medium text-sm">{FIELD_LABELS[field]}</TableCell>
+                  <TableCell className="font-medium text-sm">
+                    {FIELD_LABELS[field]}
+                    {isLocked && (
+                      <span className="block text-xs text-muted-foreground mt-0.5">Obrigatório (não pode ser alterado)</span>
+                    )}
+                  </TableCell>
                   <TableCell>
                     <RadioGroup
-                      value={draft[field]}
-                      onValueChange={(v) => setDraft({ ...draft, [field]: v as FieldVisibility })}
+                      value={isLocked ? "required" : draft[field]}
+                      onValueChange={(v) => {
+                        if (isLocked) return;
+                        setDraft({ ...draft, [field]: v as FieldVisibility });
+                      }}
                       className="flex gap-4"
+                      disabled={isLocked}
                     >
                       {VISIBILITY_OPTIONS.map((opt) => (
                         <div key={opt.value} className="flex items-center gap-1.5">
-                          <RadioGroupItem value={opt.value} id={`${field}-${opt.value}`} />
-                          <Label htmlFor={`${field}-${opt.value}`} className="text-sm cursor-pointer">
+                          <RadioGroupItem value={opt.value} id={`${field}-${opt.value}`} disabled={isLocked} />
+                          <Label htmlFor={`${field}-${opt.value}`} className={`text-sm ${isLocked ? "text-muted-foreground cursor-not-allowed" : "cursor-pointer"}`}>
                             {opt.label}
                           </Label>
                         </div>
