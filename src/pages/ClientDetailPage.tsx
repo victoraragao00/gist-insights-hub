@@ -709,11 +709,8 @@ const ClientDetailPage = () => {
             <CardContent className="space-y-3">
               <div className="flex h-3 rounded-full overflow-hidden bg-muted">
                 {toneDistribution.map(({ tone, pct }) => {
-                  const colors: Record<string, string> = {
-                    ok: "bg-green-500", atencao: "bg-yellow-500", alerta: "bg-orange-500", critico: "bg-red-500",
-                  };
                   return pct > 0 ? (
-                    <div key={tone} className={`${colors[tone] ?? "bg-muted"} transition-all`} style={{ width: `${pct}%` }} />
+                    <div key={tone} className="transition-all" style={{ width: `${pct}%`, backgroundColor: TONE_BAR_COLORS[tone as keyof typeof TONE_BAR_COLORS] ?? "hsl(var(--muted))" }} />
                   ) : null;
                 })}
               </div>

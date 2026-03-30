@@ -50,7 +50,7 @@ export function useDemandAnalytics(clientId?: string | null, days: number = 30) 
       });
       if (error) throw error;
 
-      const result = data as unknown as DemandAnalyticsData;
+      const result = data as DemandAnalyticsData;
       return {
         totals: result.totals ?? {
           total: 0, open: 0, completed: 0, blocked: 0,

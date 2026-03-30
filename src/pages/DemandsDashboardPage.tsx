@@ -48,7 +48,7 @@ const DemandsDashboardPage = () => {
   const { data, isLoading } = useDemandAnalytics(clientId, days);
 
   // Blocked demands direct query
-  const { data: blockedDemands = [], isLoading: loadingBlocked } = useQuery<Array<{
+  const { data: blockedDemands = [], isLoading: loadingBlocked, error: blockedError } = useQuery<Array<{
     id: string; title: string; priority: string; blocker_reason: string | null;
     blocked_at: string | null; client_name: string;
   }>>({

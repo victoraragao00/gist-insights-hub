@@ -270,7 +270,7 @@ const Index = () => {
                   <CardTitle className="text-base font-semibold">Evolução de tom (últimos 6 meses)</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <ChartContainer config={{ ok: { label: "Ok", color: "hsl(160, 84%, 39%)" }, atencao: { label: "Atenção", color: "hsl(48, 96%, 53%)" }, alerta: { label: "Alerta", color: "hsl(25, 95%, 53%)" }, critico: { label: "Crítico", color: "hsl(0, 84%, 60%)" } }} className="h-64 w-full">
+                  <ChartContainer config={TONE_CHART_COLORS} className="h-64 w-full">
                     <BarChart data={globalStats.monthly_tone_evolution} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
                       <XAxis dataKey="mes" tick={{ fontSize: 10 }} />
                       <YAxis tick={{ fontSize: 10 }} />

@@ -54,6 +54,9 @@ export function AppSidebar() {
       if (error) throw error;
     },
     onSuccess: () => navigate("/login"),
+    onError: () => {
+      toast.error("Erro ao sair. Tente novamente.");
+    },
   });
 
   return (
