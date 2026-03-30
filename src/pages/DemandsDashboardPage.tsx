@@ -76,6 +76,12 @@ const DemandsDashboardPage = () => {
     },
   });
 
+  useEffect(() => {
+    if (blockedError) {
+      toast.error("Erro ao carregar tickets bloqueados");
+    }
+  }, [blockedError]);
+
   const totals = data?.totals;
   const byType = data?.by_type ?? [];
   const byPriority = (data?.by_priority ?? []).map((p) => ({
