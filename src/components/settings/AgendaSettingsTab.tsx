@@ -43,9 +43,11 @@ export function AgendaSettingsTab() {
 
   const saveMutation = useMutation({
     mutationFn: async (config: AgendaFieldConfig) => {
+      const safeConfig = { ...config };
+      for (const f of LOCKED_FIELDS) safeConfig[f] = "required";
       const { error } = await supabase
         .from("app_settings")
-        .update({ value: config as unknown as Record<string, string>, updated_at: new Date().toISOString() } as never)
+        .update({ value: safeConfig as unknown as Record<string, string>, updated_at: new Date().toISOString() } as never)
         .eq("key", "agenda_required_fields");
       if (error) throw error;
     },
