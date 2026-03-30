@@ -176,6 +176,7 @@ export function UserManagementTab() {
                 <TableHead>Clientes</TableHead>
                 <TableHead>Último acesso</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead className="text-right pr-6">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
