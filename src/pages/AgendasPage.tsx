@@ -15,11 +15,17 @@ import { SatisfactionDisplay } from "@/components/agendas/SatisfactionPicker";
 const AgendasPage = () => {
   const { clients } = useClient();
   const [filterClientId, setFilterClientId] = useState<string>("");
+  const [filterPeriod, setFilterPeriod] = useState<string>("");
+  const [filterSatisfaction, setFilterSatisfaction] = useState<string>("");
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedAgendaId, setSelectedAgendaId] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
 
-  const { data: agendas = [], isLoading } = useMeetingAgendas(filterClientId || undefined);
+  const { data: agendas = [], isLoading } = useMeetingAgendas({
+    clientId: filterClientId && filterClientId !== "all" ? filterClientId : undefined,
+    periodDays: filterPeriod ? Number(filterPeriod) : undefined,
+    satisfactionScore: filterSatisfaction ? Number(filterSatisfaction) : undefined,
+  });
 
   const handleOpen = (agenda: MeetingAgendaWithClient) => {
     setSelectedAgendaId(agenda.id);
@@ -39,7 +45,7 @@ const AgendasPage = () => {
       </div>
 
       {/* Filters */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap">
         <Select value={filterClientId} onValueChange={setFilterClientId}>
           <SelectTrigger className="w-48">
             <SelectValue placeholder="Todos os clientes" />
@@ -49,6 +55,32 @@ const AgendasPage = () => {
             {clients.map((c) => (
               <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
             ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={filterPeriod} onValueChange={setFilterPeriod}>
+          <SelectTrigger className="w-36">
+            <SelectValue placeholder="Período" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos</SelectItem>
+            <SelectItem value="7">7 dias</SelectItem>
+            <SelectItem value="30">30 dias</SelectItem>
+            <SelectItem value="90">90 dias</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select value={filterSatisfaction} onValueChange={setFilterSatisfaction}>
+          <SelectTrigger className="w-36">
+            <SelectValue placeholder="Satisfação" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas</SelectItem>
+            <SelectItem value="1">😡 1</SelectItem>
+            <SelectItem value="2">😕 2</SelectItem>
+            <SelectItem value="3">😐 3</SelectItem>
+            <SelectItem value="4">🙂 4</SelectItem>
+            <SelectItem value="5">🤩 5</SelectItem>
           </SelectContent>
         </Select>
       </div>

@@ -184,6 +184,25 @@ function formatRelativeTime(dateStr: string): string {
 const TIER_OPTIONS = ["azzas", "enterprise", "medium", "small"] as const;
 const STATUS_OPTIONS = ["ativo", "trial", "inativo"] as const;
 
+function AgendaCountBadge({ clientId }: { clientId: string }) {
+  const { user } = useAuth();
+  const { data: count } = useQuery<number>({
+    queryKey: ["agenda_count", user?.id, clientId],
+    enabled: !!user?.id && !!clientId,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("meeting_agendas")
+        .select("id", { count: "exact", head: true })
+        .eq("client_id", clientId);
+      if (error) throw error;
+      return count ?? 0;
+    },
+  });
+  if (count === undefined) return null;
+  return <Badge variant="secondary" className="ml-1 text-xs">{count}</Badge>;
+}
+
 const ClientDetailPage = () => {
   const { slug } = useParams<{ slug: string }>();
   const { user } = useAuth();
@@ -597,7 +616,10 @@ const ClientDetailPage = () => {
         <TabsList className="bg-muted/50 flex-wrap h-auto">
           <TabsTrigger value="overview">Visão Geral</TabsTrigger>
           <TabsTrigger value="demands">Demandas ({clientDemands.length})</TabsTrigger>
-          <TabsTrigger value="agendas">Pautas</TabsTrigger>
+          <TabsTrigger value="agendas" className="gap-1">
+            Pautas
+            <AgendaCountBadge clientId={client.id} />
+          </TabsTrigger>
           <TabsTrigger value="interactions">Interações</TabsTrigger>
           <TabsTrigger value="participants">Participantes ({participantsTotalCount})</TabsTrigger>
           <TabsTrigger value="channels">Canais ({bindings.length})</TabsTrigger>

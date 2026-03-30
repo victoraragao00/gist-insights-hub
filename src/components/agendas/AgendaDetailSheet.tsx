@@ -147,11 +147,29 @@ export function AgendaDetailSheet({ agendaId, open, onOpenChange }: AgendaDetail
               <div className="flex items-center gap-3 text-sm text-muted-foreground flex-wrap">
                 <span>{new Date(agenda.meeting_date).toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
                 {agenda.location && <span>· {agenda.location}</span>}
+                {agenda.duration_minutes && <span>· {agenda.duration_minutes} min</span>}
                 {agenda.ai_processed && (
                   <Badge variant="outline" className="text-xs bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-800">
                     ✨ Processado por IA
                   </Badge>
                 )}
+              </div>
+
+              {/* Duration */}
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium">Duração (min)</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  placeholder="60"
+                  defaultValue={agenda.duration_minutes ?? ""}
+                  onBlur={(e) => {
+                    if (!agendaId) return;
+                    const val = e.target.value ? parseInt(e.target.value, 10) : null;
+                    updateAgenda.mutate({ id: agendaId, duration_minutes: val });
+                  }}
+                  className="w-32"
+                />
               </div>
 
               {/* Satisfaction */}
