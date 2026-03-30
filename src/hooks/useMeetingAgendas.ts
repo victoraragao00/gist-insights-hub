@@ -15,6 +15,7 @@ export interface MeetingAgenda {
   transcription: string | null;
   satisfaction_score: number | null;
   next_steps: string | null;
+  duration_minutes: number | null;
   ai_processed: boolean | null;
   ai_processed_at: string | null;
   created_by: string;
