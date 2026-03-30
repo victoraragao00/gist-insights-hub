@@ -281,6 +281,22 @@ export function UserManagementTab() {
                         />
                       )}
                     </TableCell>
+                    <TableCell className="text-right pr-6">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8"
+                            onClick={() => setPermissionsUser(u)}
+                          >
+                            <Shield className="h-3.5 w-3.5 mr-1" />
+                            Permissões
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Gerenciar permissões por cliente</TooltipContent>
+                      </Tooltip>
+                    </TableCell>
                   </TableRow>
                 ))
               )}
