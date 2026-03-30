@@ -36,7 +36,7 @@ import {
   DialogFooter,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { Search, Settings2, UserPlus, Loader2 } from "lucide-react";
+import { Search, Settings2, UserPlus, Loader2, Shield } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -176,6 +176,7 @@ export function UserManagementTab() {
                 <TableHead>Clientes</TableHead>
                 <TableHead>Último acesso</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead className="text-right pr-6">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -187,11 +188,12 @@ export function UserManagementTab() {
                     <TableCell><Skeleton className="h-8 w-24" /></TableCell>
                     <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-10" /></TableCell>
+                    <TableCell><Skeleton className="h-8 w-24" /></TableCell>
                   </TableRow>
                 ))
               ) : filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8 text-muted-foreground text-sm">
+                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground text-sm">
                     Nenhum usuário encontrado
                   </TableCell>
                 </TableRow>
@@ -241,21 +243,11 @@ export function UserManagementTab() {
                       )}
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-muted-foreground">
-                          {u.global_role === "admin"
-                            ? "Todos"
-                            : `${u.client_overrides.length} override${u.client_overrides.length !== 1 ? "s" : ""}`}
-                        </span>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 w-7 p-0"
-                          onClick={() => setPermissionsUser(u)}
-                        >
-                          <Settings2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
+                      <span className="text-sm text-muted-foreground">
+                        {u.global_role === "admin"
+                          ? "Todos"
+                          : `${u.client_overrides.length} override${u.client_overrides.length !== 1 ? "s" : ""}`}
+                      </span>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {u.last_sign_in
@@ -288,6 +280,22 @@ export function UserManagementTab() {
                           disabled={toggleActive.isPending}
                         />
                       )}
+                    </TableCell>
+                    <TableCell className="text-right pr-6">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8"
+                            onClick={() => setPermissionsUser(u)}
+                          >
+                            <Shield className="h-3.5 w-3.5 mr-1" />
+                            Permissões
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Gerenciar permissões por cliente</TooltipContent>
+                      </Tooltip>
                     </TableCell>
                   </TableRow>
                 ))
