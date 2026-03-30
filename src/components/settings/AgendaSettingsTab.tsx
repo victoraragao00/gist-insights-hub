@@ -117,7 +117,8 @@ export function AgendaSettingsTab() {
                     </RadioGroup>
                   </TableCell>
                 </TableRow>
-              ))}
+                );
+              })}
             </TableBody>
           </Table>
 
