@@ -1,0 +1,1 @@
+ALTER TABLE meeting_agendas ADD COLUMN IF NOT EXISTS duration_minutes integer;

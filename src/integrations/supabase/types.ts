@@ -845,6 +845,7 @@ export type Database = {
           context_notes: string | null
           created_at: string | null
           created_by: string
+          duration_minutes: number | null
           executive_summary: string | null
           id: string
           location: string | null
@@ -863,6 +864,7 @@ export type Database = {
           context_notes?: string | null
           created_at?: string | null
           created_by: string
+          duration_minutes?: number | null
           executive_summary?: string | null
           id?: string
           location?: string | null
@@ -881,6 +883,7 @@ export type Database = {
           context_notes?: string | null
           created_at?: string | null
           created_by?: string
+          duration_minutes?: number | null
           executive_summary?: string | null
           id?: string
           location?: string | null
