@@ -243,21 +243,11 @@ export function UserManagementTab() {
                       )}
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-muted-foreground">
-                          {u.global_role === "admin"
-                            ? "Todos"
-                            : `${u.client_overrides.length} override${u.client_overrides.length !== 1 ? "s" : ""}`}
-                        </span>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 w-7 p-0"
-                          onClick={() => setPermissionsUser(u)}
-                        >
-                          <Settings2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
+                      <span className="text-sm text-muted-foreground">
+                        {u.global_role === "admin"
+                          ? "Todos"
+                          : `${u.client_overrides.length} override${u.client_overrides.length !== 1 ? "s" : ""}`}
+                      </span>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {u.last_sign_in
