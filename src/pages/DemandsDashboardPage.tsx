@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { useClient } from "@/context/ClientContext";
 import { useAuth } from "@/context/AuthContext";
@@ -47,7 +48,7 @@ const DemandsDashboardPage = () => {
   const { data, isLoading } = useDemandAnalytics(clientId, days);
 
   // Blocked demands direct query
-  const { data: blockedDemands = [], isLoading: loadingBlocked } = useQuery<Array<{
+  const { data: blockedDemands = [], isLoading: loadingBlocked, error: blockedError } = useQuery<Array<{
     id: string; title: string; priority: string; blocker_reason: string | null;
     blocked_at: string | null; client_name: string;
   }>>({
@@ -74,6 +75,12 @@ const DemandsDashboardPage = () => {
       }));
     },
   });
+
+  useEffect(() => {
+    if (blockedError) {
+      toast.error("Erro ao carregar tickets bloqueados");
+    }
+  }, [blockedError]);
 
   const totals = data?.totals;
   const byType = data?.by_type ?? [];
