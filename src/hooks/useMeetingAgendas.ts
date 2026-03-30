@@ -27,13 +27,22 @@ export interface MeetingAgendaWithClient extends MeetingAgenda {
   clients?: { name: string } | null;
 }
 
-export function useMeetingAgendas(clientId?: string) {
+export interface MeetingAgendasFilters {
+  clientId?: string;
+  periodDays?: number;
+  satisfactionScore?: number;
+}
+
+export function useMeetingAgendas(filters?: MeetingAgendasFilters) {
   const { user } = useAuth();
+  const clientId = filters?.clientId;
+  const periodDays = filters?.periodDays;
+  const satisfactionScore = filters?.satisfactionScore;
 
   return useQuery<MeetingAgendaWithClient[]>({
-    queryKey: ["meeting_agendas", user?.id, clientId ?? "all"],
+    queryKey: ["meeting_agendas", user?.id, clientId ?? "all", periodDays ?? "all", satisfactionScore ?? "all"],
     enabled: !!user?.id,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30 * 1000,
     queryFn: async () => {
       let query = supabase
         .from("meeting_agendas")
@@ -43,6 +52,13 @@ export function useMeetingAgendas(clientId?: string) {
 
       if (clientId) {
         query = query.eq("client_id", clientId);
+      }
+      if (periodDays) {
+        const since = new Date(Date.now() - periodDays * 24 * 60 * 60 * 1000).toISOString();
+        query = query.gte("meeting_date", since);
+      }
+      if (satisfactionScore !== undefined) {
+        query = query.eq("satisfaction_score", satisfactionScore);
       }
 
       const { data, error } = await query;
