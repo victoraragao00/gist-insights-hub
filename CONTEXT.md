@@ -621,7 +621,7 @@ gist-insights-hub/
 23. **Concluido:** Fix seguranca process-meeting-transcription (JWT + CORS + DELETE error + log sanitizado, Lovable, auditado 2026-03-26)
 24. **Concluido:** DT-1 — Divida tecnica parcial (paleta, 7/10 casts, mutation, imports, skeleton, stagger, key, tipagem)
 25. **Concluido:** Features #10-#18 (branding, toggle ativo, RLS fix, duration, filtros, badge, logout, blocked tickets, watchers names)
-26. **Pendente — MEDIO:** 6 residuais da DT-1 (2 cores hardcoded, 2 casts, 2 error handlers) — prompt final pendente
+26. **Concluido:** DT-1b — 4/6 residuais corrigidos (cores, error handlers). 2 casts mantidos (TypeScript exige as unknown as)
 27. **Pendente:** Lovable S6 — Edge function deliver-audit-alerts (baixa prioridade)
 28. **Pendente:** Testar notificacoes in-app com 2 usuarios simultaneos
 29. **Fase 8:** Insights IA avancados

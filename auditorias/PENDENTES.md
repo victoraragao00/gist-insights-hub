@@ -28,9 +28,9 @@
 | DS1 | 2026-03-22 | MÉDIO | DemandsDashboardPage.tsx | ~~HSL hardcoded~~ → importa PRIORITY_CHART_COLORS de colorPalette.ts | RESOLVIDO 2026-03-30 |
 | DS2 | 2026-03-22 | MÉDIO | ClientDetailPage.tsx:713 | ~~HSL hardcoded~~ → chart config corrigido. **RESIDUAL:** bg-green-500 em tone distribution bar | PARCIAL |
 | O2 | 2026-03-08 | MÉDIO | SearchPage/ClientDetailPage/Index | ~~TONE_CONFIG duplicado~~ → centralizado em colorPalette.ts | RESOLVIDO 2026-03-30 |
-| F16 | 2026-03-30 | MÉDIO | AppSidebar.tsx:50-56 | logoutMutation sem onError — user sem feedback se signOut falhar | ABERTO |
-| F17 | 2026-03-30 | MÉDIO | DemandsDashboardPage.tsx:50-76 | blocked_demands query sem toast de erro | ABERTO |
-| DS-R1 | 2026-03-30 | BAIXO | Index.tsx:273 | HSL hardcoded no ChartContainer — deve usar TONE_CHART_COLORS | ABERTO |
+| F16 | 2026-03-30 | MÉDIO | AppSidebar.tsx | ~~logoutMutation sem onError~~ → toast.error adicionado | RESOLVIDO 2026-03-30 |
+| F17 | 2026-03-30 | MÉDIO | DemandsDashboardPage.tsx | ~~blocked_demands sem toast~~ → useEffect + toast.error | RESOLVIDO 2026-03-30 |
+| DS-R1 | 2026-03-30 | BAIXO | Index.tsx | ~~HSL hardcoded~~ → TONE_CHART_COLORS importado | RESOLVIDO 2026-03-30 |
 
 ## Baixas
 
