@@ -39,11 +39,41 @@ function formatHours(hours: number | null | undefined): string {
 
 const DemandsDashboardPage = () => {
   const { clients } = useClient();
+  const { user } = useAuth();
   const [selectedClientId, setSelectedClientId] = useState<string>("all");
   const [days, setDays] = useState<number>(30);
 
   const clientId = selectedClientId === "all" ? null : selectedClientId;
   const { data, isLoading } = useDemandAnalytics(clientId, days);
+
+  // Blocked demands direct query
+  const { data: blockedDemands = [], isLoading: loadingBlocked } = useQuery<Array<{
+    id: string; title: string; priority: string; blocker_reason: string | null;
+    blocked_at: string | null; client_name: string;
+  }>>({
+    queryKey: ["blocked_demands", user?.id, clientId ?? "all"],
+    enabled: !!user?.id,
+    staleTime: 30_000,
+    queryFn: async () => {
+      let query = supabase
+        .from("demands")
+        .select("id, title, priority, blocker_reason, blocked_at, clients(name)")
+        .eq("is_blocked", true)
+        .order("blocked_at", { ascending: false })
+        .limit(50);
+      if (clientId) query = query.eq("client_id", clientId);
+      const { data: rows, error } = await query;
+      if (error) throw error;
+      return (rows ?? []).map((r) => ({
+        id: r.id,
+        title: r.title,
+        priority: r.priority,
+        blocker_reason: r.blocker_reason,
+        blocked_at: r.blocked_at,
+        client_name: (r.clients as unknown as { name: string } | null)?.name ?? "—",
+      }));
+    },
+  });
 
   const totals = data?.totals;
   const byType = data?.by_type ?? [];
