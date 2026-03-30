@@ -1,8 +1,13 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useClient } from "@/context/ClientContext";
+import { useAuth } from "@/context/AuthContext";
 import { useDemandAnalytics } from "@/hooks/useDemandAnalytics";
+import { supabase } from "@/integrations/supabase/client";
 import { PRIORITY_CHART_COLORS as PRIORITY_COLORS, PRIORITY_LABELS } from "@/lib/colorPalette";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 
 function DashKPICard({ label, value, sub }: { label: string; value: string; sub: string }) {
@@ -34,11 +39,41 @@ function formatHours(hours: number | null | undefined): string {
 
 const DemandsDashboardPage = () => {
   const { clients } = useClient();
+  const { user } = useAuth();
   const [selectedClientId, setSelectedClientId] = useState<string>("all");
   const [days, setDays] = useState<number>(30);
 
   const clientId = selectedClientId === "all" ? null : selectedClientId;
   const { data, isLoading } = useDemandAnalytics(clientId, days);
+
+  // Blocked demands direct query
+  const { data: blockedDemands = [], isLoading: loadingBlocked } = useQuery<Array<{
+    id: string; title: string; priority: string; blocker_reason: string | null;
+    blocked_at: string | null; client_name: string;
+  }>>({
+    queryKey: ["blocked_demands", user?.id, clientId ?? "all"],
+    enabled: !!user?.id,
+    staleTime: 30_000,
+    queryFn: async () => {
+      let query = supabase
+        .from("demands")
+        .select("id, title, priority, blocker_reason, blocked_at, clients(name)")
+        .eq("is_blocked", true)
+        .order("blocked_at", { ascending: false })
+        .limit(50);
+      if (clientId) query = query.eq("client_id", clientId);
+      const { data: rows, error } = await query;
+      if (error) throw error;
+      return (rows ?? []).map((r) => ({
+        id: r.id,
+        title: r.title,
+        priority: r.priority,
+        blocker_reason: r.blocker_reason,
+        blocked_at: r.blocked_at,
+        client_name: (r.clients as unknown as { name: string } | null)?.name ?? "—",
+      }));
+    },
+  });
 
   const totals = data?.totals;
   const byType = data?.by_type ?? [];
@@ -287,6 +322,54 @@ const DemandsDashboardPage = () => {
                 />
               </LineChart>
             </ResponsiveContainer>
+          )}
+        </CardContent>
+      </Card>
+      {/* Blocked Tickets Table */}
+      <Card className="border border-border rounded-xl">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base font-semibold">
+            Tickets Bloqueados Ativos ({blockedDemands.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {loadingBlocked ? (
+            <Skeleton className="h-32 w-full animate-shimmer" />
+          ) : blockedDemands.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-6 text-center">Nenhum ticket bloqueado</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Título</TableHead>
+                  <TableHead>Cliente</TableHead>
+                  <TableHead>Prioridade</TableHead>
+                  <TableHead>Motivo</TableHead>
+                  <TableHead>Bloqueado em</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {blockedDemands.map((d) => (
+                  <TableRow key={d.id}>
+                    <TableCell className="font-medium text-sm max-w-xs truncate">{d.title}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{d.client_name}</TableCell>
+                    <TableCell>
+                      <Badge
+                        variant="outline"
+                        className="text-xs border-0"
+                        style={{ backgroundColor: PRIORITY_COLORS[d.priority] + "20", color: PRIORITY_COLORS[d.priority] }}
+                      >
+                        {PRIORITY_LABELS[d.priority] ?? d.priority}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground max-w-xs truncate">{d.blocker_reason ?? "—"}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                      {d.blocked_at ? new Date(d.blocked_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }) : "—"}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           )}
         </CardContent>
       </Card>
