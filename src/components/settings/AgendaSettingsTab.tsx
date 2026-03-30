@@ -28,6 +28,8 @@ const VISIBILITY_OPTIONS: { value: FieldVisibility; label: string }[] = [
   { value: "hidden", label: "Oculto" },
 ];
 
+const LOCKED_FIELDS: (keyof AgendaFieldConfig)[] = ["title", "client_id", "meeting_date"];
+
 export function AgendaSettingsTab() {
   const { data: fieldConfig, isLoading } = useAgendaFieldConfig();
   const [draft, setDraft] = useState<AgendaFieldConfig | null>(null);
@@ -41,9 +43,11 @@ export function AgendaSettingsTab() {
 
   const saveMutation = useMutation({
     mutationFn: async (config: AgendaFieldConfig) => {
+      const safeConfig = { ...config };
+      for (const f of LOCKED_FIELDS) safeConfig[f] = "required";
       const { error } = await supabase
         .from("app_settings")
-        .update({ value: config as unknown as Record<string, string>, updated_at: new Date().toISOString() } as never)
+        .update({ value: safeConfig as unknown as Record<string, string>, updated_at: new Date().toISOString() } as never)
         .eq("key", "agenda_required_fields");
       if (error) throw error;
     },
@@ -84,19 +88,30 @@ export function AgendaSettingsTab() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {fields.map((field) => (
+              {fields.map((field) => {
+                const isLocked = LOCKED_FIELDS.includes(field);
+                return (
                 <TableRow key={field}>
-                  <TableCell className="font-medium text-sm">{FIELD_LABELS[field]}</TableCell>
+                  <TableCell className="font-medium text-sm">
+                    {FIELD_LABELS[field]}
+                    {isLocked && (
+                      <span className="block text-xs text-muted-foreground mt-0.5">Obrigatório (não pode ser alterado)</span>
+                    )}
+                  </TableCell>
                   <TableCell>
                     <RadioGroup
-                      value={draft[field]}
-                      onValueChange={(v) => setDraft({ ...draft, [field]: v as FieldVisibility })}
+                      value={isLocked ? "required" : draft[field]}
+                      onValueChange={(v) => {
+                        if (isLocked) return;
+                        setDraft({ ...draft, [field]: v as FieldVisibility });
+                      }}
                       className="flex gap-4"
+                      disabled={isLocked}
                     >
                       {VISIBILITY_OPTIONS.map((opt) => (
                         <div key={opt.value} className="flex items-center gap-1.5">
-                          <RadioGroupItem value={opt.value} id={`${field}-${opt.value}`} />
-                          <Label htmlFor={`${field}-${opt.value}`} className="text-sm cursor-pointer">
+                          <RadioGroupItem value={opt.value} id={`${field}-${opt.value}`} disabled={isLocked} />
+                          <Label htmlFor={`${field}-${opt.value}`} className={`text-sm ${isLocked ? "text-muted-foreground cursor-not-allowed" : "cursor-pointer"}`}>
                             {opt.label}
                           </Label>
                         </div>
@@ -104,7 +119,8 @@ export function AgendaSettingsTab() {
                     </RadioGroup>
                   </TableCell>
                 </TableRow>
-              ))}
+                );
+              })}
             </TableBody>
           </Table>
 
