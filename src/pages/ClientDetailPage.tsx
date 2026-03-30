@@ -184,6 +184,25 @@ function formatRelativeTime(dateStr: string): string {
 const TIER_OPTIONS = ["azzas", "enterprise", "medium", "small"] as const;
 const STATUS_OPTIONS = ["ativo", "trial", "inativo"] as const;
 
+function AgendaCountBadge({ clientId }: { clientId: string }) {
+  const { user } = useAuth();
+  const { data: count } = useQuery<number>({
+    queryKey: ["agenda_count", user?.id, clientId],
+    enabled: !!user?.id && !!clientId,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("meeting_agendas")
+        .select("id", { count: "exact", head: true })
+        .eq("client_id", clientId);
+      if (error) throw error;
+      return count ?? 0;
+    },
+  });
+  if (count === undefined) return null;
+  return <Badge variant="secondary" className="ml-1 text-xs">{count}</Badge>;
+}
+
 const ClientDetailPage = () => {
   const { slug } = useParams<{ slug: string }>();
   const { user } = useAuth();
