@@ -1,7 +1,7 @@
 # PENDENTES — Violações em Aberto
 
 > Atualizado por: Claude Code
-> Última atualização: 2026-03-24
+> Última atualização: 2026-03-30
 
 ## Críticas
 
@@ -23,24 +23,27 @@
 
 | ID | Data | Severidade | Arquivo | Descrição | Status |
 |----|------|-----------|---------|-----------|--------|
-| M1a | 2026-03-22 | MÉDIO | 7 hooks + 2 componentes | 10x `as unknown as Type` — bypass de tipagem (m1). +3 em SA-2/SA-3 hooks | ABERTO |
-| M9a | 2026-03-22 | MÉDIO | GistContactWizard.tsx:304-354 | useState manual para escrita em vez de useMutation (m9) | ABERTO |
-| DS1 | 2026-03-22 | MÉDIO | DemandsDashboardPage.tsx:26-31 | HSL hardcoded em PRIORITY_COLORS | ABERTO |
-| DS2 | 2026-03-22 | MÉDIO | ClientDetailPage.tsx:668-671,698 | HSL hardcoded + green-500 em vez de emerald-500 | ABERTO |
-| O2 | 2026-03-08 | MÉDIO | SearchPage/ClientDetailPage/Index | TONE_CONFIG duplicado em 3 páginas (DRY) | ABERTO |
+| M1a | 2026-03-22 | MÉDIO | Múltiplos hooks | ~~10x as unknown as~~ → 7 corrigidos (DT-1). 2 residuais corrigíveis + 5 justificados (JOINs/JSON/error) | PARCIAL |
+| M9a | 2026-03-22 | MÉDIO | GistContactWizard.tsx | ~~useState manual~~ → useMutation + isPending (DT-1) | RESOLVIDO 2026-03-30 |
+| DS1 | 2026-03-22 | MÉDIO | DemandsDashboardPage.tsx | ~~HSL hardcoded~~ → importa PRIORITY_CHART_COLORS de colorPalette.ts | RESOLVIDO 2026-03-30 |
+| DS2 | 2026-03-22 | MÉDIO | ClientDetailPage.tsx:713 | ~~HSL hardcoded~~ → chart config corrigido. **RESIDUAL:** bg-green-500 em tone distribution bar | PARCIAL |
+| O2 | 2026-03-08 | MÉDIO | SearchPage/ClientDetailPage/Index | ~~TONE_CONFIG duplicado~~ → centralizado em colorPalette.ts | RESOLVIDO 2026-03-30 |
+| F16 | 2026-03-30 | MÉDIO | AppSidebar.tsx:50-56 | logoutMutation sem onError — user sem feedback se signOut falhar | ABERTO |
+| F17 | 2026-03-30 | MÉDIO | DemandsDashboardPage.tsx:50-76 | blocked_demands query sem toast de erro | ABERTO |
+| DS-R1 | 2026-03-30 | BAIXO | Index.tsx:273 | HSL hardcoded no ChartContainer — deve usar TONE_CHART_COLORS | ABERTO |
 
 ## Baixas
 
 | ID | Data | Severidade | Arquivo | Descrição | Status |
 |----|------|-----------|---------|-----------|--------|
 | M13a | 2026-03-22 | BAIXO | — | Sem testes para process-jobs, classify-batch, ClientContext, interactions | ABERTO |
-| DS4 | 2026-03-22 | BAIXO | skeleton.tsx:4 | animate-pulse em vez de animate-shimmer | ABERTO |
 | DS5 | 2026-03-22 | BAIXO | Múltiplos | Zero uso de motion-safe: prefix | ABERTO |
-| A2 | 2026-03-08 | BAIXO | Audits.tsx:626 | `key={i}` em lista dinâmica de recipients | ABERTO |
-| O1 | 2026-03-08 | BAIXO | useAuditRules.ts:16 | `alert_recipients: unknown` — poderia ser tipado | ABERTO |
-| M11b | 2026-03-26 | BAIXO | AgendasPage.tsx:2, CreateAgendaDialog.tsx:2 | 2x `useQuery` importado mas não usado | ABERTO |
-| DSb1 | 2026-03-26 | BAIXO | SatisfactionPicker.tsx:7-11 | Cores hardcoded (red/orange/yellow/emerald) — usar paleta semântica | ABERTO |
-| DSb2 | 2026-03-26 | BAIXO | AgendasPage.tsx:75 | Stagger animation sem classe animate-fade-in-up — itens invisíveis | ABERTO |
+| DS4 | 2026-03-22 | BAIXO | skeleton.tsx | ~~animate-pulse~~ → animate-shimmer (DT-1) | RESOLVIDO 2026-03-30 |
+| A2 | 2026-03-08 | BAIXO | Audits.tsx | ~~key={i}~~ → key={`recipient-${r.value \|\| i}`} (DT-1) | RESOLVIDO 2026-03-30 |
+| O1 | 2026-03-08 | BAIXO | useAuditRules.ts | ~~unknown~~ → string[] (DT-1) | RESOLVIDO 2026-03-30 |
+| M11b | 2026-03-26 | BAIXO | AgendasPage, CreateAgendaDialog | ~~useQuery importado sem uso~~ → removido (DT-1) | RESOLVIDO 2026-03-30 |
+| DSb1 | 2026-03-26 | BAIXO | SatisfactionPicker.tsx | ~~Cores hardcoded~~ → importa SATISFACTION_CONFIG (DT-1) | RESOLVIDO 2026-03-30 |
+| DSb2 | 2026-03-26 | BAIXO | AgendasPage.tsx | ~~Sem animate-fade-in-up~~ → classe adicionada (DT-1) | RESOLVIDO 2026-03-30 |
 
 ## Resolvidas (desde última auditoria)
 

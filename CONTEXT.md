@@ -1,8 +1,8 @@
-# CONTEXT.md — Estado do Projeto (v23 — 2026-03-26)
+# CONTEXT.md — Estado do Projeto (v24 — 2026-03-30)
 
 > Mantido pelo Claude Code ao final de cada sessao. Lido por todos os agentes para manter contexto.
 >
-> last_updated: 2026-03-26
+> last_updated: 2026-03-30
 > last_updated_by: Claude Code
 
 ---
@@ -619,7 +619,9 @@ gist-insights-hub/
 21. **Concluido:** Issues #32, #37, #38, #65 fechadas no GitHub (2026-03-24)
 22. **Concluido:** Fase 9 — Modulo de Pautas de Reuniao (SA-1 a SA-4, Lovable, auditado 2026-03-26)
 23. **Concluido:** Fix seguranca process-meeting-transcription (JWT + CORS + DELETE error + log sanitizado, Lovable, auditado 2026-03-26)
-24. **Pendente:** Lovable S6 — Edge function deliver-audit-alerts (baixa prioridade)
-25. **Pendente:** Testar notificacoes in-app com 2 usuarios simultaneos
-26. **Pendente:** Correcoes medias da auditoria (m1 10x, m9 1x, m11 2x, DS1-DS3, TONE_CONFIG) — ver PENDENTES.md
-27. **Fase 8:** Insights IA avancados
+24. **Concluido:** DT-1 — Divida tecnica parcial (paleta, 7/10 casts, mutation, imports, skeleton, stagger, key, tipagem)
+25. **Concluido:** Features #10-#18 (branding, toggle ativo, RLS fix, duration, filtros, badge, logout, blocked tickets, watchers names)
+26. **Pendente — MEDIO:** 6 residuais da DT-1 (2 cores hardcoded, 2 casts, 2 error handlers) — prompt final pendente
+27. **Pendente:** Lovable S6 — Edge function deliver-audit-alerts (baixa prioridade)
+28. **Pendente:** Testar notificacoes in-app com 2 usuarios simultaneos
+29. **Fase 8:** Insights IA avancados
