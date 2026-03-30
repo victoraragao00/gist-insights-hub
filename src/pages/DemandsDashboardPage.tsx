@@ -325,6 +325,54 @@ const DemandsDashboardPage = () => {
           )}
         </CardContent>
       </Card>
+      {/* Blocked Tickets Table */}
+      <Card className="border border-border rounded-xl">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base font-semibold">
+            Tickets Bloqueados Ativos ({blockedDemands.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {loadingBlocked ? (
+            <Skeleton className="h-32 w-full animate-shimmer" />
+          ) : blockedDemands.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-6 text-center">Nenhum ticket bloqueado</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Título</TableHead>
+                  <TableHead>Cliente</TableHead>
+                  <TableHead>Prioridade</TableHead>
+                  <TableHead>Motivo</TableHead>
+                  <TableHead>Bloqueado em</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {blockedDemands.map((d) => (
+                  <TableRow key={d.id}>
+                    <TableCell className="font-medium text-sm max-w-xs truncate">{d.title}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{d.client_name}</TableCell>
+                    <TableCell>
+                      <Badge
+                        variant="outline"
+                        className="text-xs border-0"
+                        style={{ backgroundColor: PRIORITY_COLORS[d.priority] + "20", color: PRIORITY_COLORS[d.priority] }}
+                      >
+                        {PRIORITY_LABELS[d.priority] ?? d.priority}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground max-w-xs truncate">{d.blocker_reason ?? "—"}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                      {d.blocked_at ? new Date(d.blocked_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }) : "—"}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 };
