@@ -41,7 +41,7 @@ import { CreateDemandDialog } from "@/components/demands/CreateDemandDialog";
 import { DemandDetailSheet } from "@/components/demands/DemandDetailSheet";
 import { ClientAgendasTab } from "@/components/agendas/ClientAgendasTab";
 import type { DemandRow } from "@/hooks/useDemands";
-import { TONE_CONFIG, TONE_CHART_COLORS } from "@/lib/colorPalette";
+import { TONE_CONFIG, TONE_CHART_COLORS, TONE_BAR_COLORS } from "@/lib/colorPalette";
 
 // ── Types ──
 
