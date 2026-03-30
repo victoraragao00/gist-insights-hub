@@ -25,12 +25,12 @@ interface Client {
 
 function RoleBadge({ role }: { role: string }) {
   if (role === "admin") {
-    return <Badge className="bg-purple-50 text-purple-600 border-purple-200 hover:bg-purple-50">admin</Badge>;
+    return <span className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold bg-purple-50 text-purple-600 border-purple-200">admin</span>;
   }
   if (role === "analyst") {
-    return <Badge className="bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-50">analyst</Badge>;
+    return <span className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold bg-blue-50 text-blue-600 border-blue-200">analyst</span>;
   }
-  return <Badge className="bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-100">viewer</Badge>;
+  return <span className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold bg-slate-100 text-slate-600 border-slate-200">viewer</span>;
 }
 
 interface Props {
