@@ -26,10 +26,10 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const geminiApiKey = Deno.env.get("GEMINI_API_KEY");
+    const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
 
-    if (!geminiApiKey) {
-      return new Response(JSON.stringify({ error: "GEMINI_API_KEY not configured" }), {
+    if (!lovableApiKey) {
+      return new Response(JSON.stringify({ error: "LOVABLE_API_KEY not configured" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -103,42 +103,53 @@ serve(async (req) => {
       });
     }
 
-    // ── Call Gemini ──
-    const prompt = `Você é um analista de CX da uMode, empresa de tecnologia para o mercado têxtil/moda.
-Analise a conversa abaixo entre a uMode e um cliente e gere um resumo estruturado em português com:
+    // ── Call Lovable AI Gateway ──
+    const systemPrompt = `Você é um analista de CX da uMode, empresa de tecnologia para o mercado têxtil/moda.
+Analise a conversa entre a uMode e um cliente e gere um resumo estruturado em português com:
 
 1. **Problema/Solicitação:** O que o cliente trouxe ou pediu
 2. **Encaminhamento dado:** Como a uMode respondeu ou encaminhou
 3. **Status final:** Se foi resolvido, pendente ou sem resposta
 
-Seja direto e objetivo. Máximo 4 linhas por item.
+Seja direto e objetivo. Máximo 4 linhas por item.`;
 
-CONVERSA:
-${formatted}`;
-
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`;
-
-    const geminiRes = await fetch(geminiUrl, {
+    const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Authorization": `Bearer ${lovableApiKey}`,
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { maxOutputTokens: 1024, temperature: 0.3 },
+        model: "google/gemini-2.5-flash",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: `Resuma esta conversa:\n${formatted}` },
+        ],
+        max_tokens: 1024,
+        temperature: 0.3,
       }),
     });
 
-    if (!geminiRes.ok) {
-      const errText = await geminiRes.text();
-      console.error("Gemini API error:", geminiRes.status, errText);
+    if (!aiRes.ok) {
+      const errText = await aiRes.text();
+      console.error("AI Gateway error:", aiRes.status, errText);
+      if (aiRes.status === 429) {
+        return new Response(JSON.stringify({ error: "Rate limit exceeded, tente novamente em instantes" }), {
+          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      if (aiRes.status === 402) {
+        return new Response(JSON.stringify({ error: "Créditos de IA esgotados" }), {
+          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
       return new Response(JSON.stringify({ error: "AI processing failed" }), {
-        status: 502,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const geminiData = await geminiRes.json();
-    const summary =
-      geminiData?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+    const aiData = await aiRes.json();
+    const summary = aiData?.choices?.[0]?.message?.content ?? "";
 
     if (!summary) {
       return new Response(JSON.stringify({ error: "Empty AI response" }), {
