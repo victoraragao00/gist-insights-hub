@@ -466,6 +466,41 @@ export type Database = {
           },
         ]
       }
+      demand_conversation_summaries: {
+        Row: {
+          conversation_id: string
+          created_by: string | null
+          demand_id: string
+          generated_at: string
+          id: string
+          summary: string
+        }
+        Insert: {
+          conversation_id: string
+          created_by?: string | null
+          demand_id: string
+          generated_at?: string
+          id?: string
+          summary: string
+        }
+        Update: {
+          conversation_id?: string
+          created_by?: string | null
+          demand_id?: string
+          generated_at?: string
+          id?: string
+          summary?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "demand_conversation_summaries_demand_id_fkey"
+            columns: ["demand_id"]
+            isOneToOne: false
+            referencedRelation: "demands"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       demand_interactions: {
         Row: {
           created_at: string | null
