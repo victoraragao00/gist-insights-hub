@@ -600,6 +600,13 @@ export type Database = {
             referencedRelation: "demands"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "demand_watchers_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
         ]
       }
       demands: {

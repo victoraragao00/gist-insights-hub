@@ -63,12 +63,42 @@ export function useToggleWatcher(demandId: string) {
         if (error) throw error;
       }
     },
+    onMutate: async (isWatching) => {
+      await queryClient.cancelQueries({ queryKey: ["demand_watchers"] });
+
+      const queryKey = ["demand_watchers", user?.id, demandId];
+      const previous = queryClient.getQueryData<DemandWatcher[]>(queryKey);
+
+      queryClient.setQueryData<DemandWatcher[]>(queryKey, (old = []) => {
+        if (isWatching) {
+          return old.filter((w) => w.user_id !== user?.id);
+        }
+        return [
+          ...old,
+          {
+            id: crypto.randomUUID(),
+            demand_id: demandId,
+            user_id: user?.id ?? "",
+            created_at: new Date().toISOString(),
+            full_name: null,
+            email: user?.email ?? null,
+          },
+        ];
+      });
+
+      return { previous };
+    },
     onSuccess: (_data, isWatching) => {
       toast.success(isWatching ? "Você parou de observar esta demanda" : "Você está observando esta demanda");
-      queryClient.invalidateQueries({ queryKey: ["demand_watchers"] });
     },
-    onError: (err) => {
+    onError: (err, _vars, context) => {
+      if (context?.previous !== undefined) {
+        queryClient.setQueryData(["demand_watchers", user?.id, demandId], context.previous);
+      }
       toast.error("Erro: " + (err instanceof Error ? err.message : "Erro"));
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["demand_watchers"] });
     },
   });
 }
