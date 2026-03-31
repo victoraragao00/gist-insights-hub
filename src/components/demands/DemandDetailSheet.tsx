@@ -22,6 +22,7 @@ import {
 import {
   Plus, ArrowRightLeft, User, Lock, Unlock, Edit, Trash2, Loader2,
   FileText, Link2, Upload, ExternalLink, X, MessageSquare, Eye, EyeOff,
+  ChevronRight,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
