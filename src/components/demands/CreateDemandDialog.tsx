@@ -193,11 +193,6 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaul
             </div>
           </div>
 
-          {/* RFI URL */}
-          <div className="space-y-1.5">
-            <Label>RFI Vinculado</Label>
-            <Input value={rfiUrl} onChange={(e) => setRfiUrl(e.target.value)} type="url" placeholder="https://..." />
-          </div>
 
           {/* Description */}
           <div className="space-y-1.5">
