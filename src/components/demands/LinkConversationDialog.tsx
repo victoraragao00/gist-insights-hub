@@ -123,10 +123,9 @@ export function LinkConversationDialog({ demand, open, onOpenChange }: LinkConve
                 </p>
               )}
               {conversations.map((conv) => (
-                <button
+                <div
                   key={conv.conversation_id}
-                  onClick={() => handleSelectConv(conv)}
-                  className="w-full text-left rounded-lg border border-border p-3 hover:bg-accent transition-colors space-y-1"
+                  className="rounded-lg border border-border p-3 space-y-2"
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-mono text-muted-foreground truncate max-w-xs">
@@ -141,7 +140,32 @@ export function LinkConversationDialog({ demand, open, onOpenChange }: LinkConve
                     Última mensagem:{" "}
                     {formatDistanceToNow(new Date(conv.last_message_at), { addSuffix: true, locale: ptBR })}
                   </p>
-                </button>
+                  <div className="flex gap-2 pt-1">
+                    <Button
+                      variant="default"
+                      size="sm"
+                      className="h-7 text-xs flex-1"
+                      disabled={linkMutation.isPending}
+                      onClick={() => {
+                        // Vincular inteira — fetch all messages then link
+                        handleSelectConv(conv);
+                        // We set a flag to auto-link after messages load
+                        setAutoLinkConv(conv.conversation_id);
+                      }}
+                    >
+                      {linkMutation.isPending && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
+                      Vincular inteira
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs flex-1"
+                      onClick={() => handleSelectConv(conv)}
+                    >
+                      Selecionar mensagens
+                    </Button>
+                  </div>
+                </div>
               ))}
             </>
           )}
