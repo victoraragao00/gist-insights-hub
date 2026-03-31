@@ -10,18 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-
-function DashKPICard({ label, value, sub }: { label: string; value: string; sub: string }) {
-  return (
-    <Card className="border border-border rounded-xl shadow-sm">
-      <CardContent className="p-4 space-y-1">
-        <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">{label}</p>
-        <p className="text-2xl font-bold text-foreground">{value}</p>
-        <p className="text-xs text-muted-foreground">{sub}</p>
-      </CardContent>
-    </Card>
-  );
-}
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -30,7 +19,31 @@ import {
   PieChart, Pie, Cell, LineChart, Line, CartesianGrid, Legend,
 } from "recharts";
 
-// PRIORITY_CHART_COLORS and PRIORITY_LABELS imported from colorPalette
+type DrillCategory = "open" | "completed" | "blocked" | "cancelled";
+
+const DRILL_LABELS: Record<DrillCategory, string> = {
+  open: "Demandas Abertas",
+  completed: "Demandas Concluídas",
+  blocked: "Demandas Bloqueadas",
+  cancelled: "Demandas Canceladas",
+};
+
+function DashKPICard({ label, value, sub, onClick }: {
+  label: string; value: string; sub: string; onClick?: () => void;
+}) {
+  return (
+    <Card
+      className={`border border-border rounded-xl shadow-sm ${onClick ? "cursor-pointer hover:border-primary/40 hover:shadow-md transition-all" : ""}`}
+      onClick={onClick}
+    >
+      <CardContent className="p-4 space-y-1">
+        <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">{label}</p>
+        <p className="text-2xl font-bold text-foreground">{value}</p>
+        <p className="text-xs text-muted-foreground">{sub}</p>
+      </CardContent>
+    </Card>
+  );
+}
 
 function formatHours(hours: number | null | undefined): string {
   if (hours == null) return "—";
@@ -43,11 +56,53 @@ const DemandsDashboardPage = () => {
   const { user } = useAuth();
   const [selectedClientId, setSelectedClientId] = useState<string>("all");
   const [days, setDays] = useState<number>(30);
+  const [drillCategory, setDrillCategory] = useState<DrillCategory | null>(null);
 
   const clientId = selectedClientId === "all" ? null : selectedClientId;
   const { data, isLoading } = useDemandAnalytics(clientId, days);
 
-  // Blocked demands direct query
+  // Drill-down query
+  const { data: drillDemands = [], isLoading: loadingDrill } = useQuery<Array<{
+    id: string; title: string; priority: string; client_name: string;
+    created_at: string | null; finished_at: string | null;
+  }>>({
+    queryKey: ["demand_drill", user?.id, clientId ?? "all", drillCategory, days],
+    enabled: !!user?.id && !!drillCategory,
+    staleTime: 30_000,
+    queryFn: async () => {
+      let query = supabase
+        .from("demands")
+        .select("id, title, priority, created_at, finished_at, is_blocked, cancellation_reason, clients(name)")
+        .order("created_at", { ascending: false })
+        .limit(100);
+
+      if (clientId) query = query.eq("client_id", clientId);
+
+      // Apply category filter
+      if (drillCategory === "open") {
+        query = query.is("finished_at", null).eq("is_blocked", false).is("cancellation_reason", null);
+      } else if (drillCategory === "completed") {
+        query = query.not("finished_at", "is", null).is("cancellation_reason", null);
+      } else if (drillCategory === "blocked") {
+        query = query.eq("is_blocked", true);
+      } else if (drillCategory === "cancelled") {
+        query = query.not("cancellation_reason", "is", null);
+      }
+
+      const { data: rows, error } = await query;
+      if (error) throw error;
+      return (rows ?? []).map((r) => ({
+        id: r.id,
+        title: r.title,
+        priority: r.priority,
+        client_name: (r.clients as unknown as { name: string } | null)?.name ?? "—",
+        created_at: r.created_at,
+        finished_at: r.finished_at,
+      }));
+    },
+  });
+
+  // Blocked demands direct query (for bottom table)
   const { data: blockedDemands = [], isLoading: loadingBlocked, error: blockedError } = useQuery<Array<{
     id: string; title: string; priority: string; blocker_reason: string | null;
     blocked_at: string | null; client_name: string;
@@ -103,10 +158,7 @@ const DemandsDashboardPage = () => {
         <h1 className="text-2xl font-bold text-foreground">Dashboard de Demandas</h1>
 
         <div className="flex items-center gap-3">
-          <Select
-            value={selectedClientId}
-            onValueChange={setSelectedClientId}
-          >
+          <Select value={selectedClientId} onValueChange={setSelectedClientId}>
             <SelectTrigger className="h-9 w-44">
               <SelectValue placeholder="Cliente" />
             </SelectTrigger>
@@ -118,10 +170,7 @@ const DemandsDashboardPage = () => {
             </SelectContent>
           </Select>
 
-          <Select
-            value={String(days)}
-            onValueChange={(v) => setDays(Number(v))}
-          >
+          <Select value={String(days)} onValueChange={(v) => setDays(Number(v))}>
             <SelectTrigger className="h-9 w-32">
               <SelectValue />
             </SelectTrigger>
@@ -144,22 +193,59 @@ const DemandsDashboardPage = () => {
       ) : (
         <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4">
           <DashKPICard label="Total" value={String(totals?.total ?? 0)} sub={`últimos ${days} dias`} />
-          <DashKPICard label="Abertos" value={String(totals?.open ?? 0)} sub="em andamento" />
-          <DashKPICard label="Concluídos" value={String(totals?.completed ?? 0)} sub="finalizados" />
-          <DashKPICard label="Bloqueados" value={String(totals?.blocked ?? 0)} sub="com bloqueio" />
-          <DashKPICard label="Cancelados" value={String(totals?.cancelled ?? 0)} sub="cancelados" />
-          <DashKPICard
-            label="Lead Time médio"
-            value={formatHours(totals?.avg_lead_time_hours)}
-            sub="criação → conclusão"
-          />
-          <DashKPICard
-            label="Cycle Time médio"
-            value={formatHours(totals?.avg_cycle_time_hours)}
-            sub="início → conclusão"
-          />
+          <DashKPICard label="Abertos" value={String(totals?.open ?? 0)} sub="em andamento" onClick={() => setDrillCategory("open")} />
+          <DashKPICard label="Concluídos" value={String(totals?.completed ?? 0)} sub="finalizados" onClick={() => setDrillCategory("completed")} />
+          <DashKPICard label="Bloqueados" value={String(totals?.blocked ?? 0)} sub="com bloqueio" onClick={() => setDrillCategory("blocked")} />
+          <DashKPICard label="Cancelados" value={String(totals?.cancelled ?? 0)} sub="cancelados" onClick={() => setDrillCategory("cancelled")} />
+          <DashKPICard label="Lead Time médio" value={formatHours(totals?.avg_lead_time_hours)} sub="criação → conclusão" />
+          <DashKPICard label="Cycle Time médio" value={formatHours(totals?.avg_cycle_time_hours)} sub="início → conclusão" />
         </div>
       )}
+
+      {/* Drill-down Modal */}
+      <Dialog open={!!drillCategory} onOpenChange={(open) => !open && setDrillCategory(null)}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{drillCategory ? DRILL_LABELS[drillCategory] : ""}</DialogTitle>
+          </DialogHeader>
+          {loadingDrill ? (
+            <Skeleton className="h-32 w-full animate-shimmer" />
+          ) : drillDemands.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-6 text-center">Nenhuma demanda encontrada</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Título</TableHead>
+                  <TableHead>Cliente</TableHead>
+                  <TableHead>Prioridade</TableHead>
+                  <TableHead>Criado em</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {drillDemands.map((d) => (
+                  <TableRow key={d.id}>
+                    <TableCell className="font-medium text-sm max-w-xs truncate">{d.title}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{d.client_name}</TableCell>
+                    <TableCell>
+                      <Badge
+                        variant="outline"
+                        className="text-xs border-0"
+                        style={{ backgroundColor: PRIORITY_COLORS[d.priority] + "20", color: PRIORITY_COLORS[d.priority] }}
+                      >
+                        {PRIORITY_LABELS[d.priority] ?? d.priority}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                      {d.created_at ? new Date(d.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }) : "—"}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Charts Row 1 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -179,16 +265,9 @@ const DemandsDashboardPage = () => {
                   <XAxis dataKey="name" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
                   <YAxis hide />
                   <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
-                  <Bar
-                    dataKey="total"
-                    radius={[4, 4, 0, 0]}
-                    fill="hsl(var(--primary))"
-                  >
+                  <Bar dataKey="total" radius={[4, 4, 0, 0]} fill="hsl(var(--primary))">
                     {byType.map((entry, index) => (
-                      <Cell
-                        key={`cell-${index}`}
-                        fill={entry.color ?? "hsl(var(--primary))"}
-                      />
+                      <Cell key={`cell-${index}`} fill={entry.color ?? "hsl(var(--primary))"} />
                     ))}
                   </Bar>
                 </BarChart>
@@ -210,14 +289,7 @@ const DemandsDashboardPage = () => {
             ) : (
               <div className="flex flex-col items-center gap-4 w-full">
                 <PieChart width={200} height={180}>
-                  <Pie
-                    data={byPriority}
-                    dataKey="total"
-                    nameKey="label"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={80}
-                  >
+                  <Pie data={byPriority} dataKey="total" nameKey="label" cx="50%" cy="50%" outerRadius={80}>
                     {byPriority.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
@@ -227,10 +299,7 @@ const DemandsDashboardPage = () => {
                 <div className="flex flex-wrap gap-3 justify-center">
                   {byPriority.map((p) => (
                     <div key={p.priority} className="flex items-center gap-1.5 text-xs">
-                      <span
-                        className="w-2.5 h-2.5 rounded-full shrink-0"
-                        style={{ backgroundColor: p.color }}
-                      />
+                      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: p.color }} />
                       <span className="text-muted-foreground">{p.label} ({p.total})</span>
                     </div>
                   ))}
@@ -255,11 +324,7 @@ const DemandsDashboardPage = () => {
               <p className="text-sm text-muted-foreground py-10 text-center">Sem dados</p>
             ) : (
               <ResponsiveContainer width="100%" height={200}>
-                <BarChart
-                  data={byColumn}
-                  layout="vertical"
-                  margin={{ top: 4, right: 24, left: 8, bottom: 4 }}
-                >
+                <BarChart data={byColumn} layout="vertical" margin={{ top: 4, right: 24, left: 8, bottom: 4 }}>
                   <XAxis type="number" hide />
                   <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={100} />
                   <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
@@ -288,10 +353,7 @@ const DemandsDashboardPage = () => {
                   <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
                   <Bar dataKey="total" radius={[4, 4, 0, 0]}>
                     {byArea.map((entry, index) => (
-                      <Cell
-                        key={`cell-${index}`}
-                        fill={entry.color ?? "hsl(var(--primary))"}
-                      />
+                      <Cell key={`cell-${index}`} fill={entry.color ?? "hsl(var(--primary))"} />
                     ))}
                   </Bar>
                 </BarChart>
@@ -319,20 +381,13 @@ const DemandsDashboardPage = () => {
                 <YAxis tick={{ fontSize: 11 }} tickLine={false} />
                 <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
-                <Line
-                  type="monotone"
-                  dataKey="total"
-                  name="Tickets criados"
-                  stroke="hsl(var(--primary))"
-                  strokeWidth={2}
-                  dot={{ r: 4 }}
-                  activeDot={{ r: 6 }}
-                />
+                <Line type="monotone" dataKey="total" name="Tickets criados" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
               </LineChart>
             </ResponsiveContainer>
           )}
         </CardContent>
       </Card>
+
       {/* Blocked Tickets Table */}
       <Card className="border border-border rounded-xl">
         <CardHeader className="pb-3">
