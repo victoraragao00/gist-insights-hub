@@ -1,8 +1,8 @@
-# CONTEXT.md — Estado do Projeto (v24 — 2026-03-30)
+# CONTEXT.md — Estado do Projeto (v25 — 2026-03-31)
 
 > Mantido pelo Claude Code ao final de cada sessao. Lido por todos os agentes para manter contexto.
 >
-> last_updated: 2026-03-30
+> last_updated: 2026-03-31
 > last_updated_by: Claude Code
 
 ---
@@ -622,6 +622,11 @@ gist-insights-hub/
 24. **Concluido:** DT-1 — Divida tecnica parcial (paleta, 7/10 casts, mutation, imports, skeleton, stagger, key, tipagem)
 25. **Concluido:** Features #10-#18 (branding, toggle ativo, RLS fix, duration, filtros, badge, logout, blocked tickets, watchers names)
 26. **Concluido:** DT-1b — 4/6 residuais corrigidos (cores, error handlers). 2 casts mantidos (TypeScript exige as unknown as)
-27. **Pendente:** Lovable S6 — Edge function deliver-audit-alerts (baixa prioridade)
-28. **Pendente:** Testar notificacoes in-app com 2 usuarios simultaneos
-29. **Fase 8:** Insights IA avancados
+27. **Concluido:** Intervencoes Victor/Operador (2026-03-31, auditado Claude Code):
+    - Fix critico: RLS recursion em user_client_access → policies usam is_admin() em vez de auto-referencia
+    - FK demand_watchers.user_id → user_profiles(id) com ON DELETE CASCADE
+    - Optimistic updates em useToggleWatcher (onMutate/onError/onSettled)
+    - Fix build: tipagem process-jobs classify batch + Gemini model update
+28. **Pendente:** Lovable S6 — Edge function deliver-audit-alerts (baixa prioridade)
+29. **Pendente:** Testar notificacoes in-app com 2 usuarios simultaneos
+30. **Fase 8:** Insights IA avancados
