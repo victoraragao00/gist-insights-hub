@@ -122,7 +122,7 @@ export function useCreateDemand() {
       column_id: string;
       area_id?: string;
       assignee_id?: string;
-      rfi_url?: string; // deprecated — kept for backward compat
+      
       description?: string;
       expected_result?: string;
       assignee?: string;
