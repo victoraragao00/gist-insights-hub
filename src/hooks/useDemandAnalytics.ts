@@ -54,7 +54,7 @@ export function useDemandAnalytics(clientId?: string | null, days: number = 30) 
       const result = data as unknown as DemandAnalyticsData;
       return {
         totals: result.totals ?? {
-          total: 0, open: 0, completed: 0, blocked: 0,
+          total: 0, open: 0, completed: 0, blocked: 0, cancelled: 0,
           avg_lead_time_hours: null, avg_cycle_time_hours: null,
         },
         by_type: result.by_type ?? [],
