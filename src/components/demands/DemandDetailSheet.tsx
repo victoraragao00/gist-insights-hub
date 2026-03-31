@@ -490,25 +490,36 @@ function DemandDetailContent({ demand, onClose }: { demand: DemandRow; onClose: 
         </div>
         <div className="space-y-1">
           <Label className="text-xs text-muted-foreground">RFI</Label>
-          <div className="flex items-center gap-1.5">
-            <Input
-              value={rfiUrl}
-              onChange={(e) => setRfiUrl(e.target.value)}
-              onBlur={() => {
-                const normalized = normalizeUrl(rfiUrl);
-                if (normalized !== rfiUrl) setRfiUrl(normalized);
-                if (normalized !== (demand.rfi_url ?? "")) saveField("rfi_url", normalized, "RFI");
-              }}
-              className="h-8 flex-1"
-              type="url"
-              placeholder="https://..."
-            />
-            {rfiUrl.trim() && (
-              <a href={normalizeUrl(rfiUrl)} target="_blank" rel="noopener noreferrer" title="Abrir RFI">
-                <ExternalLink className="h-4 w-4 text-muted-foreground hover:text-foreground transition-colors" />
-              </a>
-            )}
-          </div>
+          {rfiData ? (
+            <div className="flex items-center gap-2">
+              <Button
+                variant="link"
+                className="h-auto p-0 font-mono text-sm"
+                onClick={() => setRfiSheetOpen(true)}
+              >
+                {rfiData.rfi_number}
+              </Button>
+              {rfiData.rfi_statuses && (
+                <Badge
+                  className="text-white text-xs"
+                  style={{ backgroundColor: (rfiData.rfi_statuses as { color: string | null }).color ?? undefined }}
+                >
+                  {(rfiData.rfi_statuses as { name: string }).name}
+                </Badge>
+              )}
+            </div>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() => createRfiMutation.mutate({ demand_id: demand.id, status_id: rfiStatuses[0]?.id })}
+              disabled={createRfiMutation.isPending}
+            >
+              {createRfiMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Plus className="h-3 w-3 mr-1" />}
+              Criar RFI
+            </Button>
+          )}
         </div>
       </div>
 
