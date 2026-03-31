@@ -43,6 +43,8 @@ import {
   type DemandComment,
 } from "@/hooks/useDemandComments";
 import { useDemandWatchers, useToggleWatcher } from "@/hooks/useDemandWatchers";
+import { useRfiByDemand, useCreateRfi, useRfiStatuses } from "@/hooks/useRfis";
+import { RfiDetailSheet } from "@/components/rfis/RfiDetailSheet";
 import { LinkConversationDialog } from "./LinkConversationDialog";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
