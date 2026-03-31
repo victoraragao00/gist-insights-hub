@@ -627,6 +627,7 @@ const SettingsPage = () => {
           {isAdmin && <TabsTrigger value="columns">Colunas</TabsTrigger>}
           {isAdmin && <TabsTrigger value="areas">Áreas</TabsTrigger>}
           {isAdmin && <TabsTrigger value="agendas">Pautas</TabsTrigger>}
+          {isAdmin && <TabsTrigger value="rfi-statuses">Status RFI</TabsTrigger>}
           {isAdmin && <TabsTrigger value="users">Equipe & Acessos</TabsTrigger>}
         </TabsList>
 
