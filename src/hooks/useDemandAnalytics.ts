@@ -7,6 +7,7 @@ export interface DemandAnalyticsTotals {
   open: number;
   completed: number;
   blocked: number;
+  cancelled: number;
   avg_lead_time_hours: number | null;
   avg_cycle_time_hours: number | null;
 }
