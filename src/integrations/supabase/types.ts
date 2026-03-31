@@ -634,7 +634,6 @@ export type Database = {
           notes: string | null
           position: number
           priority: Database["public"]["Enums"]["demand_priority"]
-          rfi_url: string | null
           started_at: string | null
           title: string
         }
@@ -662,7 +661,6 @@ export type Database = {
           notes?: string | null
           position?: number
           priority?: Database["public"]["Enums"]["demand_priority"]
-          rfi_url?: string | null
           started_at?: string | null
           title: string
         }
@@ -690,7 +688,6 @@ export type Database = {
           notes?: string | null
           position?: number
           priority?: Database["public"]["Enums"]["demand_priority"]
-          rfi_url?: string | null
           started_at?: string | null
           title?: string
         }
@@ -1081,6 +1078,106 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: true
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rfi_statuses: {
+        Row: {
+          active: boolean | null
+          color: string | null
+          created_at: string | null
+          id: string
+          name: string
+          position: number
+        }
+        Insert: {
+          active?: boolean | null
+          color?: string | null
+          created_at?: string | null
+          id?: string
+          name: string
+          position?: number
+        }
+        Update: {
+          active?: boolean | null
+          color?: string | null
+          created_at?: string | null
+          id?: string
+          name?: string
+          position?: number
+        }
+        Relationships: []
+      }
+      rfis: {
+        Row: {
+          assignee_id: string | null
+          budget_value: number | null
+          created_at: string | null
+          created_by: string
+          demand_id: string
+          description: string | null
+          due_date: string | null
+          id: string
+          link: string | null
+          rfi_number: string
+          rfi_seq_number: number
+          status_id: string | null
+          subject: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          assignee_id?: string | null
+          budget_value?: number | null
+          created_at?: string | null
+          created_by: string
+          demand_id: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          link?: string | null
+          rfi_number: string
+          rfi_seq_number: number
+          status_id?: string | null
+          subject?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          assignee_id?: string | null
+          budget_value?: number | null
+          created_at?: string | null
+          created_by?: string
+          demand_id?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          link?: string | null
+          rfi_number?: string
+          rfi_seq_number?: number
+          status_id?: string | null
+          subject?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rfis_assignee_id_fkey"
+            columns: ["assignee_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rfis_demand_id_fkey"
+            columns: ["demand_id"]
+            isOneToOne: true
+            referencedRelation: "demands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rfis_status_id_fkey"
+            columns: ["status_id"]
+            isOneToOne: false
+            referencedRelation: "rfi_statuses"
             referencedColumns: ["id"]
           },
         ]
