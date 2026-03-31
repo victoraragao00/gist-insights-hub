@@ -1125,6 +1125,7 @@ const SettingsPage = () => {
           </TabsContent>
         )}
 
+        {isAdmin && (
           <TabsContent value="users">
             <UserManagementTab />
           </TabsContent>
