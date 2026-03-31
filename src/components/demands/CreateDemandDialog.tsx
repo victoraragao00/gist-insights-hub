@@ -52,7 +52,6 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaul
   const [columnId, setColumnId] = useState(defaultColumnId ?? "");
   const [description, setDescription] = useState("");
   const [expectedResult, setExpectedResult] = useState("");
-  const [rfiUrl, setRfiUrl] = useState("");
   const [notes, setNotes] = useState("");
 
   const effectiveColumnId = columnId || columns[0]?.id || "";
