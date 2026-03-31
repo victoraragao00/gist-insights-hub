@@ -22,8 +22,9 @@ import {
 import {
   Plus, ArrowRightLeft, User, Lock, Unlock, Edit, Trash2, Loader2,
   FileText, Link2, Upload, ExternalLink, X, MessageSquare, Eye, EyeOff,
-  ChevronRight,
+  ChevronRight, Sparkles, ChevronDown,
 } from "lucide-react";
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
