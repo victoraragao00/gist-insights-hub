@@ -1119,6 +1119,11 @@ const SettingsPage = () => {
         )}
 
         {isAdmin && (
+          <TabsContent value="rfi-statuses">
+            <RfiStatusSettingsTab />
+          </TabsContent>
+        )}
+
           <TabsContent value="users">
             <UserManagementTab />
           </TabsContent>
