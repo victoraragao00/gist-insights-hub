@@ -52,7 +52,6 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaul
   const [columnId, setColumnId] = useState(defaultColumnId ?? "");
   const [description, setDescription] = useState("");
   const [expectedResult, setExpectedResult] = useState("");
-  const [rfiUrl, setRfiUrl] = useState("");
   const [notes, setNotes] = useState("");
 
   const effectiveColumnId = columnId || columns[0]?.id || "";
@@ -70,7 +69,6 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaul
         column_id: effectiveColumnId,
         area_id: areaId || undefined,
         assignee_id: assigneeId || undefined,
-        rfi_url: rfiUrl || undefined,
         description: description || undefined,
         expected_result: expectedResult || undefined,
         notes: notes || undefined,
@@ -94,7 +92,6 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaul
     setColumnId(defaultColumnId ?? "");
     setDescription("");
     setExpectedResult("");
-    setRfiUrl("");
     setNotes("");
   };
 
@@ -196,11 +193,6 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaul
             </div>
           </div>
 
-          {/* RFI URL */}
-          <div className="space-y-1.5">
-            <Label>RFI Vinculado</Label>
-            <Input value={rfiUrl} onChange={(e) => setRfiUrl(e.target.value)} type="url" placeholder="https://..." />
-          </div>
 
           {/* Description */}
           <div className="space-y-1.5">

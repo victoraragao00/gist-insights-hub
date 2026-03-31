@@ -40,6 +40,7 @@ import { ChartContainer } from "@/components/ui/chart";
 import { CreateDemandDialog } from "@/components/demands/CreateDemandDialog";
 import { DemandDetailSheet } from "@/components/demands/DemandDetailSheet";
 import { ClientAgendasTab } from "@/components/agendas/ClientAgendasTab";
+import { ClientRfisTab } from "@/components/rfis/ClientRfisTab";
 import type { DemandRow } from "@/hooks/useDemands";
 import { TONE_CONFIG, TONE_CHART_COLORS, TONE_BAR_COLORS } from "@/lib/colorPalette";
 
@@ -620,6 +621,7 @@ const ClientDetailPage = () => {
             Pautas
             <AgendaCountBadge clientId={client.id} />
           </TabsTrigger>
+          <TabsTrigger value="rfis">RFIs</TabsTrigger>
           <TabsTrigger value="interactions">Interações</TabsTrigger>
           <TabsTrigger value="participants">Participantes ({participantsTotalCount})</TabsTrigger>
           <TabsTrigger value="channels">Canais ({bindings.length})</TabsTrigger>
@@ -928,6 +930,11 @@ const ClientDetailPage = () => {
         {/* ── TAB: Pautas ── */}
         <TabsContent value="agendas" className="space-y-4">
           <ClientAgendasTab clientId={client.id} />
+        </TabsContent>
+
+        {/* ── TAB: RFIs ── */}
+        <TabsContent value="rfis" className="space-y-4">
+          <ClientRfisTab clientId={client.id} clientName={client.name} />
         </TabsContent>
 
         {/* ── TAB: Interações ── */}

@@ -43,6 +43,8 @@ import {
   type DemandComment,
 } from "@/hooks/useDemandComments";
 import { useDemandWatchers, useToggleWatcher } from "@/hooks/useDemandWatchers";
+import { useRfiByDemand, useCreateRfi, useRfiStatuses } from "@/hooks/useRfis";
+import { RfiDetailSheet } from "@/components/rfis/RfiDetailSheet";
 import { LinkConversationDialog } from "./LinkConversationDialog";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -236,6 +238,9 @@ function DemandDetailContent({ demand, onClose }: { demand: DemandRow; onClose: 
   const { data: comments = [] } = useDemandComments(demand.id);
   const { data: watchers = [] } = useDemandWatchers(demand.id);
   const toggleWatcherMutation = useToggleWatcher(demand.id);
+  const { data: rfiData } = useRfiByDemand(demand.id);
+  const createRfiMutation = useCreateRfi();
+  const { data: rfiStatuses = [] } = useRfiStatuses();
 
   const updateMutation = useUpdateDemand();
   const moveMutation = useMoveDemand();
@@ -252,7 +257,7 @@ function DemandDetailContent({ demand, onClose }: { demand: DemandRow; onClose: 
   const [description, setDescription] = useState(demand.description ?? "");
   const [expectedResult, setExpectedResult] = useState(demand.expected_result ?? "");
   const [notes, setNotes] = useState(demand.notes ?? "");
-  const [rfiUrl, setRfiUrl] = useState(demand.rfi_url ?? "");
+  const [rfiSheetOpen, setRfiSheetOpen] = useState(false);
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [newLinkUrl, setNewLinkUrl] = useState("");
   // Block dialog state
@@ -276,14 +281,7 @@ function DemandDetailContent({ demand, onClose }: { demand: DemandRow; onClose: 
     setDescription(demand.description ?? "");
     setExpectedResult(demand.expected_result ?? "");
     setNotes(demand.notes ?? "");
-    setRfiUrl(demand.rfi_url ?? "");
-  }, [demand.id, demand.title, demand.description, demand.expected_result, demand.notes, demand.rfi_url]);
-
-  const normalizeUrl = (url: string) => {
-    const trimmed = url.trim();
-    if (!trimmed) return trimmed;
-    return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
-  };
+  }, [demand.id, demand.title, demand.description, demand.expected_result, demand.notes]);
 
   const saveField = useCallback((field: string, value: string, label: string) => {
     updateMutation.mutate({ id: demand.id, fields: { [field]: value || null }, fieldLabel: label });
@@ -497,25 +495,36 @@ function DemandDetailContent({ demand, onClose }: { demand: DemandRow; onClose: 
         </div>
         <div className="space-y-1">
           <Label className="text-xs text-muted-foreground">RFI</Label>
-          <div className="flex items-center gap-1.5">
-            <Input
-              value={rfiUrl}
-              onChange={(e) => setRfiUrl(e.target.value)}
-              onBlur={() => {
-                const normalized = normalizeUrl(rfiUrl);
-                if (normalized !== rfiUrl) setRfiUrl(normalized);
-                if (normalized !== (demand.rfi_url ?? "")) saveField("rfi_url", normalized, "RFI");
-              }}
-              className="h-8 flex-1"
-              type="url"
-              placeholder="https://..."
-            />
-            {rfiUrl.trim() && (
-              <a href={normalizeUrl(rfiUrl)} target="_blank" rel="noopener noreferrer" title="Abrir RFI">
-                <ExternalLink className="h-4 w-4 text-muted-foreground hover:text-foreground transition-colors" />
-              </a>
-            )}
-          </div>
+          {rfiData ? (
+            <div className="flex items-center gap-2">
+              <Button
+                variant="link"
+                className="h-auto p-0 font-mono text-sm"
+                onClick={() => setRfiSheetOpen(true)}
+              >
+                {rfiData.rfi_number}
+              </Button>
+              {rfiData.rfi_statuses && (
+                <Badge
+                  className="text-white text-xs"
+                  style={{ backgroundColor: (rfiData.rfi_statuses as { color: string | null }).color ?? undefined }}
+                >
+                  {(rfiData.rfi_statuses as { name: string }).name}
+                </Badge>
+              )}
+            </div>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() => createRfiMutation.mutate({ demand_id: demand.id, status_id: rfiStatuses[0]?.id })}
+              disabled={createRfiMutation.isPending}
+            >
+              {createRfiMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Plus className="h-3 w-3 mr-1" />}
+              Criar RFI
+            </Button>
+          )}
         </div>
       </div>
 
@@ -992,6 +1001,15 @@ function DemandDetailContent({ demand, onClose }: { demand: DemandRow; onClose: 
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {rfiData && (
+        <RfiDetailSheet
+          open={rfiSheetOpen}
+          onOpenChange={setRfiSheetOpen}
+          rfi={rfiData as Parameters<typeof RfiDetailSheet>[0]["rfi"]}
+          demandTitle={demand.title}
+          clientName={demand.clients?.name ?? undefined}
+        />
+      )}
     </div>
   );
 }
