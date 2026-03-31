@@ -252,7 +252,7 @@ function DemandDetailContent({ demand, onClose }: { demand: DemandRow; onClose: 
   const [description, setDescription] = useState(demand.description ?? "");
   const [expectedResult, setExpectedResult] = useState(demand.expected_result ?? "");
   const [notes, setNotes] = useState(demand.notes ?? "");
-  const [rfiUrl, setRfiUrl] = useState(demand.rfi_url ?? "");
+  const [rfiSheetOpen, setRfiSheetOpen] = useState(false);
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [newLinkUrl, setNewLinkUrl] = useState("");
   // Block dialog state
