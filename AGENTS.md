@@ -19,7 +19,8 @@
 | **Lovable** | Migrations e Edge Functions | Interface Lovable |
 | **Cowork** | Guardiao de Documentacao | Claude Desktop (pasta do repo) |
 | **Projeto** (Claude.ai) | Auditoria e Estrategia | claude.ai |
-| **Operador** (Joao) | Orquestrador Humano | Supabase Dashboard / GitHub |
+| **Operador** (Victor) | Orquestrador Humano | Supabase Dashboard / GitHub / Lovable |
+| **Estrategia** (Joao) | Direcionamento de Produto e Arquitetura | Claude Code / claude.ai |
 
 ### Claude Code
 Responsabilidades:
@@ -114,12 +115,24 @@ Restricoes:
 - Sem acesso direto ao repo ou Supabase
 - Recebe dados via copy-paste do Operador
 
-### Operador (Joao)
+### Operador (Victor)
 Responsabilidades:
 - Executa SQLs no Supabase Dashboard
 - Copia dados e contexto entre agentes
-- Aprova deploys e decisoes de produto
-- Desempata divergencias tecnicas entre agentes (ver secao 2)
+- Opera o Lovable (envia prompts, valida entregas)
+- Atualiza `CONTEXT.md` quando necessario (autonomia concedida pelo Joao em 2026-03-31)
+- Desempata divergencias tecnicas entre agentes (ver secao 2), consultando Joao quando estrategico
+
+Restricoes:
+- **Nunca editar:** `AGENTS.md`, `CLAUDE.md` (apenas Claude Code)
+- Decisoes de arquitetura e produto: escalar para Joao
+
+### Estrategia (Joao)
+Responsabilidades:
+- Direcionamento de produto (prioridades, roadmap, Fase 8+)
+- Decisoes de arquitetura e trade-offs estrategicos
+- Aprovacao de deploys criticos
+- Treinamento e mentoria do Victor
 
 ---
 

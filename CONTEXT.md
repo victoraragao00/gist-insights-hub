@@ -528,7 +528,8 @@ Papeis, restricoes, fluxos e checklist completos em AGENTS.md (v9).
 | **Lovable** | Frontend + Backend (escopo total desde 2026-03-17) | Interface Lovable |
 | **Cowork** | Guardiao de Documentacao | Claude Desktop (pasta do repo) |
 | **Projeto** | Auditoria e Estrategia | claude.ai |
-| **Operador** (Joao) | Orquestrador Humano | Supabase Dashboard / GitHub |
+| **Operador** (Victor) | Orquestrador Humano | Supabase Dashboard / GitHub / Lovable |
+| **Estrategia** (Joao) | Direcionamento de Produto e Arquitetura | Claude Code / claude.ai |
 
 ### Mudanca de estrategia (2026-03-17)
 - **Cursor DESCONTINUADO** — removido do projeto. PRs historicos preservados.
@@ -536,6 +537,11 @@ Papeis, restricoes, fluxos e checklist completos em AGENTS.md (v9).
 - **Claude Code** audita todo codigo do Lovable contra Checklist do CTO + Design System + Anti-padroes
 - **Claude Code NUNCA edita codigo fonte** — apenas gera prompts para Lovable
 - **Lovable sync bidirecional:** commits vao direto para `main` (sem PRs separados)
+
+### Transicao de Operador (2026-03-31)
+- **Victor assume como Operador** — opera Lovable, executa SQLs, atualiza CONTEXT.md
+- **Joao assume papel Estrategia** — direcionamento de produto, arquitetura, decisoes criticas
+- Victor tem autonomia para atualizar `CONTEXT.md` (nao `AGENTS.md` nem `CLAUDE.md`)
 
 ### Preferencias do Operador
 - Respostas diretas e concisas — sem enrolacao
