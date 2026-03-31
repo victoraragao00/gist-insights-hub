@@ -36,6 +36,7 @@ function truncate(text: string | null | undefined, max: number) {
 export function LinkConversationDialog({ demand, open, onOpenChange }: LinkConversationDialogProps) {
   const [selectedConv, setSelectedConv] = useState<ClientConversation | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [autoLinkConv, setAutoLinkConv] = useState<string | null>(null);
 
   const { data: conversations = [], isLoading: loadingConvs } = useClientConversations(
     open ? demand.client_id : undefined
