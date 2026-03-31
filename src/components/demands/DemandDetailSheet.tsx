@@ -22,8 +22,9 @@ import {
 import {
   Plus, ArrowRightLeft, User, Lock, Unlock, Edit, Trash2, Loader2,
   FileText, Link2, Upload, ExternalLink, X, MessageSquare, Eye, EyeOff,
-  ChevronRight,
+  ChevronRight, Sparkles, ChevronDown,
 } from "lucide-react";
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
@@ -39,6 +40,9 @@ import {
 import {
   useDemandInteractions, useUnlinkInteraction,
 } from "@/hooks/useDemandInteractions";
+import {
+  useConversationSummaries, useSummarizeConversation,
+} from "@/hooks/useDemandConversationSummaries";
 import {
   useDemandComments, useCreateComment, useUpdateComment, useDeleteComment,
   type DemandComment,
@@ -250,6 +254,8 @@ function DemandDetailContent({ demand, onClose }: { demand: DemandRow; onClose: 
   const addLinkMutation = useAddLink();
   const deleteAttachmentMutation = useDeleteAttachment();
   const unlinkMutation = useUnlinkInteraction();
+  const { data: convSummaries = [] } = useConversationSummaries(demand.id);
+  const summarizeMutation = useSummarizeConversation();
   const createCommentMutation = useCreateComment();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -701,14 +707,24 @@ function DemandDetailContent({ demand, onClose }: { demand: DemandRow; onClose: 
           <p className="text-xs text-muted-foreground">Nenhuma conversa vinculada</p>
         ) : (
           Object.entries(convGroups).map(([convId, items]) => {
-            const firstItem = items[0];
-            const firstOccurred = firstItem?.interactions?.occurred_at;
+            const firstClientSender = items.find(
+              (li) => li.interactions?.sender_side === "client"
+            )?.interactions?.sender_raw;
+            const firstOccurred = items[0]?.interactions?.occurred_at;
+            const summary = convSummaries.find(
+              (s) => s.conversation_id === convId
+            );
+
             return (
-              <div key={convId} className="rounded-lg border border-border p-3 space-y-2">
+              <div key={convId} className="rounded-lg border border-border bg-card p-3 space-y-2">
+                {/* Card header */}
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-mono text-muted-foreground truncate">
-                    {convId === "sem-conversa" ? "Sem conversa" : convId.slice(0, 24) + "…"}
-                  </span>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <MessageSquare className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <span className="text-sm font-medium truncate">
+                      {firstClientSender ?? (convId === "sem-conversa" ? "Sem conversa" : convId.slice(0, 16) + "…")}
+                    </span>
+                  </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <Badge variant="outline" className="text-xs">{items.length} msg</Badge>
                     {firstOccurred && (
@@ -718,51 +734,93 @@ function DemandDetailContent({ demand, onClose }: { demand: DemandRow; onClose: 
                     )}
                   </div>
                 </div>
-                {items.map((li) => (
-                  <div key={li.id} className="flex items-start gap-2 text-xs group pl-2 border-l border-border">
-                    <div className="flex-1 min-w-0 space-y-0.5">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium truncate">{li.interactions?.sender_raw ?? "—"}</span>
-                        {li.interactions?.sender_side && (
-                          <span className={`inline-flex items-center rounded-sm px-1.5 py-0.5 text-xs font-medium ${SIDE_BADGE[li.interactions.sender_side] ?? "bg-muted text-muted-foreground"}`}>
-                            {li.interactions.sender_side === "client" ? "Cliente" : "uMode"}
-                          </span>
-                        )}
-                        {li.interactions?.occurred_at && (
-                          <span className="text-muted-foreground ml-auto shrink-0">
-                            {formatDistanceToNow(new Date(li.interactions.occurred_at), { addSuffix: true, locale: ptBR })}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-muted-foreground line-clamp-2">
-                        {li.interactions?.content ?? "—"}
-                      </p>
-                    </div>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-5 w-5 opacity-0 group-hover:opacity-100 shrink-0">
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Desvincular mensagem?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            A mensagem será removida do vínculo com este ticket.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={() => unlinkMutation.mutate({ id: li.id, demandId: demand.id })}
-                          >
-                            Desvincular
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
+
+                {/* AI Summary */}
+                {summary && (
+                  <div className="rounded-md bg-muted/50 p-2.5 text-xs text-foreground whitespace-pre-wrap">
+                    {summary.summary}
+                    <p className="text-muted-foreground mt-1">
+                      Gerado {formatDistanceToNow(new Date(summary.generated_at), { addSuffix: true, locale: ptBR })}
+                    </p>
                   </div>
-                ))}
+                )}
+
+                {/* Summarize button */}
+                {convId !== "sem-conversa" && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs w-full"
+                    onClick={() =>
+                      summarizeMutation.mutate({
+                        demand_id: demand.id,
+                        conversation_id: convId,
+                      })
+                    }
+                    disabled={summarizeMutation.isPending}
+                  >
+                    {summarizeMutation.isPending ? (
+                      <><Loader2 className="h-3 w-3 animate-spin mr-1" /> Resumindo...</>
+                    ) : (
+                      <><Sparkles className="h-3 w-3 mr-1" /> {summary ? "Regenerar resumo" : "Resumir com IA"}</>
+                    )}
+                  </Button>
+                )}
+
+                {/* Collapsible messages */}
+                <Collapsible>
+                  <CollapsibleTrigger className="text-xs text-muted-foreground flex items-center gap-1 hover:text-foreground transition-colors">
+                    <ChevronDown className="h-3 w-3" /> Ver mensagens ({items.length})
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="space-y-2 pt-2">
+                    {items.map((li) => (
+                      <div key={li.id} className="flex items-start gap-2 text-xs group pl-2 border-l border-border">
+                        <div className="flex-1 min-w-0 space-y-0.5">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium truncate">{li.interactions?.sender_raw ?? "—"}</span>
+                            {li.interactions?.sender_side && (
+                              <span className={`inline-flex items-center rounded-sm px-1.5 py-0.5 text-xs font-medium ${SIDE_BADGE[li.interactions.sender_side] ?? "bg-muted text-muted-foreground"}`}>
+                                {li.interactions.sender_side === "client" ? "Cliente" : "uMode"}
+                              </span>
+                            )}
+                            {li.interactions?.occurred_at && (
+                              <span className="text-muted-foreground ml-auto shrink-0">
+                                {formatDistanceToNow(new Date(li.interactions.occurred_at), { addSuffix: true, locale: ptBR })}
+                              </span>
+                            )}
+                          </div>
+                          <p
+                            className="text-muted-foreground line-clamp-2"
+                            dangerouslySetInnerHTML={{ __html: li.interactions?.content ?? "—" }}
+                          />
+                        </div>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-5 w-5 opacity-0 group-hover:opacity-100 shrink-0">
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Desvincular mensagem?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                A mensagem será removida do vínculo com este ticket.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => unlinkMutation.mutate({ id: li.id, demandId: demand.id })}
+                              >
+                                Desvincular
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    ))}
+                  </CollapsibleContent>
+                </Collapsible>
               </div>
             );
           })

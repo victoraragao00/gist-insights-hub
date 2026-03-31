@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
@@ -36,6 +36,7 @@ function truncate(text: string | null | undefined, max: number) {
 export function LinkConversationDialog({ demand, open, onOpenChange }: LinkConversationDialogProps) {
   const [selectedConv, setSelectedConv] = useState<ClientConversation | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [autoLinkConv, setAutoLinkConv] = useState<string | null>(null);
 
   const { data: conversations = [], isLoading: loadingConvs } = useClientConversations(
     open ? demand.client_id : undefined
@@ -46,6 +47,31 @@ export function LinkConversationDialog({ demand, open, onOpenChange }: LinkConve
   );
   const linkMutation = useLinkInteractions();
 
+  // Auto-link entire conversation when messages load
+  useEffect(() => {
+    if (autoLinkConv && selectedConv && messages.length > 0 && !loadingMsgs) {
+      const allIds = messages.map((m) => m.id);
+      linkMutation.mutate(
+        {
+          demandId: demand.id,
+          interactionIds: allIds,
+          conversationId: autoLinkConv,
+        },
+        {
+          onSuccess: () => {
+            onOpenChange(false);
+            setSelectedConv(null);
+            setSelectedIds(new Set());
+            setAutoLinkConv(null);
+          },
+          onError: () => {
+            setAutoLinkConv(null);
+          },
+        }
+      );
+      setAutoLinkConv(null);
+    }
+  }, [autoLinkConv, messages, loadingMsgs, selectedConv]);
   const handleSelectConv = (conv: ClientConversation) => {
     setSelectedConv(conv);
     setSelectedIds(new Set());
@@ -123,10 +149,9 @@ export function LinkConversationDialog({ demand, open, onOpenChange }: LinkConve
                 </p>
               )}
               {conversations.map((conv) => (
-                <button
+                <div
                   key={conv.conversation_id}
-                  onClick={() => handleSelectConv(conv)}
-                  className="w-full text-left rounded-lg border border-border p-3 hover:bg-accent transition-colors space-y-1"
+                  className="rounded-lg border border-border p-3 space-y-2"
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-mono text-muted-foreground truncate max-w-xs">
@@ -141,7 +166,32 @@ export function LinkConversationDialog({ demand, open, onOpenChange }: LinkConve
                     Última mensagem:{" "}
                     {formatDistanceToNow(new Date(conv.last_message_at), { addSuffix: true, locale: ptBR })}
                   </p>
-                </button>
+                  <div className="flex gap-2 pt-1">
+                    <Button
+                      variant="default"
+                      size="sm"
+                      className="h-7 text-xs flex-1"
+                      disabled={linkMutation.isPending}
+                      onClick={() => {
+                        // Vincular inteira — fetch all messages then link
+                        handleSelectConv(conv);
+                        // We set a flag to auto-link after messages load
+                        setAutoLinkConv(conv.conversation_id);
+                      }}
+                    >
+                      {linkMutation.isPending && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
+                      Vincular inteira
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs flex-1"
+                      onClick={() => handleSelectConv(conv)}
+                    >
+                      Selecionar mensagens
+                    </Button>
+                  </div>
+                </div>
               ))}
             </>
           )}
