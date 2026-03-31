@@ -69,7 +69,6 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaul
         column_id: effectiveColumnId,
         area_id: areaId || undefined,
         assignee_id: assigneeId || undefined,
-        rfi_url: rfiUrl || undefined,
         description: description || undefined,
         expected_result: expectedResult || undefined,
         notes: notes || undefined,
