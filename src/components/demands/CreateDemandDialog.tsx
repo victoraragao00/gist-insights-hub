@@ -92,7 +92,6 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaul
     setColumnId(defaultColumnId ?? "");
     setDescription("");
     setExpectedResult("");
-    setRfiUrl("");
     setNotes("");
   };
 

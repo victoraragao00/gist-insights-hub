@@ -1001,6 +1001,15 @@ function DemandDetailContent({ demand, onClose }: { demand: DemandRow; onClose: 
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {rfiData && (
+        <RfiDetailSheet
+          open={rfiSheetOpen}
+          onOpenChange={setRfiSheetOpen}
+          rfi={rfiData as Parameters<typeof RfiDetailSheet>[0]["rfi"]}
+          demandTitle={demand.title}
+          clientName={demand.clients?.name ?? undefined}
+        />
+      )}
     </div>
   );
 }
