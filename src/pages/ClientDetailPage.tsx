@@ -40,6 +40,7 @@ import { ChartContainer } from "@/components/ui/chart";
 import { CreateDemandDialog } from "@/components/demands/CreateDemandDialog";
 import { DemandDetailSheet } from "@/components/demands/DemandDetailSheet";
 import { ClientAgendasTab } from "@/components/agendas/ClientAgendasTab";
+import { ClientRfisTab } from "@/components/rfis/ClientRfisTab";
 import type { DemandRow } from "@/hooks/useDemands";
 import { TONE_CONFIG, TONE_CHART_COLORS, TONE_BAR_COLORS } from "@/lib/colorPalette";
 
