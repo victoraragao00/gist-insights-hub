@@ -31,6 +31,7 @@ import { ColumnSettingsTab } from "@/components/demands/ColumnSettingsTab";
 import { AreaSettingsTab } from "@/components/demands/AreaSettingsTab";
 import { UserManagementTab } from "@/components/settings/UserManagementTab";
 import { AgendaSettingsTab } from "@/components/settings/AgendaSettingsTab";
+import { RfiStatusSettingsTab } from "@/components/settings/RfiStatusSettingsTab";
 
 // ── Types ──────────────────────────────────────────────
 
