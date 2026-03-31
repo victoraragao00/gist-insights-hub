@@ -497,34 +497,37 @@ function DemandDetailContent({ demand, onClose }: { demand: DemandRow; onClose: 
         <div className="space-y-1">
           <Label className="text-xs text-muted-foreground">RFI</Label>
           {rfiData ? (
-            <div className="flex items-center gap-2">
-              <Button
-                variant="link"
-                className="h-auto p-0 font-mono text-sm"
-                onClick={() => setRfiSheetOpen(true)}
-              >
-                {rfiData.rfi_number}
-              </Button>
-              {rfiData.rfi_statuses && (
-                <Badge
-                  className="text-white text-xs"
-                  style={{ backgroundColor: (rfiData.rfi_statuses as { color: string | null }).color ?? undefined }}
-                >
-                  {(rfiData.rfi_statuses as { name: string }).name}
-                </Badge>
-              )}
-            </div>
-          ) : (
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 text-xs"
-              onClick={() => createRfiMutation.mutate({ demand_id: demand.id, status_id: rfiStatuses[0]?.id })}
-              disabled={createRfiMutation.isPending}
+            <button
+              onClick={() => setRfiSheetOpen(true)}
+              className="w-full flex items-center justify-between gap-3 rounded-lg border bg-muted/30 px-3 py-2.5 text-left hover:bg-muted/50 transition-colors"
             >
-              {createRfiMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Plus className="h-3 w-3 mr-1" />}
-              Criar RFI
-            </Button>
+              <div className="flex items-center gap-2 min-w-0">
+                <FileText className="h-4 w-4 text-primary shrink-0" />
+                <span className="font-mono font-semibold text-sm">{rfiData.rfi_number}</span>
+                {rfiData.rfi_statuses && (
+                  <Badge
+                    className="text-white text-xs"
+                    style={{ backgroundColor: (rfiData.rfi_statuses as { color: string | null }).color ?? undefined }}
+                  >
+                    {(rfiData.rfi_statuses as { name: string }).name}
+                  </Badge>
+                )}
+              </div>
+              <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+            </button>
+          ) : (
+            <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-muted-foreground/30 p-4">
+              <FileText className="h-5 w-5 text-muted-foreground" />
+              <p className="text-xs text-muted-foreground">Nenhuma RFI vinculada</p>
+              <Button
+                size="sm"
+                onClick={() => createRfiMutation.mutate({ demand_id: demand.id, status_id: rfiStatuses[0]?.id })}
+                disabled={createRfiMutation.isPending}
+              >
+                {createRfiMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Plus className="h-3 w-3 mr-1" />}
+                Criar RFI
+              </Button>
+            </div>
           )}
         </div>
       </div>
