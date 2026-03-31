@@ -620,6 +620,7 @@ const ClientDetailPage = () => {
             Pautas
             <AgendaCountBadge clientId={client.id} />
           </TabsTrigger>
+          <TabsTrigger value="rfis">RFIs</TabsTrigger>
           <TabsTrigger value="interactions">Interações</TabsTrigger>
           <TabsTrigger value="participants">Participantes ({participantsTotalCount})</TabsTrigger>
           <TabsTrigger value="channels">Canais ({bindings.length})</TabsTrigger>
