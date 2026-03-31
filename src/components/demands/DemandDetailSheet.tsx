@@ -238,6 +238,9 @@ function DemandDetailContent({ demand, onClose }: { demand: DemandRow; onClose: 
   const { data: comments = [] } = useDemandComments(demand.id);
   const { data: watchers = [] } = useDemandWatchers(demand.id);
   const toggleWatcherMutation = useToggleWatcher(demand.id);
+  const { data: rfiData } = useRfiByDemand(demand.id);
+  const createRfiMutation = useCreateRfi();
+  const { data: rfiStatuses = [] } = useRfiStatuses();
 
   const updateMutation = useUpdateDemand();
   const moveMutation = useMoveDemand();
