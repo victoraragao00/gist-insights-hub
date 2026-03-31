@@ -136,17 +136,18 @@ const DemandsDashboardPage = () => {
 
       {/* KPI Cards */}
       {isLoading ? (
-        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-          {Array.from({ length: 6 }).map((_, i) => (
+        <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4">
+          {Array.from({ length: 7 }).map((_, i) => (
             <Skeleton key={i} className="h-24 rounded-xl animate-shimmer" />
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4">
           <DashKPICard label="Total" value={String(totals?.total ?? 0)} sub={`últimos ${days} dias`} />
           <DashKPICard label="Abertos" value={String(totals?.open ?? 0)} sub="em andamento" />
           <DashKPICard label="Concluídos" value={String(totals?.completed ?? 0)} sub="finalizados" />
           <DashKPICard label="Bloqueados" value={String(totals?.blocked ?? 0)} sub="com bloqueio" />
+          <DashKPICard label="Cancelados" value={String(totals?.cancelled ?? 0)} sub="cancelados" />
           <DashKPICard
             label="Lead Time médio"
             value={formatHours(totals?.avg_lead_time_hours)}
