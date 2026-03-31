@@ -47,7 +47,32 @@ export function LinkConversationDialog({ demand, open, onOpenChange }: LinkConve
   );
   const linkMutation = useLinkInteractions();
 
-  const handleSelectConv = (conv: ClientConversation) => {
+  // Auto-link entire conversation when messages load
+  useEffect(() => {
+    if (autoLinkConv && selectedConv && messages.length > 0 && !loadingMsgs) {
+      const allIds = messages.map((m) => m.id);
+      linkMutation.mutate(
+        {
+          demandId: demand.id,
+          interactionIds: allIds,
+          conversationId: autoLinkConv,
+        },
+        {
+          onSuccess: () => {
+            onOpenChange(false);
+            setSelectedConv(null);
+            setSelectedIds(new Set());
+            setAutoLinkConv(null);
+          },
+          onError: () => {
+            setAutoLinkConv(null);
+          },
+        }
+      );
+      setAutoLinkConv(null);
+    }
+  }, [autoLinkConv, messages, loadingMsgs, selectedConv]);
+
     setSelectedConv(conv);
     setSelectedIds(new Set());
   };
