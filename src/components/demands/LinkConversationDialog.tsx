@@ -72,7 +72,7 @@ export function LinkConversationDialog({ demand, open, onOpenChange }: LinkConve
       setAutoLinkConv(null);
     }
   }, [autoLinkConv, messages, loadingMsgs, selectedConv]);
-
+  const handleSelectConv = (conv: ClientConversation) => {
     setSelectedConv(conv);
     setSelectedIds(new Set());
   };
