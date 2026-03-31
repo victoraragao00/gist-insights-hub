@@ -65,7 +65,7 @@ export function useToggleWatcher(demandId: string) {
     },
     onSuccess: (_data, isWatching) => {
       toast.success(isWatching ? "Você parou de observar esta demanda" : "Você está observando esta demanda");
-      queryClient.invalidateQueries({ queryKey: ["demand_watchers", demandId] });
+      queryClient.invalidateQueries({ queryKey: ["demand_watchers"] });
     },
     onError: (err) => {
       toast.error("Erro: " + (err instanceof Error ? err.message : "Erro"));
