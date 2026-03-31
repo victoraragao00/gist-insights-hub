@@ -1,31 +1,47 @@
 
 
-## Fix: Watcher Toggle Duplicate Key Error (23505)
+## Plan: Fix Watchers — PGRST200 (no FK) + 23505 (duplicate insert)
 
-### Root cause
-The `useToggleWatcher` invalidates queryKey `["demand_watchers", demandId]` but the query in `useDemandWatchers` uses `["demand_watchers", user?.id, demandId]`. The partial key doesn't match, so the cache never refreshes after a toggle. The UI stays showing "Observar" even after inserting, leading to a second insert attempt and error 23505.
+### Root Cause
 
-### Fix (1 line change)
-**File:** `src/hooks/useDemandWatchers.ts` line 68
+**PGRST200**: The query in `useDemandWatchers.ts` line 25 does `.select("..., user_profiles(full_name, email)")` — PostgREST requires a foreign key relationship to resolve this join. There is **no FK** from `demand_watchers.user_id` → `user_profiles.id`.
 
-Change the invalidation to use a partial match that covers the full key:
+**23505**: When the watcher query fails (PGRST200), the `watchers` array stays empty, so `isWatching` is always `false`. The button always shows "Observar" and always tries to INSERT, causing a duplicate key violation on the second click.
 
-```typescript
-// Before
-queryClient.invalidateQueries({ queryKey: ["demand_watchers", demandId] });
+### Fix (2 changes)
 
-// After  
-queryClient.invalidateQueries({ queryKey: ["demand_watchers"] });
+#### 1. Migration — Add FK from `demand_watchers.user_id` to `user_profiles.id`
+
+```sql
+ALTER TABLE public.demand_watchers
+  ADD CONSTRAINT demand_watchers_user_id_fkey
+  FOREIGN KEY (user_id) REFERENCES public.user_profiles(id) ON DELETE CASCADE;
 ```
 
-Using just `["demand_watchers"]` as a prefix will match any query starting with `"demand_watchers"`, including the one with `user?.id`. This is the standard React Query pattern for partial invalidation.
+This enables PostgREST to resolve the `user_profiles(...)` embedded select. No other table/policy changes needed.
 
-### No other changes needed
-- The `isWatching` derivation in `DemandDetailSheet.tsx` line 269 is correct
-- The button rendering (line 876-882) is correct
-- The watcher list display with names (lines 884-900) is correct
-- The hook toggle logic (insert/delete) is correct
+#### 2. Hook — Add optimistic update to prevent 23505
+
+In `useDemandWatchers.ts`, add `onMutate` with optimistic cache update so the button state flips immediately (before the server round-trip), preventing double-click issues:
+
+```typescript
+onMutate: async (isWatching) => {
+  await queryClient.cancelQueries({ queryKey: ["demand_watchers"] });
+  // snapshot + optimistic update of the specific query
+},
+onError: (_err, _vars, context) => {
+  // rollback to snapshot
+},
+onSettled: () => {
+  queryClient.invalidateQueries({ queryKey: ["demand_watchers"] });
+},
+```
 
 ### Files changed
-- **Edit:** `src/hooks/useDemandWatchers.ts` (line 68 only)
+- **New migration** (FK constraint)
+- **Edit:** `src/hooks/useDemandWatchers.ts` (optimistic update in `useToggleWatcher`)
+
+### No changes to
+- `DemandDetailSheet.tsx` (UI code is already correct)
+- RLS policies, other migrations, `src/integrations/supabase/*`, `.env`
 
