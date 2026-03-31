@@ -41,6 +41,9 @@ import {
   useDemandInteractions, useUnlinkInteraction,
 } from "@/hooks/useDemandInteractions";
 import {
+  useConversationSummaries, useSummarizeConversation,
+} from "@/hooks/useDemandConversationSummaries";
+import {
   useDemandComments, useCreateComment, useUpdateComment, useDeleteComment,
   type DemandComment,
 } from "@/hooks/useDemandComments";
