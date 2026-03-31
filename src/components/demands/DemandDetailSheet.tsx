@@ -254,6 +254,8 @@ function DemandDetailContent({ demand, onClose }: { demand: DemandRow; onClose: 
   const addLinkMutation = useAddLink();
   const deleteAttachmentMutation = useDeleteAttachment();
   const unlinkMutation = useUnlinkInteraction();
+  const { data: convSummaries = [] } = useConversationSummaries(demand.id);
+  const summarizeMutation = useSummarizeConversation();
   const createCommentMutation = useCreateComment();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
