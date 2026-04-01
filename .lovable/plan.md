@@ -1,83 +1,52 @@
 
 
-## Plan: Implementar abas Documentos e Regras de Negocio no ClientDetailPage
+## Plan: Novos usuários sem acesso automático a clientes
 
-### Overview
+### Contexto
 
-Criar duas tabelas (`client_documents`, `client_rules`), bucket de storage, hooks dedicados e dois componentes de aba que substituem os placeholders atuais baseados em `metadata`.
+Hoje, quando um novo usuário faz login, o `bootstrap-user-access` Edge Function automaticamente cria registros `viewer` em `user_client_access` para **todos os clientes ativos**. Além disso, o trigger `grant_new_client_to_all_users` faz o mesmo quando um novo cliente é criado. Isso precisa mudar: novos usuários (gerentes de contas) devem começar com **zero** clientes visíveis, e um admin configura o acesso via a tela de Permissões.
 
----
+### Mudanças
 
-### 1. Database Migration
+#### 1. Migration — Alterar trigger `grant_new_client_to_all_users`
 
-Single migration with all SQL from the prompt:
-- `client_documents` table with RLS (select/insert/update/delete via `user_accessible_client_ids`)
-- `client_rules` table with RLS (same pattern)
-- `updated_at` triggers for both tables
-- Storage bucket `client-documents` (private)
-- Storage RLS policies for authenticated users
-- Indexes on `client_id`
+Restringir para conceder acesso apenas a usuários com `global_role = 'admin'`:
 
-**Note:** The CHECK constraint on `category` is immutable and safe here (static list of values, no time-based logic).
+```sql
+CREATE OR REPLACE FUNCTION public.grant_new_client_to_all_users()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER
+SET search_path TO 'public' AS $$
+BEGIN
+  INSERT INTO user_client_access (user_id, client_id, role)
+  SELECT up.id, NEW.id, up.global_role
+  FROM user_profiles up
+  WHERE up.global_role = 'admin'
+    AND NOT EXISTS (
+      SELECT 1 FROM user_client_access uca
+      WHERE uca.user_id = up.id AND uca.client_id = NEW.id
+    );
+  RETURN NEW;
+END;
+$$;
+```
 
-The `created_by REFERENCES auth.users(id)` will be replaced with just `created_by UUID` (no FK to auth schema per project rules). The `assignee_id` FK to `user_profiles(id)` is fine.
+#### 2. Edge Function — `bootstrap-user-access/index.ts`
 
----
+Modify Step 4: after creating the `user_profiles` record, check `global_role`. If not `admin`, skip client access insertion entirely and return `{ bootstrapped: true, reason: 'non_admin_no_auto_access' }`. Only admins get auto-granted access to all active clients.
 
-### 2. Hooks
+#### 3. No frontend changes needed
 
-**`src/hooks/useClientDocuments.ts`**
-- `useClientDocuments(clientId)` — query with join `user_profiles!assignee_id(full_name, email)`, queryKey `["client_documents", clientId]`, staleTime 60s
-- `useCreateDocument()` — mutation, invalidates query
-- `useUpdateDocument()` — mutation for inline edit (title, description, assignee, category)
-- `useDeleteDocument()` — mutation
-- `useUploadDocument(clientId)` — uploads to `client-documents` bucket, then inserts record
-
-**`src/hooks/useClientRules.ts`**
-- `useClientRules(clientId)` — query, queryKey `["client_rules", clientId]`, staleTime 60s
-- `useCreateClientRule()` — mutation
-- `useUpdateClientRule()` — mutation (toggle active, edit description)
-- `useDeleteClientRule()` — mutation
-
----
-
-### 3. Components
-
-**`src/components/clients/ClientDocumentsTab.tsx`**
-- Header with "Adicionar link" and "Upload arquivo" buttons
-- Document cards with: category icon, editable title (on blur), category badge, description, assignee select, link/download, delete with AlertDialog
-- Dialog for adding link (Title, Category, Description, URL, Assignee)
-- Hidden file input for upload
-- Empty state
-
-**`src/components/clients/ClientRulesTab.tsx`**
-- Section 1: "Regras Globais" — readonly list of `audit_rules` (existing query from the page, filtered for global + this client)
-- Section 2: "Regras deste Cliente" — CRUD list from `client_rules` table with Switch toggle, editable description, delete with AlertDialog, "Nova Regra" dialog
-- Empty states for both sections
-
----
-
-### 4. Integration in ClientDetailPage
-
-- Import `ClientDocumentsTab` and `ClientRulesTab`
-- Replace current placeholder content in `TabsContent value="documents"` (lines 1038-1075) with `<ClientDocumentsTab clientId={client.id} />`
-- Replace current placeholder content in `TabsContent value="rules"` (lines 1077-1117) with `<ClientRulesTab clientId={client.id} />`
-- Update tab trigger for documents to remove `({documents.length})` count from metadata (will be handled internally by the component)
-- Remove unused `documents`, `governanceRules`, `monitoredThemes` variables and related metadata types
-
----
+- `user_accessible_client_ids()` already returns all active clients for admins (via `global_role = 'admin'` check)
+- Non-admin users with zero `user_client_access` rows will see an empty client list
+- Admin assigns clients via the existing Permissions sheet (Settings → Equipe & Acessos → Permissões)
 
 ### Files changed
 
 | Action | File |
 |--------|------|
-| Migration | Create `client_documents`, `client_rules` tables + storage bucket + RLS |
-| New | `src/hooks/useClientDocuments.ts` |
-| New | `src/hooks/useClientRules.ts` |
-| New | `src/components/clients/ClientDocumentsTab.tsx` |
-| New | `src/components/clients/ClientRulesTab.tsx` |
-| Edit | `src/pages/ClientDetailPage.tsx` (replace placeholder tabs, clean up metadata refs) |
+| Migration | Replace `grant_new_client_to_all_users()` (only grant to admins) |
+| Edit | `supabase/functions/bootstrap-user-access/index.ts` (skip auto-grant for non-admins) |
 
 ### No changes to
-- Edge Functions, `src/integrations/supabase/*`, `.env`, other tabs
+- Frontend components, hooks, RLS policies, `src/integrations/supabase/*`, `.env`
 
