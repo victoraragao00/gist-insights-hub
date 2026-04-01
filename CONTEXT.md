@@ -226,6 +226,50 @@ UPDATE user_profiles SET global_role = 'admin' WHERE email = '<email_do_operador
 
 ---
 
+## Fase 7.6 — Conversas IA + Docs/Rules + Contadores + Acesso (2026-04-01 — Concluido)
+
+### 1. Conversas Vinculadas — Resumo IA + Cards
+
+- **Tabela:** `demand_conversation_summaries` (demand_id, conversation_id, summary, generated_at, created_by)
+- **Edge Function:** `summarize-conversation` — usa Lovable AI Gateway (`google/gemini-2.5-flash`) para gerar resumos de conversas vinculadas a demandas
+- **Hook:** `useDemandConversationSummaries.ts` — query + mutation para resumo IA
+- **DemandDetailSheet:** redesenhado com cards por conversa (contato + data + qtd msgs), botao "Resumir com IA", fix HTML rendering
+- **LinkConversationDialog:** opcao "Vincular inteira" alem de selecionar mensagens individuais
+
+### 2. Dashboard Demandas — Fix contadores + KPIs clicaveis
+
+- **RPC `get_demand_analytics` corrigida:**
+  - `cancelled` = `cancellation_reason IS NOT NULL` (prioridade sobre completed — ticket cancelado com finished_at nao conta como concluido)
+  - `open` exclui tickets com cancellation_reason
+- **Novo KPI:** "Cancelados" no DemandsDashboardPage
+- **KPIs clicaveis:** modal drill-down com tabela de tickets (open, completed, blocked, cancelled)
+
+### 3. Abas Documentos e Regras de Negocio
+
+- **Tabela:** `client_documents` (client_id, title, category, url, file_name, file_path, file_size_bytes, mime_type, description, assignee_id, created_by)
+- **Tabela:** `client_rules` (client_id, description, active, created_by)
+- **Storage bucket:** `client-documents` com RLS (upload/download via user_accessible_client_ids)
+- **Hooks:** `useClientDocuments.ts` (CRUD + upload), `useClientRules.ts` (CRUD + toggle active)
+- **Componentes:** `ClientDocumentsTab.tsx` (links + upload + categorias), `ClientRulesTab.tsx` (regras globais readonly + regras especificas CRUD)
+- **ClientDetailPage:** placeholders substituidos por abas funcionais
+
+### 4. Onboarding sem acesso automatico a clientes
+
+- **Trigger `grant_new_client_to_all_users()` alterado:** so concede acesso a admins (global_role = 'admin')
+- **Edge Function `bootstrap-user-access`:** non-admins nao recebem auto-grant de clientes
+- **Resultado:** novos usuarios (gerentes de contas) entram sem acesso a clientes — admin configura via Permissoes (Settings → Equipe & Acessos)
+
+### 5. FK fixes para delecao de demandas
+
+- **`rfis.demand_id`** → `ON DELETE CASCADE` (RFI deletada junto com demanda)
+- **`meeting_homework_items.converted_to_demand_id`** → `ON DELETE SET NULL` (homework preservado, referencia limpa)
+
+### 6. DemandDetailSheet — UI do botao Criar RFI
+
+- Secao RFI redesenhada: card destacado com icone, badge de status, botao mais visivel
+
+---
+
 ## Fase 9 — Modulo de Pautas de Reuniao (SA-1 a SA-4 — Concluido)
 
 ### SA-1: Backend Schema (2026-03-26)
