@@ -142,9 +142,7 @@ const CHANNEL_LABELS: Record<string, string> = {
   transcription_gemini: "Transcrições (Gemini)", transcription_tactiq: "Transcrições (Tactiq)", manual: "Manual",
 };
 
-const DOC_ICONS: Record<string, string> = {
-  pdf: "📄", xlsx: "📊", xls: "📊", docx: "📋", doc: "📋",
-};
+// DOC_ICONS moved to ClientDocumentsTab
 
 const PAGE_SIZE = 50;
 
