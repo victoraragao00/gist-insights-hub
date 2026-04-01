@@ -1,9 +1,9 @@
-# CONTEXT.md — Estado do Projeto (v25 — 2026-03-31)
+# CONTEXT.md — Estado do Projeto (v26 — 2026-04-01)
 
 > Mantido pelo Claude Code ao final de cada sessao. Lido por todos os agentes para manter contexto.
 >
-> last_updated: 2026-03-31
-> last_updated_by: Claude Code
+> last_updated: 2026-04-01
+> last_updated_by: Lovable
 
 ---
 
