@@ -41,6 +41,8 @@ import { CreateDemandDialog } from "@/components/demands/CreateDemandDialog";
 import { DemandDetailSheet } from "@/components/demands/DemandDetailSheet";
 import { ClientAgendasTab } from "@/components/agendas/ClientAgendasTab";
 import { ClientRfisTab } from "@/components/rfis/ClientRfisTab";
+import { ClientDocumentsTab } from "@/components/clients/ClientDocumentsTab";
+import { ClientRulesTab } from "@/components/clients/ClientRulesTab";
 import type { DemandRow } from "@/hooks/useDemands";
 import { TONE_CONFIG, TONE_CHART_COLORS, TONE_BAR_COLORS } from "@/lib/colorPalette";
 
@@ -140,9 +142,7 @@ const CHANNEL_LABELS: Record<string, string> = {
   transcription_gemini: "Transcrições (Gemini)", transcription_tactiq: "Transcrições (Tactiq)", manual: "Manual",
 };
 
-const DOC_ICONS: Record<string, string> = {
-  pdf: "📄", xlsx: "📊", xls: "📊", docx: "📋", doc: "📋",
-};
+// DOC_ICONS moved to ClientDocumentsTab
 
 const PAGE_SIZE = 50;
 
@@ -571,9 +571,7 @@ const ClientDetailPage = () => {
   const connectedChannels = bindings.map((b) => b.channel);
   const disconnectedChannels = ["whatsapp", "email", "discord", "transcription_gemini"]
     .filter((ch) => !connectedChannels.includes(ch));
-  const documents = meta.documents ?? [];
-  const governanceRules = meta.governance_rules ?? [];
-  const monitoredThemes = meta.monitored_themes ?? [];
+  // documents, governanceRules, monitoredThemes moved to dedicated tab components
   const sla = meta.sla;
 
   return (
@@ -625,7 +623,7 @@ const ClientDetailPage = () => {
           <TabsTrigger value="interactions">Interações</TabsTrigger>
           <TabsTrigger value="participants">Participantes ({participantsTotalCount})</TabsTrigger>
           <TabsTrigger value="channels">Canais ({bindings.length})</TabsTrigger>
-          <TabsTrigger value="documents">Documentos ({documents.length})</TabsTrigger>
+          <TabsTrigger value="documents">Documentos</TabsTrigger>
           <TabsTrigger value="rules">Regras de Negócio</TabsTrigger>
           <TabsTrigger value="settings">Configurações</TabsTrigger>
         </TabsList>
@@ -1035,85 +1033,12 @@ const ClientDetailPage = () => {
 
         </TabsContent>
 
-        {/* ── TAB 4: Documentos ── */}
         <TabsContent value="documents" className="space-y-6">
-          <div className="flex items-center justify-between">
-            <h3 className="text-base font-semibold text-foreground">Documentos</h3>
-          </div>
-
-          {documents.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground text-sm">
-              Nenhum documento adicionado ainda.
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {documents.map((doc) => (
-                <Card key={doc.id} className="border border-border rounded-xl hover:border-primary/40 hover:bg-primary/5 transition-colors cursor-pointer">
-                  <CardContent className="p-4 space-y-2">
-                    <div className="flex items-start gap-3">
-                      <span className="text-2xl">{DOC_ICONS[doc.type.toLowerCase()] ?? "🗺"}</span>
-                      <div className="min-w-0">
-                        <p className="font-medium text-sm truncate">{doc.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {doc.type.toUpperCase()} · {doc.size_kb}KB · {new Date(doc.created_at).toLocaleDateString("pt-BR")}
-                        </p>
-                      </div>
-                    </div>
-                    {doc.category.length > 0 && (
-                      <div className="flex gap-1 flex-wrap">
-                        {doc.category.map((cat) => (
-                          <Badge key={cat} variant="outline" className="text-xs">{cat}</Badge>
-                        ))}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-
+          {clientId && <ClientDocumentsTab clientId={clientId} />}
         </TabsContent>
 
-        {/* ── TAB 5: Regras de Negócio ── */}
         <TabsContent value="rules" className="space-y-6">
-          {/* Temas */}
-          <Card className="border border-border rounded-xl">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base font-semibold">Temas monitorados</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex gap-2 flex-wrap">
-                {monitoredThemes.length === 0 && <p className="text-sm text-muted-foreground">Nenhum tema definido.</p>}
-                {monitoredThemes.map((theme) => (
-                  <Badge key={theme} className="bg-primary/10 text-primary border-0">{theme}</Badge>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Governance rules */}
-          <Card className="border border-border rounded-xl">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base font-semibold">Regras de governança</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {governanceRules.length === 0 && <p className="text-sm text-muted-foreground">Nenhuma regra definida.</p>}
-              {governanceRules.map((rule) => (
-                <div key={rule.id} className="flex items-center justify-between rounded-lg border border-border p-3">
-                  <div className="flex items-center gap-3">
-                    <span className="text-lg">{rule.icon}</span>
-                    <div>
-                      <p className="text-sm font-medium">{rule.name}</p>
-                      <p className="text-xs text-muted-foreground">{rule.description}</p>
-                    </div>
-                  </div>
-                  <Badge variant={rule.active ? "default" : "secondary"} className="text-xs">
-                    {rule.active ? "Ativo" : "Inativo"}
-                  </Badge>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
+          {clientId && <ClientRulesTab clientId={clientId} />}
         </TabsContent>
 
         {/* ── TAB 6: Configurações ── */}
