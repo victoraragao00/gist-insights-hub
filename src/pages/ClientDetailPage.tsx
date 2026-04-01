@@ -573,9 +573,7 @@ const ClientDetailPage = () => {
   const connectedChannels = bindings.map((b) => b.channel);
   const disconnectedChannels = ["whatsapp", "email", "discord", "transcription_gemini"]
     .filter((ch) => !connectedChannels.includes(ch));
-  const documents = meta.documents ?? [];
-  const governanceRules = meta.governance_rules ?? [];
-  const monitoredThemes = meta.monitored_themes ?? [];
+  // documents, governanceRules, monitoredThemes moved to dedicated tab components
   const sla = meta.sla;
 
   return (
