@@ -1037,43 +1037,8 @@ const ClientDetailPage = () => {
 
         </TabsContent>
 
-        {/* ── TAB 4: Documentos ── */}
         <TabsContent value="documents" className="space-y-6">
-          <div className="flex items-center justify-between">
-            <h3 className="text-base font-semibold text-foreground">Documentos</h3>
-          </div>
-
-          {documents.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground text-sm">
-              Nenhum documento adicionado ainda.
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {documents.map((doc) => (
-                <Card key={doc.id} className="border border-border rounded-xl hover:border-primary/40 hover:bg-primary/5 transition-colors cursor-pointer">
-                  <CardContent className="p-4 space-y-2">
-                    <div className="flex items-start gap-3">
-                      <span className="text-2xl">{DOC_ICONS[doc.type.toLowerCase()] ?? "🗺"}</span>
-                      <div className="min-w-0">
-                        <p className="font-medium text-sm truncate">{doc.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {doc.type.toUpperCase()} · {doc.size_kb}KB · {new Date(doc.created_at).toLocaleDateString("pt-BR")}
-                        </p>
-                      </div>
-                    </div>
-                    {doc.category.length > 0 && (
-                      <div className="flex gap-1 flex-wrap">
-                        {doc.category.map((cat) => (
-                          <Badge key={cat} variant="outline" className="text-xs">{cat}</Badge>
-                        ))}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-
+          {clientId && <ClientDocumentsTab clientId={clientId} />}
         </TabsContent>
 
         {/* ── TAB 5: Regras de Negócio ── */}
