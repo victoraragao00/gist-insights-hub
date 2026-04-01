@@ -1,52 +1,31 @@
 
 
-## Plan: Novos usuários sem acesso automático a clientes
+## Plan: Cascade delete RFI ao deletar demanda
 
-### Contexto
+### Problema
+A tabela `rfis` referencia `demands(id)` via `demand_id`, mas sem `ON DELETE CASCADE`. Ao deletar uma demanda, a RFI órfã permanece no banco (ou pode bloquear a exclusão se houver FK constraint).
 
-Hoje, quando um novo usuário faz login, o `bootstrap-user-access` Edge Function automaticamente cria registros `viewer` em `user_client_access` para **todos os clientes ativos**. Além disso, o trigger `grant_new_client_to_all_users` faz o mesmo quando um novo cliente é criado. Isso precisa mudar: novos usuários (gerentes de contas) devem começar com **zero** clientes visíveis, e um admin configura o acesso via a tela de Permissões.
-
-### Mudanças
-
-#### 1. Migration — Alterar trigger `grant_new_client_to_all_users`
-
-Restringir para conceder acesso apenas a usuários com `global_role = 'admin'`:
+### Solução — Migration
 
 ```sql
-CREATE OR REPLACE FUNCTION public.grant_new_client_to_all_users()
-RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER
-SET search_path TO 'public' AS $$
-BEGIN
-  INSERT INTO user_client_access (user_id, client_id, role)
-  SELECT up.id, NEW.id, up.global_role
-  FROM user_profiles up
-  WHERE up.global_role = 'admin'
-    AND NOT EXISTS (
-      SELECT 1 FROM user_client_access uca
-      WHERE uca.user_id = up.id AND uca.client_id = NEW.id
-    );
-  RETURN NEW;
-END;
-$$;
+-- Drop existing FK and recreate with CASCADE
+ALTER TABLE public.rfis
+DROP CONSTRAINT IF EXISTS rfis_demand_id_fkey;
+
+ALTER TABLE public.rfis
+ADD CONSTRAINT rfis_demand_id_fkey
+FOREIGN KEY (demand_id) REFERENCES public.demands(id)
+ON DELETE CASCADE;
 ```
 
-#### 2. Edge Function — `bootstrap-user-access/index.ts`
-
-Modify Step 4: after creating the `user_profiles` record, check `global_role`. If not `admin`, skip client access insertion entirely and return `{ bootstrapped: true, reason: 'non_admin_no_auto_access' }`. Only admins get auto-granted access to all active clients.
-
-#### 3. No frontend changes needed
-
-- `user_accessible_client_ids()` already returns all active clients for admins (via `global_role = 'admin'` check)
-- Non-admin users with zero `user_client_access` rows will see an empty client list
-- Admin assigns clients via the existing Permissions sheet (Settings → Equipe & Acessos → Permissões)
+Isso garante que ao deletar uma demanda, a RFI vinculada é automaticamente removida pelo banco.
 
 ### Files changed
 
 | Action | File |
 |--------|------|
-| Migration | Replace `grant_new_client_to_all_users()` (only grant to admins) |
-| Edit | `supabase/functions/bootstrap-user-access/index.ts` (skip auto-grant for non-admins) |
+| Migration | Alter FK `rfis.demand_id` → `ON DELETE CASCADE` |
 
 ### No changes to
-- Frontend components, hooks, RLS policies, `src/integrations/supabase/*`, `.env`
+- Frontend, hooks, edge functions, `src/integrations/supabase/*`, `.env`
 
