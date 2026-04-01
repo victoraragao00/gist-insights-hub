@@ -617,14 +617,21 @@ gist-insights-hub/
 │   └── PENDENTES.md                               # Violacoes abertas
 ├── scripts/
 ├── src/                                           # Frontend + UI (Lovable)
-│   ├── components/demands/                        # Modulo de Tickets (8 componentes)
+│   ├── components/
+│   │   ├── demands/                               # Modulo de Tickets (8 componentes)
+│   │   └── clients/                               # ClientDocumentsTab, ClientRulesTab
+│   ├── hooks/
+│   │   ├── useClientDocuments.ts                   # CRUD documentos + upload
+│   │   ├── useClientRules.ts                       # CRUD regras de negocio
+│   │   └── useDemandConversationSummaries.ts       # Resumo IA de conversas
 │   └── pages/
-│       ├── DemandsDashboardPage.tsx                # Dashboard analitico de tickets
+│       ├── DemandsDashboardPage.tsx                # Dashboard analitico (KPIs clicaveis)
 │       └── PublicDemandsPage.tsx                   # One-Page publica (sem auth)
 └── supabase/                                      # Backend (Lovable) — migrations, edge functions
     └── functions/
-        ├── bootstrap-user-access/                 # Onboarding automatico
-        └── client-demands-public/                 # One-Page publica (sem auth)
+        ├── bootstrap-user-access/                 # Onboarding (restrito para non-admins)
+        ├── client-demands-public/                 # One-Page publica (sem auth)
+        └── summarize-conversation/                # Resumo IA via Lovable AI Gateway
 ```
 
 ---
