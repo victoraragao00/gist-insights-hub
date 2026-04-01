@@ -1,9 +1,9 @@
-# CONTEXT.md — Estado do Projeto (v25 — 2026-03-31)
+# CONTEXT.md — Estado do Projeto (v26 — 2026-04-01)
 
 > Mantido pelo Claude Code ao final de cada sessao. Lido por todos os agentes para manter contexto.
 >
-> last_updated: 2026-03-31
-> last_updated_by: Claude Code
+> last_updated: 2026-04-01
+> last_updated_by: Lovable
 
 ---
 
@@ -26,6 +26,7 @@
 | 7.3 | Dashboard Analitico + One-Page + Bloqueio | Concluido — Sprint S3 (Issue #69): DemandsDashboardPage, PublicDemandsPage, client-demands-public, tokens, watchers, bloqueio/cancelamento, CSV export |
 | 7.4 | Gestao de Usuarios e Permissionamento | Concluido — Sprint S4 (Issue #70): user_profiles, role global (admin/analyst/viewer), user_accessible_client_ids atualizada, aba Usuarios em Settings |
 | 7.5 | Unificacao Assignees | Concluido — Issue #71: assignee_id → user_profiles, aba Responsaveis removida, dropdowns listam usuarios reais |
+| 7.6 | Conversas IA + Docs/Rules + Contadores + Acesso | Concluido — Resumo IA, abas Documentos/Regras, fix contadores, KPIs clicaveis, onboarding restrito, FK fixes |
 | 9 | Modulo de Pautas de Reuniao | Concluido — SA-1 (tabelas) + SA-2 (CRUD) + SA-3 (IA + homework→tickets) + SA-4 (settings) |
 | 8 | Insights IA avancados | Placeholder |
 
@@ -222,6 +223,50 @@ UPDATE user_profiles SET global_role = 'admin' WHERE email = '<email_do_operador
 - `CreateDemandDialog.tsx` e `DemandDetailSheet.tsx` — dropdown lista `user_profiles` ativos (query `user_profiles_active`)
 - `SettingsPage.tsx` — aba "Responsaveis de Tarefas" removida
 - **Fix adicional:** aba "Areas" havia sido removida acidentalmente junto com "Responsaveis" — restaurada
+
+---
+
+## Fase 7.6 — Conversas IA + Docs/Rules + Contadores + Acesso (2026-04-01 — Concluido)
+
+### 1. Conversas Vinculadas — Resumo IA + Cards
+
+- **Tabela:** `demand_conversation_summaries` (demand_id, conversation_id, summary, generated_at, created_by)
+- **Edge Function:** `summarize-conversation` — usa Lovable AI Gateway (`google/gemini-2.5-flash`) para gerar resumos de conversas vinculadas a demandas
+- **Hook:** `useDemandConversationSummaries.ts` — query + mutation para resumo IA
+- **DemandDetailSheet:** redesenhado com cards por conversa (contato + data + qtd msgs), botao "Resumir com IA", fix HTML rendering
+- **LinkConversationDialog:** opcao "Vincular inteira" alem de selecionar mensagens individuais
+
+### 2. Dashboard Demandas — Fix contadores + KPIs clicaveis
+
+- **RPC `get_demand_analytics` corrigida:**
+  - `cancelled` = `cancellation_reason IS NOT NULL` (prioridade sobre completed — ticket cancelado com finished_at nao conta como concluido)
+  - `open` exclui tickets com cancellation_reason
+- **Novo KPI:** "Cancelados" no DemandsDashboardPage
+- **KPIs clicaveis:** modal drill-down com tabela de tickets (open, completed, blocked, cancelled)
+
+### 3. Abas Documentos e Regras de Negocio
+
+- **Tabela:** `client_documents` (client_id, title, category, url, file_name, file_path, file_size_bytes, mime_type, description, assignee_id, created_by)
+- **Tabela:** `client_rules` (client_id, description, active, created_by)
+- **Storage bucket:** `client-documents` com RLS (upload/download via user_accessible_client_ids)
+- **Hooks:** `useClientDocuments.ts` (CRUD + upload), `useClientRules.ts` (CRUD + toggle active)
+- **Componentes:** `ClientDocumentsTab.tsx` (links + upload + categorias), `ClientRulesTab.tsx` (regras globais readonly + regras especificas CRUD)
+- **ClientDetailPage:** placeholders substituidos por abas funcionais
+
+### 4. Onboarding sem acesso automatico a clientes
+
+- **Trigger `grant_new_client_to_all_users()` alterado:** so concede acesso a admins (global_role = 'admin')
+- **Edge Function `bootstrap-user-access`:** non-admins nao recebem auto-grant de clientes
+- **Resultado:** novos usuarios (gerentes de contas) entram sem acesso a clientes — admin configura via Permissoes (Settings → Equipe & Acessos)
+
+### 5. FK fixes para delecao de demandas
+
+- **`rfis.demand_id`** → `ON DELETE CASCADE` (RFI deletada junto com demanda)
+- **`meeting_homework_items.converted_to_demand_id`** → `ON DELETE SET NULL` (homework preservado, referencia limpa)
+
+### 6. DemandDetailSheet — UI do botao Criar RFI
+
+- Secao RFI redesenhada: card destacado com icone, badge de status, botao mais visivel
 
 ---
 
@@ -572,14 +617,21 @@ gist-insights-hub/
 │   └── PENDENTES.md                               # Violacoes abertas
 ├── scripts/
 ├── src/                                           # Frontend + UI (Lovable)
-│   ├── components/demands/                        # Modulo de Tickets (8 componentes)
+│   ├── components/
+│   │   ├── demands/                               # Modulo de Tickets (8 componentes)
+│   │   └── clients/                               # ClientDocumentsTab, ClientRulesTab
+│   ├── hooks/
+│   │   ├── useClientDocuments.ts                   # CRUD documentos + upload
+│   │   ├── useClientRules.ts                       # CRUD regras de negocio
+│   │   └── useDemandConversationSummaries.ts       # Resumo IA de conversas
 │   └── pages/
-│       ├── DemandsDashboardPage.tsx                # Dashboard analitico de tickets
+│       ├── DemandsDashboardPage.tsx                # Dashboard analitico (KPIs clicaveis)
 │       └── PublicDemandsPage.tsx                   # One-Page publica (sem auth)
 └── supabase/                                      # Backend (Lovable) — migrations, edge functions
     └── functions/
-        ├── bootstrap-user-access/                 # Onboarding automatico
-        └── client-demands-public/                 # One-Page publica (sem auth)
+        ├── bootstrap-user-access/                 # Onboarding (restrito para non-admins)
+        ├── client-demands-public/                 # One-Page publica (sem auth)
+        └── summarize-conversation/                # Resumo IA via Lovable AI Gateway
 ```
 
 ---
@@ -633,6 +685,12 @@ gist-insights-hub/
     - FK demand_watchers.user_id → user_profiles(id) com ON DELETE CASCADE
     - Optimistic updates em useToggleWatcher (onMutate/onError/onSettled)
     - Fix build: tipagem process-jobs classify batch + Gemini model update
-28. **Pendente:** Lovable S6 — Edge function deliver-audit-alerts (baixa prioridade)
-29. **Pendente:** Testar notificacoes in-app com 2 usuarios simultaneos
-30. **Fase 8:** Insights IA avancados
+28. **Concluido:** Fase 7.6 — Conversas IA: summarize-conversation Edge Function + demand_conversation_summaries + DemandDetailSheet cards (2026-04-01)
+29. **Concluido:** Fase 7.6 — Dashboard contadores fix: get_demand_analytics RPC (cancelled vs open) + KPIs clicaveis com drill-down modal (2026-04-01)
+30. **Concluido:** Fase 7.6 — Abas Documentos e Regras: client_documents + client_rules + storage bucket + hooks + componentes (2026-04-01)
+31. **Concluido:** Fase 7.6 — Onboarding restrito: trigger + bootstrap-user-access alterados para non-admins sem auto-grant (2026-04-01)
+32. **Concluido:** Fase 7.6 — FK fixes: rfis.demand_id CASCADE + meeting_homework_items.converted_to_demand_id SET NULL (2026-04-01)
+33. **Concluido:** Fase 7.6 — DemandDetailSheet RFI UI redesenhada (2026-04-01)
+34. **Pendente:** Lovable S6 — Edge function deliver-audit-alerts (baixa prioridade)
+35. **Pendente:** Testar notificacoes in-app com 2 usuarios simultaneos
+36. **Fase 8:** Insights IA avancados
