@@ -1,30 +1,29 @@
 
 
-## Plan: Cascade delete RFI ao deletar demanda
+## Plan: Fix FK `meeting_homework_items.converted_to_demand_id` → ON DELETE SET NULL
 
 ### Problema
-A tabela `rfis` referencia `demands(id)` via `demand_id`, mas sem `ON DELETE CASCADE`. Ao deletar uma demanda, a RFI órfã permanece no banco (ou pode bloquear a exclusão se houver FK constraint).
+A migration anterior corrigiu apenas `rfis.demand_id`. A FK `meeting_homework_items_converted_to_demand_id_fkey` ainda bloqueia deleção de demandas.
 
-### Solução — Migration
+### Migration
 
 ```sql
--- Drop existing FK and recreate with CASCADE
-ALTER TABLE public.rfis
-DROP CONSTRAINT IF EXISTS rfis_demand_id_fkey;
+ALTER TABLE public.meeting_homework_items
+DROP CONSTRAINT IF EXISTS meeting_homework_items_converted_to_demand_id_fkey;
 
-ALTER TABLE public.rfis
-ADD CONSTRAINT rfis_demand_id_fkey
-FOREIGN KEY (demand_id) REFERENCES public.demands(id)
-ON DELETE CASCADE;
+ALTER TABLE public.meeting_homework_items
+ADD CONSTRAINT meeting_homework_items_converted_to_demand_id_fkey
+FOREIGN KEY (converted_to_demand_id) REFERENCES public.demands(id)
+ON DELETE SET NULL;
 ```
 
-Isso garante que ao deletar uma demanda, a RFI vinculada é automaticamente removida pelo banco.
+`SET NULL` preserva o homework item, apenas limpa a referência à demanda deletada.
 
 ### Files changed
 
 | Action | File |
 |--------|------|
-| Migration | Alter FK `rfis.demand_id` → `ON DELETE CASCADE` |
+| Migration | Alter FK on `meeting_homework_items.converted_to_demand_id` → `ON DELETE SET NULL` |
 
 ### No changes to
 - Frontend, hooks, edge functions, `src/integrations/supabase/*`, `.env`
