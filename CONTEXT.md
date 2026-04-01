@@ -685,6 +685,12 @@ gist-insights-hub/
     - FK demand_watchers.user_id → user_profiles(id) com ON DELETE CASCADE
     - Optimistic updates em useToggleWatcher (onMutate/onError/onSettled)
     - Fix build: tipagem process-jobs classify batch + Gemini model update
-28. **Pendente:** Lovable S6 — Edge function deliver-audit-alerts (baixa prioridade)
-29. **Pendente:** Testar notificacoes in-app com 2 usuarios simultaneos
-30. **Fase 8:** Insights IA avancados
+28. **Concluido:** Fase 7.6 — Conversas IA: summarize-conversation Edge Function + demand_conversation_summaries + DemandDetailSheet cards (2026-04-01)
+29. **Concluido:** Fase 7.6 — Dashboard contadores fix: get_demand_analytics RPC (cancelled vs open) + KPIs clicaveis com drill-down modal (2026-04-01)
+30. **Concluido:** Fase 7.6 — Abas Documentos e Regras: client_documents + client_rules + storage bucket + hooks + componentes (2026-04-01)
+31. **Concluido:** Fase 7.6 — Onboarding restrito: trigger + bootstrap-user-access alterados para non-admins sem auto-grant (2026-04-01)
+32. **Concluido:** Fase 7.6 — FK fixes: rfis.demand_id CASCADE + meeting_homework_items.converted_to_demand_id SET NULL (2026-04-01)
+33. **Concluido:** Fase 7.6 — DemandDetailSheet RFI UI redesenhada (2026-04-01)
+34. **Pendente:** Lovable S6 — Edge function deliver-audit-alerts (baixa prioridade)
+35. **Pendente:** Testar notificacoes in-app com 2 usuarios simultaneos
+36. **Fase 8:** Insights IA avancados
