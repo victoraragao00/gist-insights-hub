@@ -1041,46 +1041,8 @@ const ClientDetailPage = () => {
           {clientId && <ClientDocumentsTab clientId={clientId} />}
         </TabsContent>
 
-        {/* ── TAB 5: Regras de Negócio ── */}
         <TabsContent value="rules" className="space-y-6">
-          {/* Temas */}
-          <Card className="border border-border rounded-xl">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base font-semibold">Temas monitorados</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex gap-2 flex-wrap">
-                {monitoredThemes.length === 0 && <p className="text-sm text-muted-foreground">Nenhum tema definido.</p>}
-                {monitoredThemes.map((theme) => (
-                  <Badge key={theme} className="bg-primary/10 text-primary border-0">{theme}</Badge>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Governance rules */}
-          <Card className="border border-border rounded-xl">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base font-semibold">Regras de governança</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {governanceRules.length === 0 && <p className="text-sm text-muted-foreground">Nenhuma regra definida.</p>}
-              {governanceRules.map((rule) => (
-                <div key={rule.id} className="flex items-center justify-between rounded-lg border border-border p-3">
-                  <div className="flex items-center gap-3">
-                    <span className="text-lg">{rule.icon}</span>
-                    <div>
-                      <p className="text-sm font-medium">{rule.name}</p>
-                      <p className="text-xs text-muted-foreground">{rule.description}</p>
-                    </div>
-                  </div>
-                  <Badge variant={rule.active ? "default" : "secondary"} className="text-xs">
-                    {rule.active ? "Ativo" : "Inativo"}
-                  </Badge>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
+          {clientId && <ClientRulesTab clientId={clientId} />}
         </TabsContent>
 
         {/* ── TAB 6: Configurações ── */}
