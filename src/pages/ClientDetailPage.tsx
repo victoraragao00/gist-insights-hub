@@ -627,7 +627,7 @@ const ClientDetailPage = () => {
           <TabsTrigger value="interactions">Interações</TabsTrigger>
           <TabsTrigger value="participants">Participantes ({participantsTotalCount})</TabsTrigger>
           <TabsTrigger value="channels">Canais ({bindings.length})</TabsTrigger>
-          <TabsTrigger value="documents">Documentos ({documents.length})</TabsTrigger>
+          <TabsTrigger value="documents">Documentos</TabsTrigger>
           <TabsTrigger value="rules">Regras de Negócio</TabsTrigger>
           <TabsTrigger value="settings">Configurações</TabsTrigger>
         </TabsList>
