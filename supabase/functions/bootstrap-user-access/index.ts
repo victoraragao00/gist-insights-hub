@@ -67,7 +67,21 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ── STEP 2: Check if user already has any access rows ──
+    // ── STEP 2: Check global_role — only admins get auto-access ──
+    const { data: userProfile } = await supaAdmin
+      .from('user_profiles')
+      .select('global_role')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (userProfile?.global_role !== 'admin') {
+      console.log(`[bootstrap-user-access] User ${userId} is ${userProfile?.global_role ?? 'viewer'} — no auto client access`);
+      return new Response(JSON.stringify({ bootstrapped: true, reason: 'non_admin_no_auto_access' }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // ── STEP 3: Check if admin already has access rows ──
     const { count, error: countError } = await supaAdmin
       .from('user_client_access')
       .select('id', { count: 'exact', head: true })
@@ -81,7 +95,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ── STEP 3: Get all active clients ──
+    // ── STEP 4: Get all active clients ──
     const { data: clients, error: clientsError } = await supaAdmin
       .from('clients')
       .select('id')
@@ -95,11 +109,11 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ── STEP 4: Insert viewer access for all active clients ──
+    // ── STEP 5: Insert admin access for all active clients ──
     const rows = clients.map((c: { id: string }) => ({
       user_id: userId,
       client_id: c.id,
-      role: 'viewer',
+      role: 'admin',
     }));
 
     const { error: insertError } = await supaAdmin
@@ -108,7 +122,7 @@ Deno.serve(async (req) => {
 
     if (insertError) throw new Error('Failed to insert access: ' + insertError.message);
 
-    console.log(`[bootstrap-user-access] Granted viewer access to ${clients.length} clients for user ${userId}`);
+    console.log(`[bootstrap-user-access] Granted admin access to ${clients.length} clients for user ${userId}`);
 
     return new Response(JSON.stringify({ bootstrapped: true, clients_granted: clients.length }), {
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
