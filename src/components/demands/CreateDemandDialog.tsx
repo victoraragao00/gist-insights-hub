@@ -105,7 +105,61 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaul
     setDescription("");
     setExpectedResult("");
     setNotes("");
+    setCreatedDemandId(null);
   };
+
+  // Post-creation view
+  if (createdDemandId) {
+    return (
+      <Dialog open={open} onOpenChange={(v) => { if (!v) { resetForm(); } onOpenChange(v); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Demanda Criada ✓</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              A demanda <span className="font-medium text-foreground">{title || "Nova Demanda"}</span> foi criada com sucesso.
+            </p>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs text-muted-foreground">Análise IA</Label>
+                <Button
+                  variant="outline" size="sm" className="h-7 text-xs"
+                  onClick={() => analyzeMutation.mutate(createdDemandId)}
+                  disabled={analyzeMutation.isPending}
+                >
+                  {analyzeMutation.isPending
+                    ? <><Loader2 className="h-3 w-3 animate-spin mr-1" /> Analisando...</>
+                    : <><Sparkles className="h-3 w-3 mr-1" /> {analysis ? "Reanalisar" : "Analisar com IA"}</>
+                  }
+                </Button>
+              </div>
+
+              {analysis && (
+                <div className="rounded-lg border bg-primary/5 border-primary/20 p-3 space-y-3">
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-primary">Problema identificado</p>
+                    <p className="text-xs text-foreground">{analysis.problem_summary}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-primary">Sugestão de resolução</p>
+                    <p className="text-xs text-foreground">{analysis.suggested_resolution}</p>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Gerado {formatDistanceToNow(new Date(analysis.generated_at), { addSuffix: true, locale: ptBR })}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+          <DialogFooter className="mt-4">
+            <Button onClick={() => { resetForm(); onOpenChange(false); }}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
