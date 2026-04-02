@@ -43,6 +43,7 @@ import {
 import {
   useConversationSummaries, useSummarizeConversation,
 } from "@/hooks/useDemandConversationSummaries";
+import { useDemandAnalysis, useAnalyzeDemand } from "@/hooks/useDemandAnalysis";
 import {
   useDemandComments, useCreateComment, useUpdateComment, useDeleteComment,
   type DemandComment,
