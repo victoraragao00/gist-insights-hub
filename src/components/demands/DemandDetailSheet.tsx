@@ -588,6 +588,53 @@ function DemandDetailContent({ demand, onClose }: { demand: DemandRow; onClose: 
         />
       </div>
 
+      {/* Resolution */}
+      <div className="space-y-1.5">
+        <Label className="text-xs text-muted-foreground">Resolução</Label>
+        <Textarea
+          value={resolution}
+          onChange={(e) => setResolution(e.target.value)}
+          onBlur={() => {
+            if (resolution !== ((demand as any).resolution ?? "")) saveField("resolution", resolution, "Resolução");
+          }}
+          rows={2}
+          placeholder="Como foi resolvido..."
+        />
+      </div>
+
+      {/* AI Analysis */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Label className="text-xs text-muted-foreground">Análise IA</Label>
+          <Button
+            variant="outline" size="sm" className="h-7 text-xs"
+            onClick={() => analyzeMutation.mutate(demand.id)}
+            disabled={analyzeMutation.isPending}
+          >
+            {analyzeMutation.isPending
+              ? <><Loader2 className="h-3 w-3 animate-spin mr-1" /> Analisando...</>
+              : <><Sparkles className="h-3 w-3 mr-1" /> {analysis ? "Reanalisar" : "Analisar com IA"}</>
+            }
+          </Button>
+        </div>
+
+        {analysis && (
+          <div className="rounded-lg border bg-primary/5 border-primary/20 p-3 space-y-3">
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-primary">Problema identificado</p>
+              <p className="text-xs text-foreground">{analysis.problem_summary}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-primary">Sugestão de resolução</p>
+              <p className="text-xs text-foreground">{analysis.suggested_resolution}</p>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Gerado {formatDistanceToNow(new Date(analysis.generated_at), { addSuffix: true, locale: ptBR })}
+            </p>
+          </div>
+        )}
+      </div>
+
       <Separator />
 
       {/* Attachments & Links */}
