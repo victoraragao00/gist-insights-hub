@@ -56,6 +56,10 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaul
   const [description, setDescription] = useState("");
   const [expectedResult, setExpectedResult] = useState("");
   const [notes, setNotes] = useState("");
+  const [createdDemandId, setCreatedDemandId] = useState<string | null>(null);
+
+  const { data: analysis } = useDemandAnalysis(createdDemandId ?? undefined);
+  const analyzeMutation = useAnalyzeDemand();
 
   const effectiveColumnId = columnId || columns[0]?.id || "";
 
