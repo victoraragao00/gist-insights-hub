@@ -399,6 +399,44 @@ export type Database = {
           },
         ]
       }
+      demand_ai_analyses: {
+        Row: {
+          context_used: Json | null
+          created_by: string | null
+          demand_id: string
+          generated_at: string
+          id: string
+          problem_summary: string
+          suggested_resolution: string
+        }
+        Insert: {
+          context_used?: Json | null
+          created_by?: string | null
+          demand_id: string
+          generated_at?: string
+          id?: string
+          problem_summary: string
+          suggested_resolution: string
+        }
+        Update: {
+          context_used?: Json | null
+          created_by?: string | null
+          demand_id?: string
+          generated_at?: string
+          id?: string
+          problem_summary?: string
+          suggested_resolution?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "demand_ai_analyses_demand_id_fkey"
+            columns: ["demand_id"]
+            isOneToOne: true
+            referencedRelation: "demands"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       demand_areas: {
         Row: {
           active: boolean | null
@@ -773,6 +811,7 @@ export type Database = {
           notes: string | null
           position: number
           priority: Database["public"]["Enums"]["demand_priority"]
+          resolution: string | null
           started_at: string | null
           title: string
         }
@@ -800,6 +839,7 @@ export type Database = {
           notes?: string | null
           position?: number
           priority?: Database["public"]["Enums"]["demand_priority"]
+          resolution?: string | null
           started_at?: string | null
           title: string
         }
@@ -827,6 +867,7 @@ export type Database = {
           notes?: string | null
           position?: number
           priority?: Database["public"]["Enums"]["demand_priority"]
+          resolution?: string | null
           started_at?: string | null
           title?: string
         }
