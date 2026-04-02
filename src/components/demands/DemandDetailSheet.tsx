@@ -265,6 +265,7 @@ function DemandDetailContent({ demand, onClose }: { demand: DemandRow; onClose: 
   const [description, setDescription] = useState(demand.description ?? "");
   const [expectedResult, setExpectedResult] = useState(demand.expected_result ?? "");
   const [notes, setNotes] = useState(demand.notes ?? "");
+  const [resolution, setResolution] = useState((demand as any).resolution ?? "");
   const [rfiSheetOpen, setRfiSheetOpen] = useState(false);
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [newLinkUrl, setNewLinkUrl] = useState("");
