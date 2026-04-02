@@ -21,3 +21,5 @@ project_id = "qyfwbmukylyfsgzgocfo"
     verify_jwt = false
   [functions.summarize-conversation]
     verify_jwt = false
+  [functions.analyze-demand]
+    verify_jwt = false
