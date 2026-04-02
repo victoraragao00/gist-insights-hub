@@ -43,6 +43,7 @@ import {
 import {
   useConversationSummaries, useSummarizeConversation,
 } from "@/hooks/useDemandConversationSummaries";
+import { useDemandAnalysis, useAnalyzeDemand } from "@/hooks/useDemandAnalysis";
 import {
   useDemandComments, useCreateComment, useUpdateComment, useDeleteComment,
   type DemandComment,
@@ -257,6 +258,8 @@ function DemandDetailContent({ demand, onClose }: { demand: DemandRow; onClose: 
   const { data: convSummaries = [] } = useConversationSummaries(demand.id);
   const summarizeMutation = useSummarizeConversation();
   const createCommentMutation = useCreateComment();
+  const { data: analysis } = useDemandAnalysis(demand.id);
+  const analyzeMutation = useAnalyzeDemand();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -264,6 +267,7 @@ function DemandDetailContent({ demand, onClose }: { demand: DemandRow; onClose: 
   const [description, setDescription] = useState(demand.description ?? "");
   const [expectedResult, setExpectedResult] = useState(demand.expected_result ?? "");
   const [notes, setNotes] = useState(demand.notes ?? "");
+  const [resolution, setResolution] = useState((demand as any).resolution ?? "");
   const [rfiSheetOpen, setRfiSheetOpen] = useState(false);
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [newLinkUrl, setNewLinkUrl] = useState("");
@@ -288,7 +292,8 @@ function DemandDetailContent({ demand, onClose }: { demand: DemandRow; onClose: 
     setDescription(demand.description ?? "");
     setExpectedResult(demand.expected_result ?? "");
     setNotes(demand.notes ?? "");
-  }, [demand.id, demand.title, demand.description, demand.expected_result, demand.notes]);
+    setResolution((demand as any).resolution ?? "");
+  }, [demand.id, demand.title, demand.description, demand.expected_result, demand.notes, (demand as any).resolution]);
 
   const saveField = useCallback((field: string, value: string, label: string) => {
     updateMutation.mutate({ id: demand.id, fields: { [field]: value || null }, fieldLabel: label });
@@ -581,6 +586,53 @@ function DemandDetailContent({ demand, onClose }: { demand: DemandRow; onClose: 
           }}
           rows={2}
         />
+      </div>
+
+      {/* Resolution */}
+      <div className="space-y-1.5">
+        <Label className="text-xs text-muted-foreground">Resolução</Label>
+        <Textarea
+          value={resolution}
+          onChange={(e) => setResolution(e.target.value)}
+          onBlur={() => {
+            if (resolution !== ((demand as any).resolution ?? "")) saveField("resolution", resolution, "Resolução");
+          }}
+          rows={2}
+          placeholder="Como foi resolvido..."
+        />
+      </div>
+
+      {/* AI Analysis */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Label className="text-xs text-muted-foreground">Análise IA</Label>
+          <Button
+            variant="outline" size="sm" className="h-7 text-xs"
+            onClick={() => analyzeMutation.mutate(demand.id)}
+            disabled={analyzeMutation.isPending}
+          >
+            {analyzeMutation.isPending
+              ? <><Loader2 className="h-3 w-3 animate-spin mr-1" /> Analisando...</>
+              : <><Sparkles className="h-3 w-3 mr-1" /> {analysis ? "Reanalisar" : "Analisar com IA"}</>
+            }
+          </Button>
+        </div>
+
+        {analysis && (
+          <div className="rounded-lg border bg-primary/5 border-primary/20 p-3 space-y-3">
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-primary">Problema identificado</p>
+              <p className="text-xs text-foreground">{analysis.problem_summary}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-primary">Sugestão de resolução</p>
+              <p className="text-xs text-foreground">{analysis.suggested_resolution}</p>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Gerado {formatDistanceToNow(new Date(analysis.generated_at), { addSuffix: true, locale: ptBR })}
+            </p>
+          </div>
+        )}
       </div>
 
       <Separator />
