@@ -292,7 +292,8 @@ function DemandDetailContent({ demand, onClose }: { demand: DemandRow; onClose: 
     setDescription(demand.description ?? "");
     setExpectedResult(demand.expected_result ?? "");
     setNotes(demand.notes ?? "");
-  }, [demand.id, demand.title, demand.description, demand.expected_result, demand.notes]);
+    setResolution((demand as any).resolution ?? "");
+  }, [demand.id, demand.title, demand.description, demand.expected_result, demand.notes, (demand as any).resolution]);
 
   const saveField = useCallback((field: string, value: string, label: string) => {
     updateMutation.mutate({ id: demand.id, fields: { [field]: value || null }, fieldLabel: label });
