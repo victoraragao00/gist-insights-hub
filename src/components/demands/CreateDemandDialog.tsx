@@ -81,9 +81,14 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaul
         notes: notes || undefined,
       },
       {
-        onSuccess: () => {
-          onOpenChange(false);
-          resetForm();
+        onSuccess: (data) => {
+          const newId = (data as any)?.id;
+          if (newId) {
+            setCreatedDemandId(newId);
+          } else {
+            onOpenChange(false);
+            resetForm();
+          }
         },
       }
     );
