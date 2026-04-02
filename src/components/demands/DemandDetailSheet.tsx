@@ -258,6 +258,8 @@ function DemandDetailContent({ demand, onClose }: { demand: DemandRow; onClose: 
   const { data: convSummaries = [] } = useConversationSummaries(demand.id);
   const summarizeMutation = useSummarizeConversation();
   const createCommentMutation = useCreateComment();
+  const { data: analysis } = useDemandAnalysis(demand.id);
+  const analyzeMutation = useAnalyzeDemand();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
