@@ -187,12 +187,52 @@ export function AgendaDetailSheet({ agendaId, open, onOpenChange }: AgendaDetail
               </div>
 
               {/* Objective */}
-              {agenda.objective && (
-                <div className="space-y-1.5">
-                  <Label className="text-sm font-medium">Objetivo</Label>
-                  <p className="text-sm text-muted-foreground">{agenda.objective}</p>
-                </div>
-              )}
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium">Objetivo</Label>
+                <Textarea
+                  value={objective}
+                  onChange={(e) => setObjective(e.target.value)}
+                  onBlur={() => {
+                    if (!agendaId || objective === (agenda.objective ?? "")) return;
+                    updateAgenda.mutate({ id: agendaId, objective });
+                  }}
+                  placeholder="Objetivo da reunião..."
+                  rows={2}
+                  className="text-sm"
+                />
+              </div>
+
+              {/* Context Notes */}
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium">Notas de Contexto</Label>
+                <Textarea
+                  value={contextNotes}
+                  onChange={(e) => setContextNotes(e.target.value)}
+                  onBlur={() => {
+                    if (!agendaId || contextNotes === (agenda.context_notes ?? "")) return;
+                    updateAgenda.mutate({ id: agendaId, context_notes: contextNotes });
+                  }}
+                  placeholder="Contexto relevante para a reunião..."
+                  rows={2}
+                  className="text-sm"
+                />
+              </div>
+
+              {/* Next Steps */}
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium">Próximos Passos</Label>
+                <Textarea
+                  value={nextSteps}
+                  onChange={(e) => setNextSteps(e.target.value)}
+                  onBlur={() => {
+                    if (!agendaId || nextSteps === (agenda.next_steps ?? "")) return;
+                    updateAgenda.mutate({ id: agendaId, next_steps: nextSteps });
+                  }}
+                  placeholder="Próximos passos definidos..."
+                  rows={2}
+                  className="text-sm"
+                />
+              </div>
 
               <Separator />
 
