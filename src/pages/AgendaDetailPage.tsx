@@ -658,7 +658,7 @@ function CollapsibleSection({
               >
                 {value ? (
                   <div className="prose prose-sm dark:prose-invert max-w-none text-sm">
-                    <ReactMarkdown>{value}</ReactMarkdown>
+                    <ReactMarkdown components={markdownComponents}>{value}</ReactMarkdown>
                   </div>
                 ) : (
                   <p className="text-sm text-muted-foreground italic">Clique para editar...</p>
