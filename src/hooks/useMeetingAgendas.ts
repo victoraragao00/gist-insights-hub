@@ -71,18 +71,18 @@ export function useMeetingAgendas(filters?: MeetingAgendasFilters) {
 export function useMeetingAgenda(agendaId: string | null) {
   const { user } = useAuth();
 
-  return useQuery<MeetingAgenda | null>({
+  return useQuery<MeetingAgendaWithClient | null>({
     queryKey: ["meeting_agenda", user?.id, agendaId],
     enabled: !!user?.id && !!agendaId,
     staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("meeting_agendas")
-        .select("*")
+        .select("*, clients(name)")
         .eq("id", agendaId!)
         .maybeSingle();
       if (error) throw error;
-      return data as MeetingAgenda | null;
+      return data as MeetingAgendaWithClient | null;
     },
   });
 }
