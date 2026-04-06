@@ -133,7 +133,6 @@ const AgendasPage = () => {
       )}
 
       <CreateAgendaDialog open={createOpen} onOpenChange={setCreateOpen} />
-      <AgendaDetailSheet agendaId={selectedAgendaId} open={sheetOpen} onOpenChange={setSheetOpen} />
     </div>
   );
 };
