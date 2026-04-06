@@ -15,6 +15,7 @@ import DemandsDashboardPage from "./pages/DemandsDashboardPage";
 import SearchPage from "./pages/SearchPage";
 import Audits from "./pages/Audits";
 import AgendasPage from "./pages/AgendasPage";
+import AgendaDetailPage from "./pages/AgendaDetailPage";
 import SettingsPage from "./pages/SettingsPage";
 import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
