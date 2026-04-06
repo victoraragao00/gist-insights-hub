@@ -15,12 +15,11 @@ import { SatisfactionDisplay } from "@/components/agendas/SatisfactionPicker";
 
 const AgendasPage = () => {
   const { clients } = useClient();
+  const navigate = useNavigate();
   const [filterClientId, setFilterClientId] = useState<string>("");
   const [filterPeriod, setFilterPeriod] = useState<string>("");
   const [filterSatisfaction, setFilterSatisfaction] = useState<string>("");
   const [createOpen, setCreateOpen] = useState(false);
-  const [selectedAgendaId, setSelectedAgendaId] = useState<string | null>(null);
-  const [sheetOpen, setSheetOpen] = useState(false);
 
   const { data: agendas = [], isLoading } = useMeetingAgendas({
     clientId: filterClientId && filterClientId !== "all" ? filterClientId : undefined,
@@ -29,8 +28,7 @@ const AgendasPage = () => {
   });
 
   const handleOpen = (agenda: MeetingAgendaWithClient) => {
-    setSelectedAgendaId(agenda.id);
-    setSheetOpen(true);
+    navigate(`/agendas/${agenda.id}`);
   };
 
   return (
