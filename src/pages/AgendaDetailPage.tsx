@@ -345,9 +345,9 @@ const AgendaDetailPage = () => {
               onClick={() => setEditingField("summary")}
             >
               {summary ? (
-                <ReactMarkdown className="prose prose-sm dark:prose-invert max-w-none text-sm">
-                  {summary}
-                </ReactMarkdown>
+                <div className="prose prose-sm dark:prose-invert max-w-none text-sm">
+                  <ReactMarkdown>{summary}</ReactMarkdown>
+                </div>
               ) : (
                 <p className="text-sm text-muted-foreground italic">Clique para adicionar resumo executivo...</p>
               )}
