@@ -543,7 +543,7 @@ const AgendaDetailPage = () => {
             <div className="flex flex-wrap gap-2">
               {participants.map((p) => (
                 <Badge key={p.id} variant="secondary" className="text-xs">
-                  {p.participant_name || p.user_profile_name || "—"}
+                  {p.participant_name || p.user_name || "—"}
                 </Badge>
               ))}
             </div>
