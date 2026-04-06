@@ -1,45 +1,88 @@
 
 
-## Plan: Fix AgendaDetailSheet — Sync all editable fields
+## Plan: AgendaDetailPage — Dedicated page with markdown, collapsibles, inline editing
 
-### Root Cause
+### Overview
 
-Lines 62-67 use a manual sync pattern (`prevAgendaId` via useState) that only syncs `transcriptionDraft` and `summaryDraft`. The fields `objective`, `context_notes`, and `next_steps` are not synced at all — they are rendered directly from `agenda.*` as read-only text, but wrapped in `{agenda.objective && ...}` guards. Since the query data arrives asynchronously, these fields may be undefined on first render and never re-display.
+Create a new `/agendas/:id` page that replaces the Sheet navigation pattern with a full page layout. Uses `react-markdown` for rich rendering, `Collapsible` for sections, and inline edit-on-click/save-on-blur for all fields. The existing `AgendaDetailSheet` is kept intact.
 
-Additionally, these fields should be editable (Textarea with save-on-blur), not read-only paragraphs.
+---
 
-### Fix
+### 1. Install dependency
 
-**File: `src/components/agendas/AgendaDetailSheet.tsx`**
+```bash
+npm install react-markdown
+```
 
-1. Replace the manual sync pattern (lines 62-67) with a proper `useEffect` that syncs ALL draft fields when agenda data changes:
+### 2. Update `useMeetingAgenda` hook to join client name
 
+In `src/hooks/useMeetingAgendas.ts`, change the `useMeetingAgenda` query to select `*, clients(name)` and return `MeetingAgendaWithClient` instead of `MeetingAgenda`. This gives the detail page access to the client name without an extra query.
+
+### 3. New file: `src/pages/AgendaDetailPage.tsx`
+
+Full-page layout with:
+
+**Breadcrumb** — "Pautas > [title]" with click-to-navigate back
+
+**Header Card** — Title (editable Input, save on blur), client name (read-only), date, location (editable Input), duration (editable number Input), satisfaction (SatisfactionPicker). AI badge if processed.
+
+**Executive Summary Card** — Highlighted card (`bg-primary/5 border-primary/20`). Content rendered via `react-markdown` in read mode. Click toggles to Textarea for editing, save on blur. "Processar com IA" button if `ai_processed = false` and transcription exists.
+
+**Collapsible Sections** (using `Collapsible` from shadcn):
+- Objetivo — closed by default, 1-line preview when collapsed
+- Notas de Contexto — closed by default
+- Proximos Passos — closed by default
+- Licoes de Casa — **open** by default
+- Transcricao — closed by default
+
+Each text section has two modes:
+- **Read mode**: rendered with `react-markdown` + `prose prose-sm` classes. Click anywhere to enter edit mode.
+- **Edit mode**: `Textarea` with the raw text. Save on blur, return to read mode.
+
+**Homework section** — Same logic as current Sheet: split uMode/Cliente, "Adicionar item" inline, "Ticket" / "Ver ticket" buttons. Reuses `useMeetingHomework`, `useCreateHomeworkItem`, `useDeleteHomeworkItem`, `useConvertHomeworkToTicket`.
+
+**Participants** — Compact inline list at the bottom (read-only display of names).
+
+**Delete button** — AlertDialog at bottom, navigates to `/agendas` after deletion.
+
+**State sync** — Single `useEffect` keyed on `agenda?.id`:
 ```typescript
 useEffect(() => {
   if (!agenda) return;
-  setTranscriptionDraft(agenda.transcription ?? "");
-  setSummaryDraft(agenda.executive_summary ?? "");
+  setTitle(agenda.title ?? "");
+  setLocation(agenda.location ?? "");
+  setDuration(agenda.duration_minutes ?? 60);
   setObjective(agenda.objective ?? "");
   setContextNotes(agenda.context_notes ?? "");
   setNextSteps(agenda.next_steps ?? "");
-}, [agenda?.id, agenda?.transcription, agenda?.executive_summary, 
-    agenda?.objective, agenda?.context_notes, agenda?.next_steps]);
+  setSummary(agenda.executive_summary ?? "");
+  setTranscription(agenda.transcription ?? "");
+}, [agenda?.id]);
 ```
 
-2. Add state variables for `objective`, `contextNotes`, `nextSteps` (currently missing)
+### 4. Route in `src/App.tsx`
 
-3. Convert the read-only `objective` display (line 185-189) to an editable Textarea with save-on-blur
+Add inside the authenticated layout routes:
+```tsx
+<Route path="/agendas/:id" element={<ErrorBoundary><AgendaDetailPage /></ErrorBoundary>} />
+```
 
-4. Add editable sections for `context_notes` and `next_steps` (currently not shown at all in the detail view)
+### 5. Update `src/pages/AgendasPage.tsx`
 
-5. Remove the old `prevAgendaId` manual sync (lines 62-67)
+Change `handleOpen` to use `navigate(`/agendas/${agenda.id}`)` instead of opening the Sheet. Keep Sheet component rendered (but it won't be triggered from the list anymore).
+
+---
 
 ### Files changed
 
 | Action | File |
 |--------|------|
-| Edit | `src/components/agendas/AgendaDetailSheet.tsx` (add state + useEffect sync + editable fields) |
+| Install | `react-markdown` package |
+| Edit | `src/hooks/useMeetingAgendas.ts` (join `clients(name)` in `useMeetingAgenda`) |
+| New | `src/pages/AgendaDetailPage.tsx` |
+| Edit | `src/App.tsx` (add route) |
+| Edit | `src/pages/AgendasPage.tsx` (navigate instead of Sheet) |
 
 ### No changes to
-- Hooks, mutations, migrations, RLS, `src/integrations/supabase/*`, `.env`
+- `AgendaDetailSheet.tsx` (kept as-is), migrations, RLS, edge functions, `src/integrations/supabase/*`, `.env`
 
