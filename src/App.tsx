@@ -15,6 +15,7 @@ import DemandsDashboardPage from "./pages/DemandsDashboardPage";
 import SearchPage from "./pages/SearchPage";
 import Audits from "./pages/Audits";
 import AgendasPage from "./pages/AgendasPage";
+import AgendaDetailPage from "./pages/AgendaDetailPage";
 import SettingsPage from "./pages/SettingsPage";
 import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
@@ -43,6 +44,7 @@ const App = () => (
                 <Route path="/demands" element={<ErrorBoundary><DemandsPage /></ErrorBoundary>} />
                 <Route path="/demands/dashboard" element={<ErrorBoundary><DemandsDashboardPage /></ErrorBoundary>} />
                 <Route path="/agendas" element={<ErrorBoundary><AgendasPage /></ErrorBoundary>} />
+                <Route path="/agendas/:id" element={<ErrorBoundary><AgendaDetailPage /></ErrorBoundary>} />
                 <Route path="/search" element={<ErrorBoundary><SearchPage /></ErrorBoundary>} />
                 <Route path="/audits" element={<ErrorBoundary><Audits /></ErrorBoundary>} />
                 <Route path="/settings" element={<ErrorBoundary><SettingsPage /></ErrorBoundary>} />

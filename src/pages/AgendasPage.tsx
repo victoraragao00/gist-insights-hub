@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,17 +10,16 @@ import { Plus, ClipboardList, Loader2 } from "lucide-react";
 import { useMeetingAgendas, type MeetingAgendaWithClient } from "@/hooks/useMeetingAgendas";
 import { useClient } from "@/context/ClientContext";
 import { CreateAgendaDialog } from "@/components/agendas/CreateAgendaDialog";
-import { AgendaDetailSheet } from "@/components/agendas/AgendaDetailSheet";
+
 import { SatisfactionDisplay } from "@/components/agendas/SatisfactionPicker";
 
 const AgendasPage = () => {
   const { clients } = useClient();
+  const navigate = useNavigate();
   const [filterClientId, setFilterClientId] = useState<string>("");
   const [filterPeriod, setFilterPeriod] = useState<string>("");
   const [filterSatisfaction, setFilterSatisfaction] = useState<string>("");
   const [createOpen, setCreateOpen] = useState(false);
-  const [selectedAgendaId, setSelectedAgendaId] = useState<string | null>(null);
-  const [sheetOpen, setSheetOpen] = useState(false);
 
   const { data: agendas = [], isLoading } = useMeetingAgendas({
     clientId: filterClientId && filterClientId !== "all" ? filterClientId : undefined,
@@ -28,8 +28,7 @@ const AgendasPage = () => {
   });
 
   const handleOpen = (agenda: MeetingAgendaWithClient) => {
-    setSelectedAgendaId(agenda.id);
-    setSheetOpen(true);
+    navigate(`/agendas/${agenda.id}`);
   };
 
   return (
@@ -134,7 +133,6 @@ const AgendasPage = () => {
       )}
 
       <CreateAgendaDialog open={createOpen} onOpenChange={setCreateOpen} />
-      <AgendaDetailSheet agendaId={selectedAgendaId} open={sheetOpen} onOpenChange={setSheetOpen} />
     </div>
   );
 };
