@@ -1,6 +1,15 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import ReactMarkdown from "react-markdown";
+import ReactMarkdown, { Components } from "react-markdown";
+
+const markdownComponents: Components = {
+  a: ({ node, ...props }) => (
+    <a {...props} target="_blank" rel="noopener noreferrer" className="text-primary underline hover:text-primary/80" />
+  ),
+  img: ({ node, ...props }) => (
+    <img {...props} className="rounded-lg max-w-full h-auto my-2" loading="lazy" />
+  ),
+};
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -346,7 +355,7 @@ const AgendaDetailPage = () => {
             >
               {summary ? (
                 <div className="prose prose-sm dark:prose-invert max-w-none text-sm">
-                  <ReactMarkdown>{summary}</ReactMarkdown>
+                  <ReactMarkdown components={markdownComponents}>{summary}</ReactMarkdown>
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground italic">Clique para adicionar resumo executivo...</p>
@@ -649,7 +658,7 @@ function CollapsibleSection({
               >
                 {value ? (
                   <div className="prose prose-sm dark:prose-invert max-w-none text-sm">
-                    <ReactMarkdown>{value}</ReactMarkdown>
+                    <ReactMarkdown components={markdownComponents}>{value}</ReactMarkdown>
                   </div>
                 ) : (
                   <p className="text-sm text-muted-foreground italic">Clique para editar...</p>
