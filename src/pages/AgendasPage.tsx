@@ -10,7 +10,7 @@ import { Plus, ClipboardList, Loader2 } from "lucide-react";
 import { useMeetingAgendas, type MeetingAgendaWithClient } from "@/hooks/useMeetingAgendas";
 import { useClient } from "@/context/ClientContext";
 import { CreateAgendaDialog } from "@/components/agendas/CreateAgendaDialog";
-import { AgendaDetailSheet } from "@/components/agendas/AgendaDetailSheet";
+
 import { SatisfactionDisplay } from "@/components/agendas/SatisfactionPicker";
 
 const AgendasPage = () => {
