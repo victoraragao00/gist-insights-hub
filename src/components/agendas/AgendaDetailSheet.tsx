@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useClient } from "@/context/ClientContext";
 import {
@@ -52,19 +52,24 @@ export function AgendaDetailSheet({ agendaId, open, onOpenChange }: AgendaDetail
 
   const [transcriptionDraft, setTranscriptionDraft] = useState("");
   const [summaryDraft, setSummaryDraft] = useState("");
+  const [objective, setObjective] = useState("");
+  const [contextNotes, setContextNotes] = useState("");
+  const [nextSteps, setNextSteps] = useState("");
   const [newItemText, setNewItemText] = useState("");
   const [newItemSide, setNewItemSide] = useState("umode");
   const [showAddItem, setShowAddItem] = useState(false);
   const [createDemandOpen, setCreateDemandOpen] = useState(false);
   const [ticketPrefill, setTicketPrefill] = useState<{ title: string; clientId: string; notes: string; homeworkItemId: string } | null>(null);
 
-  // Sync drafts when agenda loads
-  const prevAgendaId = useState<string | null>(null);
-  if (agenda && agenda.id !== prevAgendaId[0]) {
-    prevAgendaId[1](agenda.id);
+  // Sync all drafts when agenda data changes
+  useEffect(() => {
+    if (!agenda) return;
     setTranscriptionDraft(agenda.transcription ?? "");
     setSummaryDraft(agenda.executive_summary ?? "");
-  }
+    setObjective(agenda.objective ?? "");
+    setContextNotes(agenda.context_notes ?? "");
+    setNextSteps(agenda.next_steps ?? "");
+  }, [agenda?.id, agenda?.transcription, agenda?.executive_summary, agenda?.objective, agenda?.context_notes, agenda?.next_steps]);
 
   const handleProcessAI = () => {
     if (!agendaId || !transcriptionDraft.trim()) return;
@@ -182,12 +187,52 @@ export function AgendaDetailSheet({ agendaId, open, onOpenChange }: AgendaDetail
               </div>
 
               {/* Objective */}
-              {agenda.objective && (
-                <div className="space-y-1.5">
-                  <Label className="text-sm font-medium">Objetivo</Label>
-                  <p className="text-sm text-muted-foreground">{agenda.objective}</p>
-                </div>
-              )}
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium">Objetivo</Label>
+                <Textarea
+                  value={objective}
+                  onChange={(e) => setObjective(e.target.value)}
+                  onBlur={() => {
+                    if (!agendaId || objective === (agenda.objective ?? "")) return;
+                    updateAgenda.mutate({ id: agendaId, objective });
+                  }}
+                  placeholder="Objetivo da reunião..."
+                  rows={2}
+                  className="text-sm"
+                />
+              </div>
+
+              {/* Context Notes */}
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium">Notas de Contexto</Label>
+                <Textarea
+                  value={contextNotes}
+                  onChange={(e) => setContextNotes(e.target.value)}
+                  onBlur={() => {
+                    if (!agendaId || contextNotes === (agenda.context_notes ?? "")) return;
+                    updateAgenda.mutate({ id: agendaId, context_notes: contextNotes });
+                  }}
+                  placeholder="Contexto relevante para a reunião..."
+                  rows={2}
+                  className="text-sm"
+                />
+              </div>
+
+              {/* Next Steps */}
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium">Próximos Passos</Label>
+                <Textarea
+                  value={nextSteps}
+                  onChange={(e) => setNextSteps(e.target.value)}
+                  onBlur={() => {
+                    if (!agendaId || nextSteps === (agenda.next_steps ?? "")) return;
+                    updateAgenda.mutate({ id: agendaId, next_steps: nextSteps });
+                  }}
+                  placeholder="Próximos passos definidos..."
+                  rows={2}
+                  className="text-sm"
+                />
+              </div>
 
               <Separator />
 

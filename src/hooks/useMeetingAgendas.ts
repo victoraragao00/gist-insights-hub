@@ -128,7 +128,7 @@ export function useUpdateAgenda() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ id, ...updates }: { id: string; executive_summary?: string; transcription?: string; duration_minutes?: number | null } & Partial<CreateAgendaPayload>) => {
+    mutationFn: async ({ id, ...updates }: { id: string; executive_summary?: string; transcription?: string; duration_minutes?: number | null; objective?: string; context_notes?: string; next_steps?: string; satisfaction_score?: number } & Partial<CreateAgendaPayload>) => {
       const { error } = await supabase
         .from("meeting_agendas")
         .update(updates)
