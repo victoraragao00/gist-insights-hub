@@ -92,7 +92,7 @@ Regras:
             },
             {
               role: "user",
-              content: `${contextBlock}TRANSCRIÇÃO:\n${transcription}`,
+              content: `${contextBlock}${transcription?.trim() ? `TRANSCRIÇÃO:\n${transcription}` : "Sem transcrição disponível."}`,
             },
           ],
           temperature: 0.3,
