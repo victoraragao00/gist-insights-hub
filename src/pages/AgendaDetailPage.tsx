@@ -401,6 +401,37 @@ const AgendaDetailPage = () => {
         placeholder="Próximos passos definidos..."
       />
 
+      {/* Transcription - Collapsible */}
+      <Card>
+        <Collapsible open={openSections.transcription} onOpenChange={() => toggleSection("transcription")}>
+          <CollapsibleTrigger className="w-full">
+            <CardContent className="p-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {openSections.transcription ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                <span className="text-sm font-semibold">Transcrição</span>
+              </div>
+              {!openSections.transcription && transcription && (
+                <span className="text-xs text-muted-foreground truncate max-w-[300px]">{getPreview(transcription)}</span>
+              )}
+            </CardContent>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <CardContent className="px-4 pb-4 pt-0">
+              <Textarea
+                value={transcription}
+                onChange={(e) => setTranscription(e.target.value)}
+                onBlur={() => {
+                  if (transcription === (agenda.transcription ?? "")) return;
+                  saveField("transcription", transcription || null);
+                }}
+                placeholder="Cole aqui a transcrição do Tactiq ou de outra ferramenta..."
+                className="min-h-[200px] text-sm"
+              />
+            </CardContent>
+          </CollapsibleContent>
+        </Collapsible>
+      </Card>
+
       {/* Homework - Collapsible */}
       <Card>
         <Collapsible open={openSections.homework} onOpenChange={() => toggleSection("homework")}>
@@ -477,58 +508,9 @@ const AgendaDetailPage = () => {
 
               {homeworkItems.length === 0 && !showAddItem && (
                 <p className="text-sm text-muted-foreground py-4 text-center">
-                  Nenhuma lição de casa. Processe a transcrição com IA ou adicione manualmente.
+                  Nenhuma lição de casa. Processe com IA ou adicione manualmente.
                 </p>
               )}
-            </CardContent>
-          </CollapsibleContent>
-        </Collapsible>
-      </Card>
-
-      {/* Transcription - Collapsible */}
-      <Card>
-        <Collapsible open={openSections.transcription} onOpenChange={() => toggleSection("transcription")}>
-          <CollapsibleTrigger className="w-full">
-            <CardContent className="p-4 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                {openSections.transcription ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                <span className="text-sm font-semibold">Transcrição</span>
-              </div>
-              {!openSections.transcription && transcription && (
-                <span className="text-xs text-muted-foreground truncate max-w-[300px]">{getPreview(transcription)}</span>
-              )}
-            </CardContent>
-          </CollapsibleTrigger>
-          <CollapsibleContent>
-            <CardContent className="px-4 pb-4 pt-0 space-y-3">
-              <Textarea
-                value={transcription}
-                onChange={(e) => setTranscription(e.target.value)}
-                onBlur={() => {
-                  if (transcription === (agenda.transcription ?? "")) return;
-                  saveField("transcription", transcription || null);
-                }}
-                placeholder="Cole aqui a transcrição do Tactiq ou de outra ferramenta..."
-                className="min-h-[200px] text-sm"
-              />
-              <div className="flex items-center gap-2">
-                <Button
-                  onClick={handleProcessAI}
-                  disabled={isProcessing || !transcription.trim()}
-                  className="gap-2"
-                >
-                  {isProcessing ? (
-                    <><Loader2 className="h-4 w-4 animate-spin" /> Processando...</>
-                  ) : (
-                    <><Sparkles className="h-4 w-4" /> {agenda.ai_processed ? "Reprocessar com IA" : "Processar com IA"}</>
-                  )}
-                </Button>
-                {agenda.ai_processed && agenda.ai_processed_at && (
-                  <span className="text-xs text-muted-foreground">
-                    Último: {new Date(agenda.ai_processed_at).toLocaleString("pt-BR")}
-                  </span>
-                )}
-              </div>
             </CardContent>
           </CollapsibleContent>
         </Collapsible>
