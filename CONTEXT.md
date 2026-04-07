@@ -697,6 +697,7 @@ gist-insights-hub/
 37. **Concluido:** Fase 9 — Botao IA movido para Resumo Executivo, reordenacao secoes (Transcricao antes de Licoes de Casa), prompt enriquecido com objective/context_notes/next_steps (2026-04-07)
 38. **Concluido:** Fase 9 — process-meeting-transcription migrado para Lovable AI Gateway (google/gemini-2.5-flash) (2026-04-07)
 39. **Concluido:** Fase 9 — Analise de IA por demanda: resolution + demand_ai_analyses + analyze-demand Edge Function (2026-04-07)
-40. **Pendente:** Lovable S6 — Edge function deliver-audit-alerts (baixa prioridade)
-41. **Pendente:** Testar notificacoes in-app com 2 usuarios simultaneos
-42. **Fase 8:** Insights IA avancados
+40. **Concluido:** Fase 9 — Fix validacao process-meeting-transcription: aceita processar sem transcricao desde que tenha objetivo/contexto/proximos passos (2026-04-07)
+41. **Pendente:** Lovable S6 — Edge function deliver-audit-alerts (baixa prioridade)
+42. **Pendente:** Testar notificacoes in-app com 2 usuarios simultaneos
+43. **Fase 8:** Insights IA avancados
