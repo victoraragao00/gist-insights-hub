@@ -12,7 +12,7 @@ serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
 
   try {
-    // JWT validation — identify the caller before using service_role
+    // JWT validation
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       return new Response(
@@ -36,35 +36,43 @@ serve(async (req) => {
       );
     }
 
-    const { agenda_id, transcription } = await req.json();
+    const { agenda_id, transcription, objective, context_notes, next_steps } = await req.json();
 
     if (!agenda_id || !transcription?.trim()) {
       return new Response(
-        JSON.stringify({
-          error: "agenda_id e transcription são obrigatórios",
-        }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
+        JSON.stringify({ error: "agenda_id e transcription são obrigatórios" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
-    if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY not configured");
+    // Build context block
+    const contextParts: string[] = [];
+    if (objective?.trim()) contextParts.push(`Objetivo: ${objective.trim()}`);
+    if (context_notes?.trim()) contextParts.push(`Notas de Contexto: ${context_notes.trim()}`);
+    if (next_steps?.trim()) contextParts.push(`Próximos Passos Previstos: ${next_steps.trim()}`);
 
-    // Call Gemini
-    const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+    const contextBlock = contextParts.length > 0
+      ? `CONTEXTO DA REUNIÃO:\n${contextParts.join("\n")}\n\n`
+      : "";
+
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
+
+    // Call Lovable AI Gateway
+    const aiRes = await fetch(
+      "https://ai.gateway.lovable.dev/v1/chat/completions",
       {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
-          contents: [
+          model: "google/gemini-2.5-flash",
+          messages: [
             {
-              parts: [
-                {
-                  text: `Você é um assistente executivo especializado em reuniões B2B de tecnologia.
+              role: "system",
+              content: `Você é um assistente executivo especializado em reuniões B2B de tecnologia.
 
 Analise a transcrição abaixo e retorne um JSON com exatamente esta estrutura (sem markdown, sem explicações):
 
@@ -79,31 +87,41 @@ Regras:
 - homework_umode: ações que a uMode precisa executar — seja específico
 - homework_client: ações que o cliente precisa executar — seja específico
 - Se não houver lições de casa para um lado, retorne array vazio []
-- Retorne APENAS o JSON, sem markdown, sem blocos de código
-
-TRANSCRIÇÃO:
-${transcription}`,
-                },
-              ],
+- Retorne APENAS o JSON, sem markdown, sem blocos de código`,
+            },
+            {
+              role: "user",
+              content: `${contextBlock}TRANSCRIÇÃO:\n${transcription}`,
             },
           ],
-          generationConfig: {
-            temperature: 0.3,
-            maxOutputTokens: 2048,
-          },
+          temperature: 0.3,
+          max_tokens: 2048,
         }),
       }
     );
 
-    if (!geminiRes.ok) {
-      const errText = await geminiRes.text();
-      console.error("Gemini API error:", geminiRes.status, errText);
-      throw new Error(`Gemini API error: ${geminiRes.status}`);
+    if (!aiRes.ok) {
+      const errText = await aiRes.text();
+      console.error("AI Gateway error:", aiRes.status, errText);
+
+      if (aiRes.status === 429) {
+        return new Response(
+          JSON.stringify({ error: "Rate limit excedido. Tente novamente em alguns segundos." }),
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      if (aiRes.status === 402) {
+        return new Response(
+          JSON.stringify({ error: "Créditos de IA esgotados. Adicione créditos no workspace." }),
+          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      throw new Error(`AI Gateway error: ${aiRes.status}`);
     }
 
-    const geminiData = await geminiRes.json();
-    const rawText =
-      geminiData.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+    const aiData = await aiRes.json();
+    const rawText = aiData.choices?.[0]?.message?.content ?? "";
 
     // Parse JSON with recovery
     let parsed: {
@@ -116,8 +134,8 @@ ${transcription}`,
       const clean = rawText.replace(/```json|```/g, "").trim();
       parsed = JSON.parse(clean);
     } catch {
-      console.error("Gemini returned invalid format, length:", rawText.length);
-      throw new Error("Gemini retornou formato inválido");
+      console.error("AI returned invalid format, length:", rawText.length);
+      throw new Error("IA retornou formato inválido");
     }
 
     // Save to DB

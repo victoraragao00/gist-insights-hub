@@ -9,13 +9,19 @@ export function useProcessTranscription() {
     mutationFn: async ({
       agendaId,
       transcription,
+      objective,
+      context_notes,
+      next_steps,
     }: {
       agendaId: string;
       transcription: string;
+      objective?: string;
+      context_notes?: string;
+      next_steps?: string;
     }) => {
       const { data, error } = await supabase.functions.invoke(
         "process-meeting-transcription",
-        { body: { agenda_id: agendaId, transcription } }
+        { body: { agenda_id: agendaId, transcription, objective, context_notes, next_steps } }
       );
       if (error) throw error;
       if (data?.error) throw new Error(data.error);

@@ -125,7 +125,13 @@ const AgendaDetailPage = () => {
       { id, transcription },
       {
         onSuccess: () => {
-          processTranscription.mutate({ agendaId: id, transcription });
+          processTranscription.mutate({
+            agendaId: id,
+            transcription,
+            objective: objective || undefined,
+            context_notes: contextNotes || undefined,
+            next_steps: nextSteps || undefined,
+          });
         },
       }
     );
