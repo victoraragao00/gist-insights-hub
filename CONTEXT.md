@@ -1,4 +1,4 @@
-# CONTEXT.md — Estado do Projeto (v27 — 2026-04-07)
+# CONTEXT.md — Estado do Projeto (v28 — 2026-04-07)
 
 > Mantido pelo Claude Code ao final de cada sessao. Lido por todos os agentes para manter contexto.
 >
