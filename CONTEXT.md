@@ -296,9 +296,9 @@ Migration com 3 tabelas + RLS + indexes + trigger + seed:
 
 ### SA-3: IA + Homework → Tickets (2026-03-26)
 
-**Edge Function:** `process-meeting-transcription` — recebe agenda_id + transcription, chama Gemini 2.0 Flash, extrai resumo executivo + licoes de casa uMode + licoes de casa cliente. Salva no banco e marca ai_processed = true.
-**Hook:** useMeetingAI — useProcessTranscription (mutation) + useConvertHomeworkToTicket (vincula homework → demand)
-**Frontend:** Secao transcricao com textarea + botao "Processar com IA" (isPending guard), resumo executivo editavel (save onBlur), lista de licoes de casa separadas por lado (uMode/Cliente), botao "→ Ticket" abre CreateDemandDialog pre-preenchido, "Ver ticket" para itens ja convertidos.
+**Edge Function:** `process-meeting-transcription` — recebe agenda_id + transcription + objective + context_notes + next_steps, chama Lovable AI Gateway (google/gemini-2.5-flash), extrai resumo executivo + licoes de casa uMode + licoes de casa cliente. Prompt enriquecido com campos de contexto da reuniao. Salva no banco e marca ai_processed = true.
+**Hook:** useMeetingAI — useProcessTranscription (mutation com campos de contexto) + useConvertHomeworkToTicket (vincula homework → demand)
+**Frontend:** Pagina dedicada `/agendas/:id` com layout de leitura rapida, markdown rendering (react-markdown@9), secoes colapsaveis (Objetivo, Contexto, Proximos Passos, Transcricao, Licoes de Casa). Botao "Processar com IA" no card Resumo Executivo — processa com base em todos os campos preenchidos (nao apenas transcricao). Inline edit com save-on-blur em todos os campos.
 **DELETE seguro:** Reprocessamento deleta apenas itens com `converted_to_demand_id IS NULL` — protege itens ja convertidos.
 
 ### SA-4: Settings (2026-03-26)
