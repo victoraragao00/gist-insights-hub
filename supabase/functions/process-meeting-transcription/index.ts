@@ -38,9 +38,10 @@ serve(async (req) => {
 
     const { agenda_id, transcription, objective, context_notes, next_steps } = await req.json();
 
-    if (!agenda_id || !transcription?.trim()) {
+    const hasContent = transcription?.trim() || objective?.trim() || context_notes?.trim() || next_steps?.trim();
+    if (!agenda_id || !hasContent) {
       return new Response(
-        JSON.stringify({ error: "agenda_id e transcription são obrigatórios" }),
+        JSON.stringify({ error: "agenda_id e pelo menos um campo de conteúdo são obrigatórios" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
