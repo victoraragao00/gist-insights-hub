@@ -314,35 +314,19 @@ const AgendaDetailPage = () => {
         <CardContent className="p-6 space-y-3">
           <div className="flex items-center justify-between">
             <Label className="text-sm font-semibold">Resumo Executivo</Label>
-            {!agenda.ai_processed && transcription.trim() && (
-              <Button
-                size="sm"
-                onClick={handleProcessAI}
-                disabled={isProcessing}
-                className="gap-1.5"
-              >
-                {isProcessing ? (
-                  <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Processando...</>
-                ) : (
-                  <><Sparkles className="h-3.5 w-3.5" /> Processar com IA</>
-                )}
-              </Button>
-            )}
-            {agenda.ai_processed && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleProcessAI}
-                disabled={isProcessing}
-                className="gap-1.5"
-              >
-                {isProcessing ? (
-                  <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Reprocessando...</>
-                ) : (
-                  <><Sparkles className="h-3.5 w-3.5" /> Reprocessar</>
-                )}
-              </Button>
-            )}
+            <Button
+              size="sm"
+              variant={agenda.ai_processed ? "outline" : "default"}
+              onClick={handleProcessAI}
+              disabled={isProcessing}
+              className="gap-1.5"
+            >
+              {isProcessing ? (
+                <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Processando...</>
+              ) : (
+                <><Sparkles className="h-3.5 w-3.5" /> {agenda.ai_processed ? "Reprocessar" : "Processar com IA"}</>
+              )}
+            </Button>
           </div>
 
           {editingField === "summary" ? (
