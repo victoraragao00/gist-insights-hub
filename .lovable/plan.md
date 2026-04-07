@@ -1,35 +1,46 @@
 
 
-## Plan: Fix markdown rendering in AgendaDetailPage
+## Plan: Fix "Processar com IA" button visibility + enrich prompt with context fields
 
 ### Problem
-1. **Runtime crash**: `react-markdown` v10 removed the `className` prop — the app crashes when trying to render any markdown
-2. **No link/image support**: Default `react-markdown` renders links and images but without styling or target behavior
-
-### Solution
-
-**File: `src/pages/AgendaDetailPage.tsx`**
-
-Replace all `<ReactMarkdown>{content}</ReactMarkdown>` wrapped in `<div className="prose ...">` with just `<ReactMarkdown>` inside the prose div. The `className` is already on the wrapper `<div>`, not on `ReactMarkdown` itself — but the v10 crash may be caused by internal prop forwarding. 
-
-Actually, looking at the code again, `className` is on the wrapper div, not on `ReactMarkdown` directly. The error suggests something else is passing className. Let me re-check — the v10 `ReactMarkdown` component throws if ANY unexpected prop is passed. The current usage looks correct (no className on ReactMarkdown itself), but v10 may have other breaking changes.
-
-**Simpler fix**: Downgrade to `react-markdown@9` which supports `className` and is stable, OR configure v10 properly.
-
-**Recommended approach — downgrade to v9:**
-- `npm install react-markdown@9` — v9 supports className and is well-tested
-- This immediately fixes the crash with zero code changes
-
-**Additionally, enhance rendering:**
-- Add custom `components` prop to `ReactMarkdown` for links (`<a>` opens in new tab with `target="_blank"`) and images (styled with `max-w-full rounded`)
+1. The button only appears when `transcription.trim()` is truthy — if transcription is empty, no button shows
+2. The Edge Function prompt only includes the transcription text, missing `objective`, `context_notes`, and `next_steps` which would improve AI output quality
 
 ### Changes
 
+#### 1. `src/pages/AgendaDetailPage.tsx`
+- Move the "Processar com IA" button to the Transcription collapsible section (more intuitive — user writes/pastes transcription there, then clicks process)
+- Also keep a secondary button in the Executive Summary card for reprocessing
+- Update `handleProcessAI` to pass `objective`, `contextNotes`, and `nextSteps` alongside `transcription`
+- Relax the condition: button visible when transcription has content (keep this check since AI needs transcription to process)
+
+#### 2. `src/hooks/useMeetingAI.ts`
+- Expand the mutation input to accept optional `objective`, `context_notes`, `next_steps` fields
+- Pass them in the body to the Edge Function
+
+#### 3. `supabase/functions/process-meeting-transcription/index.ts`
+- Accept optional `objective`, `context_notes`, `next_steps` from request body
+- Append them as context sections in the Gemini prompt before the transcription:
+```
+CONTEXTO DA REUNIÃO:
+Objetivo: {objective}
+Notas de Contexto: {context_notes}
+Próximos Passos Previstos: {next_steps}
+
+TRANSCRIÇÃO:
+{transcription}
+```
+- Only include non-empty fields in the context block
+- Use Lovable AI Gateway instead of direct Gemini API (per project standards, memory `tech/ai/gemini-implementation-details`)
+
+### Files changed
+
 | Action | File |
 |--------|------|
-| Install | `react-markdown@9` (downgrade from v10) |
-| Edit | `src/pages/AgendaDetailPage.tsx` — add `components` prop for links/images rendering |
+| Edit | `src/pages/AgendaDetailPage.tsx` (button placement + pass context fields) |
+| Edit | `src/hooks/useMeetingAI.ts` (accept context fields in mutation) |
+| Edit | `supabase/functions/process-meeting-transcription/index.ts` (enrich prompt + use AI Gateway) |
 
 ### No changes to
-- Hooks, migrations, RLS, edge functions, `src/integrations/supabase/*`, `.env`
+- Migrations, RLS, `src/integrations/supabase/*`, `.env`
 
