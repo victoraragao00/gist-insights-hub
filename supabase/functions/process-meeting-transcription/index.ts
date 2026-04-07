@@ -148,7 +148,7 @@ Regras:
       .from("meeting_agendas")
       .update({
         executive_summary: parsed.executive_summary,
-        transcription,
+        ...(transcription?.trim() ? { transcription } : {}),
         ai_processed: true,
         ai_processed_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
