@@ -27,7 +27,7 @@
 | 7.4 | Gestao de Usuarios e Permissionamento | Concluido — Sprint S4 (Issue #70): user_profiles, role global (admin/analyst/viewer), user_accessible_client_ids atualizada, aba Usuarios em Settings |
 | 7.5 | Unificacao Assignees | Concluido — Issue #71: assignee_id → user_profiles, aba Responsaveis removida, dropdowns listam usuarios reais |
 | 7.6 | Conversas IA + Docs/Rules + Contadores + Acesso | Concluido — Resumo IA, abas Documentos/Regras, fix contadores, KPIs clicaveis, onboarding restrito, FK fixes |
-| 9 | Modulo de Pautas de Reuniao | Concluido — SA-1 (tabelas) + SA-2 (CRUD) + SA-3 (IA + homework→tickets) + SA-4 (settings) |
+| 9 | Modulo de Pautas de Reuniao | Concluido — SA-1 (tabelas) + SA-2 (CRUD) + SA-3 (IA + homework→tickets) + SA-4 (settings) + pagina dedicada /agendas/:id + markdown + prompt enriquecido |
 | 8 | Insights IA avancados | Placeholder |
 
 ---
