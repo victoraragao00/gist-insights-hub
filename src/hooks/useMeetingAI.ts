@@ -27,10 +27,6 @@ export function useProcessTranscription() {
       if (data?.error) throw new Error(data.error);
       return data;
     },
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      return data;
-    },
     onSuccess: (_, { agendaId }) => {
       queryClient.invalidateQueries({ queryKey: ["meeting_agenda"] });
       queryClient.invalidateQueries({ queryKey: ["meeting_agendas"] });
