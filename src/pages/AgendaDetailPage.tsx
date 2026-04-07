@@ -120,7 +120,7 @@ const AgendaDetailPage = () => {
   };
 
   const handleProcessAI = () => {
-    if (!id || !transcription.trim()) return;
+    if (!id) return;
     updateAgenda.mutate(
       { id, transcription },
       {
