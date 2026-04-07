@@ -38,9 +38,10 @@ serve(async (req) => {
 
     const { agenda_id, transcription, objective, context_notes, next_steps } = await req.json();
 
-    if (!agenda_id || !transcription?.trim()) {
+    const hasContent = transcription?.trim() || objective?.trim() || context_notes?.trim() || next_steps?.trim();
+    if (!agenda_id || !hasContent) {
       return new Response(
-        JSON.stringify({ error: "agenda_id e transcription são obrigatórios" }),
+        JSON.stringify({ error: "agenda_id e pelo menos um campo de conteúdo são obrigatórios" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -91,7 +92,7 @@ Regras:
             },
             {
               role: "user",
-              content: `${contextBlock}TRANSCRIÇÃO:\n${transcription}`,
+              content: `${contextBlock}${transcription?.trim() ? `TRANSCRIÇÃO:\n${transcription}` : "Sem transcrição disponível."}`,
             },
           ],
           temperature: 0.3,
@@ -147,7 +148,7 @@ Regras:
       .from("meeting_agendas")
       .update({
         executive_summary: parsed.executive_summary,
-        transcription,
+        ...(transcription?.trim() ? { transcription } : {}),
         ai_processed: true,
         ai_processed_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
