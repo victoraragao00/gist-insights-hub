@@ -237,6 +237,9 @@ const ClientDetailPage = () => {
   const [createDemandOpen, setCreateDemandOpen] = useState(false);
   const [selectedDemandId, setSelectedDemandId] = useState<string | null>(null);
   const [demandSheetOpen, setDemandSheetOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("overview");
+  const [selectedTone, setSelectedTone] = useState("todos");
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   const thirtyDaysAgo = useMemo(
     () => new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(), []
