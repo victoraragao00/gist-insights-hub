@@ -710,7 +710,14 @@ const ClientDetailPage = () => {
                   config={TONE_CHART_COLORS}
                   className="h-48 w-full"
                 >
-                  <BarChart data={toneTrendChartData} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
+                  <BarChart data={toneTrendChartData} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}
+                    onClick={(state) => {
+                      if (state?.activePayload?.[0]?.payload?.rawDay) {
+                        setSelectedDate((prev) => prev === state.activePayload![0].payload.rawDay ? null : state.activePayload![0].payload.rawDay);
+                      }
+                    }}
+                    style={{ cursor: "pointer" }}
+                  >
                     <XAxis dataKey="day" tick={{ fontSize: 10 }} />
                     <YAxis tick={{ fontSize: 10 }} />
                     <Tooltip />
