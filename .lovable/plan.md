@@ -1,37 +1,20 @@
 
 
-## Plan: Agrupar tabela de ocorrências por conversa
+## Plan: Mostrar nome do contato cliente na coluna "Conversa"
 
 ### Alterações em `src/pages/ClientDetailPage.tsx`
 
-**1. Substituir `nonOkInteractions` por `nonOkConversations`**
+**1. Adicionar `contact_name` ao tipo do grupo (linha 460-466)**
 
-Replace the `nonOkInteractions` useMemo (lines 455-461) with a `nonOkConversations` useMemo that groups `nonOkData` by `conversation_id`, tracking worst tone, count, last date, and unique themes. Apply `selectedTone` and `selectedDate` filters, then sort by severity descending + recency.
+Adicionar `contact_name: string | null` ao tipo do objeto de agrupamento.
 
-**2. Replace table markup (lines 816-884)**
+**2. Capturar `contact_name` no loop (linhas 468-489)**
 
-Replace the per-message table with a per-conversation table:
-- Columns: Última ocorrência | Conversa | Pior tom | Msgs não-ok | Temas | (chevron)
-- Each row keyed by `conversation_id`
-- Date shown via `formatDistanceToNow` with `ptBR` locale
-- Conversation ID truncated to 12 chars + "…"
-- Worst tone badge with tooltip using `TONE_RUBRIC`
-- Themes as outline badges (max 2 shown + "+N" overflow)
-- `ChevronRight` icon in last column
-- Row click navigates to Interactions tab
-- Empty state message preserved
+Ao criar o grupo, inicializar `contact_name` com `sender_raw` se `sender_side === "client"`, senão `null`. Nas iterações seguintes, preencher se ainda `null`.
 
-**3. Imports**
+**3. Substituir ID truncado pelo nome (linha 887-889)**
 
-`ChevronRight` already imported (line 27). `formatDistanceToNow` needs to be imported from `date-fns`, and `ptBR` from `date-fns/locale`.
-
-**4. Add `formatDistanceToNow` import**
-
-Check if already imported; if not, add:
-```typescript
-import { formatDistanceToNow } from "date-fns";
-import { ptBR } from "date-fns/locale";
-```
+Trocar `conv.conversation_id.slice(0, 12) + "…"` por `conv.contact_name ?? conv.conversation_id.slice(0, 12) + "…"`, remover `font-mono`.
 
 ### Files changed
 
