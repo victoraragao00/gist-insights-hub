@@ -889,8 +889,8 @@ const ClientDetailPage = () => {
                             <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                               {formatDistanceToNow(new Date(conv.last_occurred_at), { addSuffix: true, locale: ptBR })}
                             </TableCell>
-                            <TableCell className="text-sm font-mono text-muted-foreground">
-                              {conv.conversation_id === "sem-conversa" ? "—" : conv.conversation_id.slice(0, 12) + "…"}
+                            <TableCell className="text-sm text-foreground">
+                              {conv.contact_name ?? (conv.conversation_id === "sem-conversa" ? "—" : conv.conversation_id.slice(0, 12) + "…")}
                             </TableCell>
                             <TableCell>
                               <ShadTooltip>
