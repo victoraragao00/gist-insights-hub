@@ -1,60 +1,43 @@
 
 
-## Plan: Badge de lado na tabela + Regras anti-vies no Mega Agente
+## Plan: Agrupar tabela de ocorrências por conversa
 
-### 1. `src/pages/ClientDetailPage.tsx` — Badge sender_side na coluna Remetente
+### Alterações em `src/pages/ClientDetailPage.tsx`
 
-Na linha 844, onde hoje temos:
+**1. Substituir `nonOkInteractions` por `nonOkConversations`**
 
-```tsx
-<TableCell className="text-sm">{i.sender_raw ?? "—"}</TableCell>
-```
+Replace the `nonOkInteractions` useMemo (lines 455-461) with a `nonOkConversations` useMemo that groups `nonOkData` by `conversation_id`, tracking worst tone, count, last date, and unique themes. Apply `selectedTone` and `selectedDate` filters, then sort by severity descending + recency.
 
-Substituir por:
+**2. Replace table markup (lines 816-884)**
 
-```tsx
-<TableCell className="text-sm">
-  <div className="flex items-center flex-wrap gap-1">
-    <span>{i.sender_raw ?? "—"}</span>
-    {i.sender_side === "umode" ? (
-      <Badge className="ml-1.5 bg-blue-50 text-blue-600 border-blue-200 text-xs font-normal">
-        uMode
-      </Badge>
-    ) : (
-      <Badge className="ml-1.5 bg-orange-50 text-orange-600 border-orange-200 text-xs font-normal">
-        Cliente
-      </Badge>
-    )}
-  </div>
-</TableCell>
-```
+Replace the per-message table with a per-conversation table:
+- Columns: Última ocorrência | Conversa | Pior tom | Msgs não-ok | Temas | (chevron)
+- Each row keyed by `conversation_id`
+- Date shown via `formatDistanceToNow` with `ptBR` locale
+- Conversation ID truncated to 12 chars + "…"
+- Worst tone badge with tooltip using `TONE_RUBRIC`
+- Themes as outline badges (max 2 shown + "+N" overflow)
+- `ChevronRight` icon in last column
+- Row click navigates to Interactions tab
+- Empty state message preserved
 
-`sender_side` already exists in the `Interaction` interface and the `nonOkData` query select.
+**3. Imports**
 
-### 2. `docs/mega-agente/MEGA_AGENTE_v2.md` — Adicionar Regras 10-13
+`ChevronRight` already imported (line 27). `formatDistanceToNow` needs to be imported from `date-fns`, and `ptBR` from `date-fns/locale`.
 
-Apos a Regra 9 (linha 189), antes de `---`, adicionar 4 novas regras anti-vies para mensagens da uMode:
+**4. Add `formatDistanceToNow` import**
 
-```markdown
-**Regra 10 — Mensagens curtas e neutras da uMode = ok**
-Mensagens curtas da uMode como "ok", "certo", "entendido", "sim", "não", "obrigado", "até logo" NÃO devem ser classificadas como Atenção, Alerta ou Crítico. Tom = "ok" salvo conteúdo explicitamente problemático.
-
-**Regra 11 — Mensagens de sistema = ok**
-Mensagens de sistema ("This message was deleted", "This message was edited") NÃO devem receber tom negativo. Classificar sempre como "ok".
-
-**Regra 12 — Encaminhamento operacional da uMode = ok**
-Mensagens da uMode que expressam encaminhamento ("vou verificar", "passando para o time", "te aviso em breve") são neutras — classificar como "ok" mesmo que o contexto da conversa seja de Atenção.
-
-**Regra 13 — Tom reflete sentimento do CLIENTE**
-O tom deve refletir o sentimento do CLIENTE, não o conteúdo isolado de cada mensagem da uMode. Ao classificar uma mensagem da uMode, perguntar: "Isso indica que o cliente está insatisfeito?" Se não, classificar como "ok".
+Check if already imported; if not, add:
+```typescript
+import { formatDistanceToNow } from "date-fns";
+import { ptBR } from "date-fns/locale";
 ```
 
 ### Files changed
 
 | Action | File |
 |--------|------|
-| Edit | `src/pages/ClientDetailPage.tsx` (badge sender_side na coluna Remetente) |
-| Edit | `docs/mega-agente/MEGA_AGENTE_v2.md` (regras 10-13 anti-vies uMode) |
+| Edit | `src/pages/ClientDetailPage.tsx` |
 
 ### No changes to
 - Queries, hooks, migrations, RLS, edge functions, `src/integrations/supabase/*`, `.env`
