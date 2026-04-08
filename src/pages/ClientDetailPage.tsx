@@ -114,6 +114,22 @@ interface Interaction {
   content: string | null;
   channel: string;
   is_out_of_scope: boolean | null;
+  theme: string | null;
+  conversation_id: string | null;
+}
+
+function getToneTooltip(tone: string, theme: string | null): string {
+  const themeText = theme ? ` no tema "${theme}"` : "";
+  switch (tone) {
+    case "critico":
+      return `Mensagem classificada como Crítico${themeText}. Indica insatisfação severa, urgência ou risco de perda do cliente.`;
+    case "alerta":
+      return `Mensagem classificada como Alerta${themeText}. Indica frustração ou problema que precisa de atenção rápida.`;
+    case "atencao":
+      return `Mensagem classificada como Atenção${themeText}. Indica um ponto de fricção que pode escalar se não tratado.`;
+    default:
+      return `Tom: ${tone}${themeText}`;
+  }
 }
 
 interface AuditRule {
