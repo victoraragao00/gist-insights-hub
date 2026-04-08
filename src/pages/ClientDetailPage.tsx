@@ -30,6 +30,8 @@ import { ChevronRight, MoreHorizontal, Loader2, AlertCircle, Plus, Copy, Refresh
 import { Tooltip as ShadTooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { InteractionsFeed } from "@/components/InteractionsFeed";
+import ClientConversationsTab from "@/components/clients/ClientConversationsTab";
+import { useClientConversationsStatus } from "@/hooks/useClientConversationsStatus";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
