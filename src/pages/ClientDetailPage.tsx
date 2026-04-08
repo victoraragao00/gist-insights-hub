@@ -1169,15 +1169,6 @@ const ClientDetailPage = () => {
           <ClientRfisTab clientId={client.id} clientName={client.name} />
         </TabsContent>
 
-        {/* ── TAB: Interações ── */}
-        <TabsContent value="interactions" className="min-h-[500px]">
-          <InteractionsFeed clientId={client.id} />
-        </TabsContent>
-
-        {/* ── TAB: Conversas ── */}
-        <TabsContent value="conversations" className="min-h-[500px]">
-          <ClientConversationsTab clientId={client.id} />
-        </TabsContent>
 
         {/* ── TAB 2: Participantes ── */}
         <TabsContent value="participants" className="space-y-6">
