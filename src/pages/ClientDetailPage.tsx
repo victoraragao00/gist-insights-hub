@@ -454,12 +454,53 @@ const ClientDetailPage = () => {
     }));
   }, [interactions]);
 
-  // Non-ok interactions (last 5)
-  const nonOkInteractions = useMemo(() => {
-    let filtered = nonOkData;
-    if (selectedTone !== "todos") filtered = filtered.filter((i) => i.tone === selectedTone);
-    if (selectedDate) filtered = filtered.filter((i) => i.occurred_at.startsWith(selectedDate));
-    return filtered.slice(0, 20);
+  // Non-ok conversations grouped by conversation_id
+  const nonOkConversations = useMemo(() => {
+    const TONE_SEVERITY: Record<string, number> = { critico: 3, alerta: 2, atencao: 1, ok: 0 };
+    const groups: Record<string, {
+      conversation_id: string;
+      worst_tone: string;
+      non_ok_count: number;
+      last_occurred_at: string;
+      themes: string[];
+    }> = {};
+
+    for (const i of nonOkData) {
+      const key = i.conversation_id ?? "sem-conversa";
+      if (!groups[key]) {
+        groups[key] = {
+          conversation_id: key,
+          worst_tone: i.tone ?? "ok",
+          non_ok_count: 0,
+          last_occurred_at: i.occurred_at,
+          themes: [],
+        };
+      }
+      const g = groups[key];
+      g.non_ok_count += 1;
+      if ((TONE_SEVERITY[i.tone ?? "ok"] ?? 0) > (TONE_SEVERITY[g.worst_tone] ?? 0)) {
+        g.worst_tone = i.tone ?? "ok";
+      }
+      if (i.occurred_at > g.last_occurred_at) {
+        g.last_occurred_at = i.occurred_at;
+      }
+      if (i.theme && !g.themes.includes(i.theme)) {
+        g.themes.push(i.theme);
+      }
+    }
+
+    let result = Object.values(groups);
+    if (selectedTone !== "todos") {
+      result = result.filter((g) => g.worst_tone === selectedTone);
+    }
+    if (selectedDate) {
+      result = result.filter((g) => g.last_occurred_at.startsWith(selectedDate));
+    }
+    return result.sort((a, b) => {
+      const diff = (TONE_SEVERITY[b.worst_tone] ?? 0) - (TONE_SEVERITY[a.worst_tone] ?? 0);
+      if (diff !== 0) return diff;
+      return b.last_occurred_at.localeCompare(a.last_occurred_at);
+    });
   }, [nonOkData, selectedTone, selectedDate]);
 
   // Initialize edit state when client and clientScore load
