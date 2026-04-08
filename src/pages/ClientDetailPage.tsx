@@ -719,6 +719,14 @@ const ClientDetailPage = () => {
           </TabsTrigger>
           <TabsTrigger value="rfis">RFIs</TabsTrigger>
           <TabsTrigger value="interactions">Interações</TabsTrigger>
+          <TabsTrigger value="conversations" className="relative">
+            Conversas
+            {conversationsNoReplyCount > 0 && (
+              <span className="ml-1.5 inline-flex items-center justify-center rounded-full bg-orange-500 text-white text-[10px] font-bold min-w-[18px] h-[18px] px-1">
+                {conversationsNoReplyCount}
+              </span>
+            )}
+          </TabsTrigger>
           <TabsTrigger value="participants">Participantes ({participantsTotalCount})</TabsTrigger>
           <TabsTrigger value="channels">Canais ({bindings.length})</TabsTrigger>
           <TabsTrigger value="documents">Documentos</TabsTrigger>
