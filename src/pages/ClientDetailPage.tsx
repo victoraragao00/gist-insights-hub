@@ -24,7 +24,8 @@ import {
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ChevronRight, MoreHorizontal, Loader2, AlertCircle, Plus, Copy, RefreshCw, Link2 } from "lucide-react";
+import { ChevronRight, MoreHorizontal, Loader2, AlertCircle, Plus, Copy, RefreshCw, Link2, X } from "lucide-react";
+import { Tooltip as ShadTooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { InteractionsFeed } from "@/components/InteractionsFeed";
 import { supabase } from "@/integrations/supabase/client";
