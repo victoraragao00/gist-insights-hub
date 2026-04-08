@@ -437,10 +437,12 @@ const ClientDetailPage = () => {
   }, [interactions]);
 
   // Non-ok interactions (last 5)
-  const nonOkInteractions = useMemo(
-    () => interactions.filter((i) => i.tone && i.tone !== "ok").slice(0, 5),
-    [interactions]
-  );
+  const nonOkInteractions = useMemo(() => {
+    let filtered = interactions.filter((i) => i.tone && i.tone !== "ok");
+    if (selectedTone !== "todos") filtered = filtered.filter((i) => i.tone === selectedTone);
+    if (selectedDate) filtered = filtered.filter((i) => i.occurred_at.startsWith(selectedDate));
+    return filtered.slice(0, 20);
+  }, [interactions, selectedTone, selectedDate]);
 
   // Initialize edit state when client and clientScore load
   useEffect(() => {
