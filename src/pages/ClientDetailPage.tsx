@@ -463,6 +463,7 @@ const ClientDetailPage = () => {
       non_ok_count: number;
       last_occurred_at: string;
       themes: string[];
+      contact_name: string | null;
     }> = {};
 
     for (const i of nonOkData) {
@@ -474,10 +475,14 @@ const ClientDetailPage = () => {
           non_ok_count: 0,
           last_occurred_at: i.occurred_at,
           themes: [],
+          contact_name: i.sender_side === "client" ? (i.sender_raw ?? null) : null,
         };
       }
       const g = groups[key];
       g.non_ok_count += 1;
+      if (!g.contact_name && i.sender_side === "client" && i.sender_raw) {
+        g.contact_name = i.sender_raw;
+      }
       if ((TONE_SEVERITY[i.tone ?? "ok"] ?? 0) > (TONE_SEVERITY[g.worst_tone] ?? 0)) {
         g.worst_tone = i.tone ?? "ok";
       }
@@ -884,8 +889,8 @@ const ClientDetailPage = () => {
                             <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                               {formatDistanceToNow(new Date(conv.last_occurred_at), { addSuffix: true, locale: ptBR })}
                             </TableCell>
-                            <TableCell className="text-sm font-mono text-muted-foreground">
-                              {conv.conversation_id === "sem-conversa" ? "—" : conv.conversation_id.slice(0, 12) + "…"}
+                            <TableCell className="text-sm text-foreground">
+                              {conv.contact_name ?? (conv.conversation_id === "sem-conversa" ? "—" : conv.conversation_id.slice(0, 12) + "…")}
                             </TableCell>
                             <TableCell>
                               <ShadTooltip>
