@@ -1,4 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
+import { formatDistanceToNow } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -452,12 +454,53 @@ const ClientDetailPage = () => {
     }));
   }, [interactions]);
 
-  // Non-ok interactions (last 5)
-  const nonOkInteractions = useMemo(() => {
-    let filtered = nonOkData;
-    if (selectedTone !== "todos") filtered = filtered.filter((i) => i.tone === selectedTone);
-    if (selectedDate) filtered = filtered.filter((i) => i.occurred_at.startsWith(selectedDate));
-    return filtered.slice(0, 20);
+  // Non-ok conversations grouped by conversation_id
+  const nonOkConversations = useMemo(() => {
+    const TONE_SEVERITY: Record<string, number> = { critico: 3, alerta: 2, atencao: 1, ok: 0 };
+    const groups: Record<string, {
+      conversation_id: string;
+      worst_tone: string;
+      non_ok_count: number;
+      last_occurred_at: string;
+      themes: string[];
+    }> = {};
+
+    for (const i of nonOkData) {
+      const key = i.conversation_id ?? "sem-conversa";
+      if (!groups[key]) {
+        groups[key] = {
+          conversation_id: key,
+          worst_tone: i.tone ?? "ok",
+          non_ok_count: 0,
+          last_occurred_at: i.occurred_at,
+          themes: [],
+        };
+      }
+      const g = groups[key];
+      g.non_ok_count += 1;
+      if ((TONE_SEVERITY[i.tone ?? "ok"] ?? 0) > (TONE_SEVERITY[g.worst_tone] ?? 0)) {
+        g.worst_tone = i.tone ?? "ok";
+      }
+      if (i.occurred_at > g.last_occurred_at) {
+        g.last_occurred_at = i.occurred_at;
+      }
+      if (i.theme && !g.themes.includes(i.theme)) {
+        g.themes.push(i.theme);
+      }
+    }
+
+    let result = Object.values(groups);
+    if (selectedTone !== "todos") {
+      result = result.filter((g) => g.worst_tone === selectedTone);
+    }
+    if (selectedDate) {
+      result = result.filter((g) => g.last_occurred_at.startsWith(selectedDate));
+    }
+    return result.sort((a, b) => {
+      const diff = (TONE_SEVERITY[b.worst_tone] ?? 0) - (TONE_SEVERITY[a.worst_tone] ?? 0);
+      if (diff !== 0) return diff;
+      return b.last_occurred_at.localeCompare(a.last_occurred_at);
+    });
   }, [nonOkData, selectedTone, selectedDate]);
 
   // Initialize edit state when client and clientScore load
@@ -814,49 +857,35 @@ const ClientDetailPage = () => {
               )}
             </CardHeader>
             <CardContent>
-              {nonOkInteractions.length === 0 ? (
+              {nonOkConversations.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Nenhuma ocorrência {selectedTone !== "todos" || selectedDate ? "com esse filtro" : "recente"}.</p>
               ) : (
                 <TooltipProvider>
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Data</TableHead>
-                        <TableHead>Remetente</TableHead>
-                        <TableHead>Mensagem</TableHead>
-                        <TableHead>Tom</TableHead>
-                        <TableHead>Tema</TableHead>
-                        <TableHead>Canal</TableHead>
+                        <TableHead>Última ocorrência</TableHead>
+                        <TableHead>Conversa</TableHead>
+                        <TableHead>Pior tom</TableHead>
+                        <TableHead>Msgs não-ok</TableHead>
+                        <TableHead>Temas</TableHead>
+                        <TableHead></TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {nonOkInteractions.map((i) => {
-                        const tCfg = TONE_CONFIG[i.tone ?? "ok"] ?? TONE_CONFIG.ok;
+                      {nonOkConversations.map((conv) => {
+                        const tCfg = TONE_CONFIG[conv.worst_tone] ?? TONE_CONFIG.ok;
                         return (
                           <TableRow
-                            key={i.id}
+                            key={conv.conversation_id}
                             className="cursor-pointer hover:bg-muted/50 transition-colors"
                             onClick={() => setActiveTab("interactions")}
                           >
-                            <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
-                              {formatDate(i.occurred_at)}
+                            <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                              {formatDistanceToNow(new Date(conv.last_occurred_at), { addSuffix: true, locale: ptBR })}
                             </TableCell>
-                            <TableCell className="text-sm">
-                              <div className="flex items-center flex-wrap gap-1">
-                                <span>{i.sender_raw ?? "—"}</span>
-                                {i.sender_side === "umode" ? (
-                                  <Badge className="ml-1.5 bg-blue-50 text-blue-600 border-blue-200 text-xs font-normal">
-                                    uMode
-                                  </Badge>
-                                ) : (
-                                  <Badge className="ml-1.5 bg-orange-50 text-orange-600 border-orange-200 text-xs font-normal">
-                                    Cliente
-                                  </Badge>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-sm max-w-xs">
-                              <span className="line-clamp-2" dangerouslySetInnerHTML={{ __html: i.content ?? "—" }} />
+                            <TableCell className="text-sm font-mono text-muted-foreground">
+                              {conv.conversation_id === "sem-conversa" ? "—" : conv.conversation_id.slice(0, 12) + "…"}
                             </TableCell>
                             <TableCell>
                               <ShadTooltip>
@@ -864,18 +893,24 @@ const ClientDetailPage = () => {
                                   <Badge variant="outline" className={`text-xs border-0 cursor-help ${tCfg.className}`}>{tCfg.label}</Badge>
                                 </TooltipTrigger>
                                 <TooltipContent side="top" className="max-w-xs text-xs">
-                                  {TONE_RUBRIC[i.tone ?? "ok"] ?? i.tone}
+                                  {TONE_RUBRIC[conv.worst_tone] ?? conv.worst_tone}
                                 </TooltipContent>
                               </ShadTooltip>
                             </TableCell>
+                            <TableCell className="text-sm font-medium">{conv.non_ok_count}</TableCell>
                             <TableCell>
-                              {i.theme ? (
-                                <Badge variant="secondary" className="text-xs bg-muted text-muted-foreground">{i.theme}</Badge>
-                              ) : (
-                                <span className="text-muted-foreground">—</span>
-                              )}
+                              <div className="flex flex-wrap gap-1">
+                                {conv.themes.slice(0, 2).map((t) => (
+                                  <Badge key={t} variant="outline" className="text-xs bg-muted text-muted-foreground">{t}</Badge>
+                                ))}
+                                {conv.themes.length > 2 && (
+                                  <Badge variant="outline" className="text-xs bg-muted text-muted-foreground">+{conv.themes.length - 2}</Badge>
+                                )}
+                              </div>
                             </TableCell>
-                            <TableCell className="text-base">{CHANNEL_ICONS[i.channel] ?? "📡"}</TableCell>
+                            <TableCell>
+                              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                            </TableCell>
                           </TableRow>
                         );
                       })}
