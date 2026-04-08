@@ -24,7 +24,8 @@ import {
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ChevronRight, MoreHorizontal, Loader2, AlertCircle, Plus, Copy, RefreshCw, Link2 } from "lucide-react";
+import { ChevronRight, MoreHorizontal, Loader2, AlertCircle, Plus, Copy, RefreshCw, Link2, X } from "lucide-react";
+import { Tooltip as ShadTooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { InteractionsFeed } from "@/components/InteractionsFeed";
 import { supabase } from "@/integrations/supabase/client";
@@ -113,6 +114,22 @@ interface Interaction {
   content: string | null;
   channel: string;
   is_out_of_scope: boolean | null;
+  theme: string | null;
+  conversation_id: string | null;
+}
+
+function getToneTooltip(tone: string, theme: string | null): string {
+  const themeText = theme ? ` no tema "${theme}"` : "";
+  switch (tone) {
+    case "critico":
+      return `Mensagem classificada como Crítico${themeText}. Indica insatisfação severa, urgência ou risco de perda do cliente.`;
+    case "alerta":
+      return `Mensagem classificada como Alerta${themeText}. Indica frustração ou problema que precisa de atenção rápida.`;
+    case "atencao":
+      return `Mensagem classificada como Atenção${themeText}. Indica um ponto de fricção que pode escalar se não tratado.`;
+    default:
+      return `Tom: ${tone}${themeText}`;
+  }
 }
 
 interface AuditRule {
@@ -220,6 +237,9 @@ const ClientDetailPage = () => {
   const [createDemandOpen, setCreateDemandOpen] = useState(false);
   const [selectedDemandId, setSelectedDemandId] = useState<string | null>(null);
   const [demandSheetOpen, setDemandSheetOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("overview");
+  const [selectedTone, setSelectedTone] = useState("todos");
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   const thirtyDaysAgo = useMemo(
     () => new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(), []
@@ -291,7 +311,7 @@ const ClientDetailPage = () => {
       const to = (pageInteractions + 1) * PAGE_SIZE - 1;
       const { data, error, count } = await supabase
         .from("interactions")
-        .select("id, tone, occurred_at, sender_raw, sender_side, content, channel, is_out_of_scope", { count: "exact" })
+        .select("id, tone, occurred_at, sender_raw, sender_side, content, channel, is_out_of_scope, theme, conversation_id", { count: "exact" })
         .eq("client_id", clientId!)
         .gte("occurred_at", thirtyDaysAgo)
         .order("occurred_at", { ascending: false })
@@ -349,6 +369,7 @@ const ClientDetailPage = () => {
     () =>
       toneTrend?.map((d) => ({
         ...d,
+        rawDay: d.day,
         day: new Date(d.day + "T00:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }),
       })) ?? [],
     [toneTrend]
@@ -416,10 +437,12 @@ const ClientDetailPage = () => {
   }, [interactions]);
 
   // Non-ok interactions (last 5)
-  const nonOkInteractions = useMemo(
-    () => interactions.filter((i) => i.tone && i.tone !== "ok").slice(0, 5),
-    [interactions]
-  );
+  const nonOkInteractions = useMemo(() => {
+    let filtered = interactions.filter((i) => i.tone && i.tone !== "ok");
+    if (selectedTone !== "todos") filtered = filtered.filter((i) => i.tone === selectedTone);
+    if (selectedDate) filtered = filtered.filter((i) => i.occurred_at.startsWith(selectedDate));
+    return filtered.slice(0, 20);
+  }, [interactions, selectedTone, selectedDate]);
 
   // Initialize edit state when client and clientScore load
   useEffect(() => {
@@ -611,7 +634,7 @@ const ClientDetailPage = () => {
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="overview" className="space-y-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="bg-muted/50 flex-wrap h-auto">
           <TabsTrigger value="overview">Visão Geral</TabsTrigger>
           <TabsTrigger value="demands">Demandas ({clientDemands.length})</TabsTrigger>
@@ -687,7 +710,14 @@ const ClientDetailPage = () => {
                   config={TONE_CHART_COLORS}
                   className="h-48 w-full"
                 >
-                  <BarChart data={toneTrendChartData} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
+                  <BarChart data={toneTrendChartData} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}
+                    onClick={(state) => {
+                      if (state?.activePayload?.[0]?.payload?.rawDay) {
+                        setSelectedDate((prev) => prev === state.activePayload![0].payload.rawDay ? null : state.activePayload![0].payload.rawDay);
+                      }
+                    }}
+                    style={{ cursor: "pointer" }}
+                  >
                     <XAxis dataKey="day" tick={{ fontSize: 10 }} />
                     <YAxis tick={{ fontSize: 10 }} />
                     <Tooltip />
@@ -730,41 +760,90 @@ const ClientDetailPage = () => {
           {/* Recent non-ok */}
           <Card className="border border-border rounded-xl">
             <CardHeader className="pb-3">
-              <CardTitle className="text-base font-semibold">Últimas ocorrências de tom não-ok</CardTitle>
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <CardTitle className="text-base font-semibold">Últimas ocorrências de tom não-ok</CardTitle>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">Filtrar por tom:</span>
+                  {["todos", "atencao", "alerta", "critico"].map((t) => (
+                    <Button
+                      key={t}
+                      variant={selectedTone === t ? "default" : "outline"}
+                      size="sm"
+                      className="h-7 text-xs capitalize"
+                      onClick={() => setSelectedTone(t)}
+                    >
+                      {t === "todos" ? "Todos" : t.charAt(0).toUpperCase() + t.slice(1)}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+              {selectedDate && (
+                <div className="flex items-center gap-2 mt-2">
+                  <Badge variant="secondary" className="text-xs gap-1">
+                    Filtrando: {new Date(selectedDate + "T00:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" })}
+                    <button onClick={() => setSelectedDate(null)} className="ml-1 hover:text-foreground">
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                </div>
+              )}
             </CardHeader>
             <CardContent>
               {nonOkInteractions.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Nenhuma ocorrência recente.</p>
+                <p className="text-sm text-muted-foreground">Nenhuma ocorrência {selectedTone !== "todos" || selectedDate ? "com esse filtro" : "recente"}.</p>
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Data</TableHead>
-                      <TableHead>Remetente</TableHead>
-                      <TableHead>Mensagem</TableHead>
-                      <TableHead>Tom</TableHead>
-                      <TableHead>Canal</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {nonOkInteractions.map((i) => {
-                      const tCfg = TONE_CONFIG[i.tone ?? "ok"] ?? TONE_CONFIG.ok;
-                      return (
-                        <TableRow key={i.id} className="cursor-default">
-                          <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
-                            {formatDate(i.occurred_at)}
-                          </TableCell>
-                          <TableCell className="text-sm">{i.sender_raw ?? "—"}</TableCell>
-                          <TableCell className="text-sm max-w-xs truncate">{i.content?.slice(0, 150) ?? "—"}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className={`text-xs border-0 ${tCfg.className}`}>{tCfg.label}</Badge>
-                          </TableCell>
-                          <TableCell className="text-base">{CHANNEL_ICONS[i.channel] ?? "📡"}</TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
+                <TooltipProvider>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Data</TableHead>
+                        <TableHead>Remetente</TableHead>
+                        <TableHead>Mensagem</TableHead>
+                        <TableHead>Tom</TableHead>
+                        <TableHead>Tema</TableHead>
+                        <TableHead>Canal</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {nonOkInteractions.map((i) => {
+                        const tCfg = TONE_CONFIG[i.tone ?? "ok"] ?? TONE_CONFIG.ok;
+                        return (
+                          <TableRow
+                            key={i.id}
+                            className="cursor-pointer hover:bg-muted/50 transition-colors"
+                            onClick={() => setActiveTab("interactions")}
+                          >
+                            <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                              {formatDate(i.occurred_at)}
+                            </TableCell>
+                            <TableCell className="text-sm">{i.sender_raw ?? "—"}</TableCell>
+                            <TableCell className="text-sm max-w-xs">
+                              <span className="line-clamp-2" dangerouslySetInnerHTML={{ __html: i.content ?? "—" }} />
+                            </TableCell>
+                            <TableCell>
+                              <ShadTooltip>
+                                <TooltipTrigger asChild>
+                                  <Badge variant="outline" className={`text-xs border-0 cursor-help ${tCfg.className}`}>{tCfg.label}</Badge>
+                                </TooltipTrigger>
+                                <TooltipContent side="top" className="max-w-xs text-xs">
+                                  {getToneTooltip(i.tone ?? "ok", i.theme)}
+                                </TooltipContent>
+                              </ShadTooltip>
+                            </TableCell>
+                            <TableCell>
+                              {i.theme ? (
+                                <Badge variant="secondary" className="text-xs bg-muted text-muted-foreground">{i.theme}</Badge>
+                              ) : (
+                                <span className="text-muted-foreground">—</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-base">{CHANNEL_ICONS[i.channel] ?? "📡"}</TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </TooltipProvider>
               )}
             </CardContent>
           </Card>
