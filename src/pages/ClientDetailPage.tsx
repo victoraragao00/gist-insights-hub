@@ -841,7 +841,20 @@ const ClientDetailPage = () => {
                             <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
                               {formatDate(i.occurred_at)}
                             </TableCell>
-                            <TableCell className="text-sm">{i.sender_raw ?? "—"}</TableCell>
+                            <TableCell className="text-sm">
+                              <div className="flex items-center flex-wrap gap-1">
+                                <span>{i.sender_raw ?? "—"}</span>
+                                {i.sender_side === "umode" ? (
+                                  <Badge className="ml-1.5 bg-blue-50 text-blue-600 border-blue-200 text-xs font-normal">
+                                    uMode
+                                  </Badge>
+                                ) : (
+                                  <Badge className="ml-1.5 bg-orange-50 text-orange-600 border-orange-200 text-xs font-normal">
+                                    Cliente
+                                  </Badge>
+                                )}
+                              </div>
+                            </TableCell>
                             <TableCell className="text-sm max-w-xs">
                               <span className="line-clamp-2" dangerouslySetInnerHTML={{ __html: i.content ?? "—" }} />
                             </TableCell>
