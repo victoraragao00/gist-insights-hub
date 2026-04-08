@@ -118,19 +118,16 @@ interface Interaction {
   conversation_id: string | null;
 }
 
-function getToneTooltip(tone: string, theme: string | null): string {
-  const themeText = theme ? ` no tema "${theme}"` : "";
-  switch (tone) {
-    case "critico":
-      return `Mensagem classificada como Crítico${themeText}. Indica insatisfação severa, urgência ou risco de perda do cliente.`;
-    case "alerta":
-      return `Mensagem classificada como Alerta${themeText}. Indica frustração ou problema que precisa de atenção rápida.`;
-    case "atencao":
-      return `Mensagem classificada como Atenção${themeText}. Indica um ponto de fricção que pode escalar se não tratado.`;
-    default:
-      return `Tom: ${tone}${themeText}`;
-  }
-}
+const TONE_RUBRIC: Record<string, string> = {
+  ok: "✅ Ok — Interação neutra ou positiva, sem fricção identificada.",
+  atencao: "⚠️ Atenção — Ponto de fricção que pode escalar se não tratado. Monitore e considere uma ação preventiva.",
+  alerta: "🔶 Alerta — Frustração clara ou problema que precisa de atenção rápida. Responda em breve.",
+  critico: "🔴 Crítico — Insatisfação severa, urgência ou risco real de perda do cliente. Ação imediata necessária.",
+};
+
+const TONE_FILTER_LABELS: Record<string, string> = {
+  todos: "Todos", atencao: "Atenção", alerta: "Alerta", critico: "Crítico",
+};
 
 interface AuditRule {
   id: string;
