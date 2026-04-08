@@ -1,50 +1,73 @@
 
 
-## Plan: Melhorar aba Visão Geral — HTML fix, tema, tooltip, filtros, interatividade
+## Plan: Fix ocorrências table, acentuação nos filtros, tooltips com rubrica fixa
 
-### Overview
+### Problema 1 — Tabela de ocorrências vazia na página 1
 
-Four changes to the "Visão Geral" tab in `ClientDetailPage.tsx`: fix raw HTML in the occurrences table, add theme column with tone tooltip, add tone filter buttons, and add click interactivity (row → Interactions tab, chart bar → filter table by date).
+A causa real não é offset errado — a paginação usa `pageInteractions` iniciando em 0, o que é correto. O problema é que `nonOkInteractions` filtra a partir de `interactions`, que traz apenas 50 registros por página (ordenados por data DESC). Se as 50 interações mais recentes são "ok", a tabela aparece vazia.
 
-### Changes — `src/pages/ClientDetailPage.tsx`
+**Fix:** Adicionar uma query separada dedicada a buscar apenas interações não-ok dos últimos 30 dias, com limit de 20, independente da paginação principal. Isso não altera a query existente — adiciona uma nova.
 
-**1. Interface + Query update**
-- Add `theme`, `conversation_id` to `Interaction` interface
-- Add `theme, conversation_id` to the Supabase `.select()` on line 294
+```typescript
+const { data: nonOkData = [] } = useQuery<Interaction[]>({
+  queryKey: ["detail_non_ok_interactions", user?.id, clientId, thirtyDaysAgo],
+  enabled: !!clientId && !!user?.id,
+  staleTime: 5 * 60_000,
+  queryFn: async () => {
+    const { data, error } = await supabase
+      .from("interactions")
+      .select("id, tone, occurred_at, sender_raw, sender_side, content, channel, is_out_of_scope, theme, conversation_id")
+      .eq("client_id", clientId!)
+      .gte("occurred_at", thirtyDaysAgo)
+      .in("tone", ["atencao", "alerta", "critico"])
+      .order("occurred_at", { ascending: false })
+      .limit(50);
+    if (error) throw error;
+    return (data ?? []) as Interaction[];
+  },
+});
+```
 
-**2. Controlled Tabs + new state**
-- Change `<Tabs defaultValue="overview">` to controlled: `<Tabs value={activeTab} onValueChange={setActiveTab}>`
-- Add state: `activeTab` (default `"overview"`), `selectedTone` (default `"todos"`), `selectedDate` (default `null`)
+Atualizar `nonOkInteractions` useMemo para usar `nonOkData` em vez de `interactions`:
 
-**3. Fix HTML rendering (line 758)**
-- Replace `{i.content?.slice(0, 150) ?? "—"}` with `dangerouslySetInnerHTML={{ __html: i.content ?? "—" }}` inside a `<span className="line-clamp-2">`
+```typescript
+const nonOkInteractions = useMemo(() => {
+  let filtered = nonOkData;
+  if (selectedTone !== "todos") filtered = filtered.filter((i) => i.tone === selectedTone);
+  if (selectedDate) filtered = filtered.filter((i) => i.occurred_at.startsWith(selectedDate));
+  return filtered.slice(0, 20);
+}, [nonOkData, selectedTone, selectedDate]);
+```
 
-**4. Theme column + Tone tooltip**
-- Add `<TableHead>Tema</TableHead>` after Tom column header
-- Add helper `getToneTooltip(tone, theme)` returning natural-language explanation
-- Wrap tone Badge with `TooltipProvider > Tooltip > TooltipTrigger > TooltipContent`
-- Add Theme cell with neutral badge (`bg-muted text-muted-foreground`) or "—"
+### Problema 2 — Acentuação nos filtros (linha 775)
 
-**5. Tone filter buttons**
-- Above the occurrences table, add toggle buttons: Todos / Atenção / Alerta / Crítico
-- Filter `nonOkInteractions` by `selectedTone` before rendering
-- Also filter by `selectedDate` when set
+Substituir a lógica de capitalização por um mapa de labels:
 
-**6. Chart click → filter by date**
-- Add `onClick` to each `<Bar>` in the tone trend chart
-- When clicked, set `selectedDate` to the raw day value
-- Show a filter badge "Filtrando: {date}" with X button to clear
-- Apply opacity styling to non-selected bars via `fillOpacity`
-- Need to keep original day string in chart data for filtering (add `rawDay` field to `toneTrendChartData`)
+```typescript
+const TONE_FILTER_LABELS: Record<string, string> = {
+  todos: "Todos", atencao: "Atenção", alerta: "Alerta", critico: "Crítico"
+};
+// No botão:
+{TONE_FILTER_LABELS[t] ?? t}
+```
 
-**7. Row click → navigate to Interactions tab**
-- Make `<TableRow>` clickable with `cursor-pointer hover:bg-muted/50`
-- On click, set `activeTab` to `"interactions"`
-- Note: InteractionsFeed doesn't currently accept a conversation filter prop, so clicking will navigate to the tab (conversation filtering would require changes to InteractionsFeed which is out of scope per PROIBIDO rules)
+### Problema 3 — Tooltips com rubrica fixa
 
-**8. Imports**
-- Add `Tooltip, TooltipTrigger, TooltipContent, TooltipProvider` from `@/components/ui/tooltip`
-- Add `X` from `lucide-react`
+Substituir `getToneTooltip()` (linhas 120-132) por rubrica fixa:
+
+```typescript
+const TONE_RUBRIC: Record<string, string> = {
+  ok: "✅ Ok — Interação neutra ou positiva, sem fricção identificada.",
+  atencao: "⚠️ Atenção — Ponto de fricção que pode escalar se não tratado. Monitore e considere uma ação preventiva.",
+  alerta: "🔶 Alerta — Frustração clara ou problema que precisa de atenção rápida. Responda em breve.",
+  critico: "🔴 Crítico — Insatisfação severa, urgência ou risco real de perda do cliente. Ação imediata necessária.",
+};
+```
+
+Aplicar tooltip em todos os badges de tom:
+- Coluna Tom da tabela de ocorrências (já existe, trocar conteúdo para `TONE_RUBRIC`)
+- Badge "Tom Predominante" no header (KPICard na linha 660 — envolver com tooltip)
+- Qualquer outro badge de tom visível na Visão Geral (distribuição de tom, linha ~695)
 
 ### Files changed
 
@@ -53,5 +76,5 @@ Four changes to the "Visão Geral" tab in `ClientDetailPage.tsx`: fix raw HTML i
 | Edit | `src/pages/ClientDetailPage.tsx` |
 
 ### No changes to
-- Queries (no new RPCs), other tabs, hooks, migrations, RLS, `src/integrations/supabase/*`, `.env`
+- Outras abas, hooks externos, migrations, RLS, edge functions, `src/integrations/supabase/*`, `.env`
 
