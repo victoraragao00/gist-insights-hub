@@ -118,19 +118,16 @@ interface Interaction {
   conversation_id: string | null;
 }
 
-function getToneTooltip(tone: string, theme: string | null): string {
-  const themeText = theme ? ` no tema "${theme}"` : "";
-  switch (tone) {
-    case "critico":
-      return `Mensagem classificada como Crítico${themeText}. Indica insatisfação severa, urgência ou risco de perda do cliente.`;
-    case "alerta":
-      return `Mensagem classificada como Alerta${themeText}. Indica frustração ou problema que precisa de atenção rápida.`;
-    case "atencao":
-      return `Mensagem classificada como Atenção${themeText}. Indica um ponto de fricção que pode escalar se não tratado.`;
-    default:
-      return `Tom: ${tone}${themeText}`;
-  }
-}
+const TONE_RUBRIC: Record<string, string> = {
+  ok: "✅ Ok — Interação neutra ou positiva, sem fricção identificada.",
+  atencao: "⚠️ Atenção — Ponto de fricção que pode escalar se não tratado. Monitore e considere uma ação preventiva.",
+  alerta: "🔶 Alerta — Frustração clara ou problema que precisa de atenção rápida. Responda em breve.",
+  critico: "🔴 Crítico — Insatisfação severa, urgência ou risco real de perda do cliente. Ação imediata necessária.",
+};
+
+const TONE_FILTER_LABELS: Record<string, string> = {
+  todos: "Todos", atencao: "Atenção", alerta: "Alerta", critico: "Crítico",
+};
 
 interface AuditRule {
   id: string;
@@ -324,6 +321,25 @@ const ClientDetailPage = () => {
   const interactions = interactionsData?.list ?? [];
   const interactionsTotalCount = interactionsData?.totalCount ?? 0;
 
+  // Dedicated query for non-ok interactions (fixes empty table on page 1)
+  const { data: nonOkData = [] } = useQuery<Interaction[]>({
+    queryKey: ["detail_non_ok_interactions", user?.id, clientId, thirtyDaysAgo],
+    enabled: !!clientId && !!user?.id,
+    staleTime: 5 * 60_000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("interactions")
+        .select("id, tone, occurred_at, sender_raw, sender_side, content, channel, is_out_of_scope, theme, conversation_id")
+        .eq("client_id", clientId!)
+        .gte("occurred_at", thirtyDaysAgo)
+        .in("tone", ["atencao", "alerta", "critico"])
+        .order("occurred_at", { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      return (data ?? []) as Interaction[];
+    },
+  });
+
   const { data: auditRules = [] } = useQuery<AuditRule[]>({
     queryKey: ["detail_audit_rules", user?.id, clientId],
     enabled: !!clientId && !!user?.id,
@@ -438,11 +454,11 @@ const ClientDetailPage = () => {
 
   // Non-ok interactions (last 5)
   const nonOkInteractions = useMemo(() => {
-    let filtered = interactions.filter((i) => i.tone && i.tone !== "ok");
+    let filtered = nonOkData;
     if (selectedTone !== "todos") filtered = filtered.filter((i) => i.tone === selectedTone);
     if (selectedDate) filtered = filtered.filter((i) => i.occurred_at.startsWith(selectedDate));
     return filtered.slice(0, 20);
-  }, [interactions, selectedTone, selectedDate]);
+  }, [nonOkData, selectedTone, selectedDate]);
 
   // Initialize edit state when client and clientScore load
   useEffect(() => {
@@ -614,9 +630,18 @@ const ClientDetailPage = () => {
             <span className={`inline-flex items-center rounded-sm px-2 py-0.5 text-xs font-medium ${STATUS_CONFIG[client.status]?.className ?? ""}`}>
               {STATUS_CONFIG[client.status]?.label ?? client.status}
             </span>
-            <Badge variant="outline" className={`text-xs border-0 ${dominantTone.className}`}>
-              {dominantTone.label}
-            </Badge>
+            <TooltipProvider>
+              <ShadTooltip>
+                <TooltipTrigger asChild>
+                  <Badge variant="outline" className={`text-xs border-0 cursor-help ${dominantTone.className}`}>
+                    {dominantTone.label}
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs text-xs">
+                  {TONE_RUBRIC[stats.dominant_tone] ?? stats.dominant_tone}
+                </TooltipContent>
+              </ShadTooltip>
+            </TooltipProvider>
           </div>
           {client.status === "inativo" && (
             <div className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
@@ -772,7 +797,7 @@ const ClientDetailPage = () => {
                       className="h-7 text-xs capitalize"
                       onClick={() => setSelectedTone(t)}
                     >
-                      {t === "todos" ? "Todos" : t.charAt(0).toUpperCase() + t.slice(1)}
+                      {TONE_FILTER_LABELS[t] ?? t}
                     </Button>
                   ))}
                 </div>
@@ -826,7 +851,7 @@ const ClientDetailPage = () => {
                                   <Badge variant="outline" className={`text-xs border-0 cursor-help ${tCfg.className}`}>{tCfg.label}</Badge>
                                 </TooltipTrigger>
                                 <TooltipContent side="top" className="max-w-xs text-xs">
-                                  {getToneTooltip(i.tone ?? "ok", i.theme)}
+                                  {TONE_RUBRIC[i.tone ?? "ok"] ?? i.tone}
                                 </TooltipContent>
                               </ShadTooltip>
                             </TableCell>
