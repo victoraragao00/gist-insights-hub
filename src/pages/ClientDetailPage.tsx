@@ -769,7 +769,7 @@ const ClientDetailPage = () => {
                       className="h-7 text-xs capitalize"
                       onClick={() => setSelectedTone(t)}
                     >
-                      {t === "todos" ? "Todos" : t.charAt(0).toUpperCase() + t.slice(1)}
+                      {TONE_FILTER_LABELS[t] ?? t}
                     </Button>
                   ))}
                 </div>
