@@ -1107,6 +1107,11 @@ const ClientDetailPage = () => {
           <InteractionsFeed clientId={client.id} />
         </TabsContent>
 
+        {/* ── TAB: Conversas ── */}
+        <TabsContent value="conversations" className="min-h-[500px]">
+          <ClientConversationsTab clientId={client.id} />
+        </TabsContent>
+
         {/* ── TAB 2: Participantes ── */}
         <TabsContent value="participants" className="space-y-6">
           <ParticipantSection title="Time do cliente" participants={clientTeam} badgeColor="bg-orange-50 text-orange-600 dark:bg-orange-950 dark:text-orange-400" />
