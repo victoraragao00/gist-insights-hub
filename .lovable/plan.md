@@ -1,80 +1,61 @@
 
 
-## Plan: Fix ocorrências table, acentuação nos filtros, tooltips com rubrica fixa
+## Plan: Badge de lado na tabela + Regras anti-vies no Mega Agente
 
-### Problema 1 — Tabela de ocorrências vazia na página 1
+### 1. `src/pages/ClientDetailPage.tsx` — Badge sender_side na coluna Remetente
 
-A causa real não é offset errado — a paginação usa `pageInteractions` iniciando em 0, o que é correto. O problema é que `nonOkInteractions` filtra a partir de `interactions`, que traz apenas 50 registros por página (ordenados por data DESC). Se as 50 interações mais recentes são "ok", a tabela aparece vazia.
+Na linha 844, onde hoje temos:
 
-**Fix:** Adicionar uma query separada dedicada a buscar apenas interações não-ok dos últimos 30 dias, com limit de 20, independente da paginação principal. Isso não altera a query existente — adiciona uma nova.
-
-```typescript
-const { data: nonOkData = [] } = useQuery<Interaction[]>({
-  queryKey: ["detail_non_ok_interactions", user?.id, clientId, thirtyDaysAgo],
-  enabled: !!clientId && !!user?.id,
-  staleTime: 5 * 60_000,
-  queryFn: async () => {
-    const { data, error } = await supabase
-      .from("interactions")
-      .select("id, tone, occurred_at, sender_raw, sender_side, content, channel, is_out_of_scope, theme, conversation_id")
-      .eq("client_id", clientId!)
-      .gte("occurred_at", thirtyDaysAgo)
-      .in("tone", ["atencao", "alerta", "critico"])
-      .order("occurred_at", { ascending: false })
-      .limit(50);
-    if (error) throw error;
-    return (data ?? []) as Interaction[];
-  },
-});
+```tsx
+<TableCell className="text-sm">{i.sender_raw ?? "—"}</TableCell>
 ```
 
-Atualizar `nonOkInteractions` useMemo para usar `nonOkData` em vez de `interactions`:
+Substituir por:
 
-```typescript
-const nonOkInteractions = useMemo(() => {
-  let filtered = nonOkData;
-  if (selectedTone !== "todos") filtered = filtered.filter((i) => i.tone === selectedTone);
-  if (selectedDate) filtered = filtered.filter((i) => i.occurred_at.startsWith(selectedDate));
-  return filtered.slice(0, 20);
-}, [nonOkData, selectedTone, selectedDate]);
+```tsx
+<TableCell className="text-sm">
+  <div className="flex items-center flex-wrap gap-1">
+    <span>{i.sender_raw ?? "—"}</span>
+    {i.sender_side === "umode" ? (
+      <Badge className="ml-1.5 bg-blue-50 text-blue-600 border-blue-200 text-xs font-normal">
+        uMode
+      </Badge>
+    ) : (
+      <Badge className="ml-1.5 bg-orange-50 text-orange-600 border-orange-200 text-xs font-normal">
+        Cliente
+      </Badge>
+    )}
+  </div>
+</TableCell>
 ```
 
-### Problema 2 — Acentuação nos filtros (linha 775)
+`sender_side` already exists in the `Interaction` interface and the `nonOkData` query select.
 
-Substituir a lógica de capitalização por um mapa de labels:
+### 2. `docs/mega-agente/MEGA_AGENTE_v2.md` — Adicionar Regras 10-13
 
-```typescript
-const TONE_FILTER_LABELS: Record<string, string> = {
-  todos: "Todos", atencao: "Atenção", alerta: "Alerta", critico: "Crítico"
-};
-// No botão:
-{TONE_FILTER_LABELS[t] ?? t}
+Apos a Regra 9 (linha 189), antes de `---`, adicionar 4 novas regras anti-vies para mensagens da uMode:
+
+```markdown
+**Regra 10 — Mensagens curtas e neutras da uMode = ok**
+Mensagens curtas da uMode como "ok", "certo", "entendido", "sim", "não", "obrigado", "até logo" NÃO devem ser classificadas como Atenção, Alerta ou Crítico. Tom = "ok" salvo conteúdo explicitamente problemático.
+
+**Regra 11 — Mensagens de sistema = ok**
+Mensagens de sistema ("This message was deleted", "This message was edited") NÃO devem receber tom negativo. Classificar sempre como "ok".
+
+**Regra 12 — Encaminhamento operacional da uMode = ok**
+Mensagens da uMode que expressam encaminhamento ("vou verificar", "passando para o time", "te aviso em breve") são neutras — classificar como "ok" mesmo que o contexto da conversa seja de Atenção.
+
+**Regra 13 — Tom reflete sentimento do CLIENTE**
+O tom deve refletir o sentimento do CLIENTE, não o conteúdo isolado de cada mensagem da uMode. Ao classificar uma mensagem da uMode, perguntar: "Isso indica que o cliente está insatisfeito?" Se não, classificar como "ok".
 ```
-
-### Problema 3 — Tooltips com rubrica fixa
-
-Substituir `getToneTooltip()` (linhas 120-132) por rubrica fixa:
-
-```typescript
-const TONE_RUBRIC: Record<string, string> = {
-  ok: "✅ Ok — Interação neutra ou positiva, sem fricção identificada.",
-  atencao: "⚠️ Atenção — Ponto de fricção que pode escalar se não tratado. Monitore e considere uma ação preventiva.",
-  alerta: "🔶 Alerta — Frustração clara ou problema que precisa de atenção rápida. Responda em breve.",
-  critico: "🔴 Crítico — Insatisfação severa, urgência ou risco real de perda do cliente. Ação imediata necessária.",
-};
-```
-
-Aplicar tooltip em todos os badges de tom:
-- Coluna Tom da tabela de ocorrências (já existe, trocar conteúdo para `TONE_RUBRIC`)
-- Badge "Tom Predominante" no header (KPICard na linha 660 — envolver com tooltip)
-- Qualquer outro badge de tom visível na Visão Geral (distribuição de tom, linha ~695)
 
 ### Files changed
 
 | Action | File |
 |--------|------|
-| Edit | `src/pages/ClientDetailPage.tsx` |
+| Edit | `src/pages/ClientDetailPage.tsx` (badge sender_side na coluna Remetente) |
+| Edit | `docs/mega-agente/MEGA_AGENTE_v2.md` (regras 10-13 anti-vies uMode) |
 
 ### No changes to
-- Outras abas, hooks externos, migrations, RLS, edge functions, `src/integrations/supabase/*`, `.env`
+- Queries, hooks, migrations, RLS, edge functions, `src/integrations/supabase/*`, `.env`
 
