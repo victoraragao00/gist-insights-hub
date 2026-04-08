@@ -1,27 +1,39 @@
 
 
-## Plan: Mostrar nome do contato cliente na coluna "Conversa"
+## Plan: Aba "Conversas" na ClientDetailPage
 
-### Alterações em `src/pages/ClientDetailPage.tsx`
+### 1. Migration — Nova DB function
 
-**1. Adicionar `contact_name` ao tipo do grupo (linha 460-466)**
+Criar `get_client_conversations_with_status(uuid)` via migration tool. A function agrupa interações por `conversation_id`, infere status (sem_resposta/em_andamento/inativo), retorna contact_name, last_message, worst_tone, total_messages. `SECURITY DEFINER` + `GRANT EXECUTE TO authenticated`.
 
-Adicionar `contact_name: string | null` ao tipo do objeto de agrupamento.
+### 2. Novo hook — `src/hooks/useClientConversationsStatus.ts`
 
-**2. Capturar `contact_name` no loop (linhas 468-489)**
+Hook com `useQuery` chamando `supabase.rpc("get_client_conversations_with_status", { p_client_id })`. `staleTime: 60_000`, `enabled: !!clientId`. Tipo `ConversationWithStatus` exportado.
 
-Ao criar o grupo, inicializar `contact_name` com `sender_raw` se `sender_side === "client"`, senão `null`. Nas iterações seguintes, preencher se ainda `null`.
+### 3. Novo componente — `src/components/clients/ClientConversationsTab.tsx`
 
-**3. Substituir ID truncado pelo nome (linha 887-889)**
+- Filtros de status: Todos | Sem resposta | Em andamento | Inativo (botões com contagem)
+- Lista de conversas com: Avatar (iniciais), nome do contato, badge de status, data relativa, última mensagem (HTML sanitizado via `dangerouslySetInnerHTML`), badge de tom, total de mensagens
+- Ordenação: sem_resposta primeiro → em_andamento → inativo
+- Empty state contextual por filtro
+- Imports: Badge, Avatar, Skeleton, formatDistanceToNow, ptBR, TONE_CONFIG
 
-Trocar `conv.conversation_id.slice(0, 12) + "…"` por `conv.contact_name ?? conv.conversation_id.slice(0, 12) + "…"`, remover `font-mono`.
+### 4. Integrar na `src/pages/ClientDetailPage.tsx`
+
+- Novo `TabsTrigger` com `value="conversations"` entre "Interações" e "Participantes" (linha 719-720)
+- Badge laranja no tab mostrando contagem de `sem_resposta`
+- `TabsContent` com `<ClientConversationsTab clientId={client.id} />`
+- Import do componente
 
 ### Files changed
 
 | Action | File |
 |--------|------|
-| Edit | `src/pages/ClientDetailPage.tsx` |
+| Migration | Nova function `get_client_conversations_with_status` |
+| New | `src/hooks/useClientConversationsStatus.ts` |
+| New | `src/components/clients/ClientConversationsTab.tsx` |
+| Edit | `src/pages/ClientDetailPage.tsx` (tab + tab content) |
 
 ### No changes to
-- Queries, hooks, migrations, RLS, edge functions, `src/integrations/supabase/*`, `.env`
+- Outras abas, `src/integrations/supabase/*`, `.env`, hooks existentes
 
