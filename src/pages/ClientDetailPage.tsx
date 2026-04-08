@@ -823,7 +823,7 @@ const ClientDetailPage = () => {
                                   <Badge variant="outline" className={`text-xs border-0 cursor-help ${tCfg.className}`}>{tCfg.label}</Badge>
                                 </TooltipTrigger>
                                 <TooltipContent side="top" className="max-w-xs text-xs">
-                                  {getToneTooltip(i.tone ?? "ok", i.theme)}
+                                  {TONE_RUBRIC[i.tone ?? "ok"] ?? i.tone}
                                 </TooltipContent>
                               </ShadTooltip>
                             </TableCell>
