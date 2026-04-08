@@ -243,6 +243,10 @@ const ClientDetailPage = () => {
   const [activeTab, setActiveTab] = useState("overview");
   const [selectedTone, setSelectedTone] = useState("todos");
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [isGraficosOpen, setIsGraficosOpen] = useState(true);
+  const [isConversasOpen, setIsConversasOpen] = useState(true);
+  const [isInteracoesOpen, setIsInteracoesOpen] = useState(false);
+  const [expandedConversation, setExpandedConversation] = useState<string | null>(null);
 
   const thirtyDaysAgo = useMemo(
     () => new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(), []
