@@ -30,6 +30,8 @@ import { ChevronRight, MoreHorizontal, Loader2, AlertCircle, Plus, Copy, Refresh
 import { Tooltip as ShadTooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { InteractionsFeed } from "@/components/InteractionsFeed";
+import ClientConversationsTab from "@/components/clients/ClientConversationsTab";
+import { useClientConversationsStatus } from "@/hooks/useClientConversationsStatus";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
@@ -285,6 +287,12 @@ const ClientDetailPage = () => {
 
   const participants = participantsData?.list ?? [];
   const participantsTotalCount = participantsData?.totalCount ?? 0;
+
+  const { data: conversationsData } = useClientConversationsStatus(client?.id);
+  const conversationsNoReplyCount = useMemo(
+    () => (conversationsData ?? []).filter((c) => c.status === "sem_resposta").length,
+    [conversationsData]
+  );
 
   const { data: bindings = [] } = useQuery<ChannelBinding[]>({
     queryKey: ["detail_bindings", user?.id, clientId],
@@ -717,6 +725,14 @@ const ClientDetailPage = () => {
           </TabsTrigger>
           <TabsTrigger value="rfis">RFIs</TabsTrigger>
           <TabsTrigger value="interactions">Interações</TabsTrigger>
+          <TabsTrigger value="conversations" className="relative">
+            Conversas
+            {conversationsNoReplyCount > 0 && (
+              <span className="ml-1.5 inline-flex items-center justify-center rounded-full bg-orange-500 text-white text-[10px] font-bold min-w-[18px] h-[18px] px-1">
+                {conversationsNoReplyCount}
+              </span>
+            )}
+          </TabsTrigger>
           <TabsTrigger value="participants">Participantes ({participantsTotalCount})</TabsTrigger>
           <TabsTrigger value="channels">Canais ({bindings.length})</TabsTrigger>
           <TabsTrigger value="documents">Documentos</TabsTrigger>
@@ -1095,6 +1111,11 @@ const ClientDetailPage = () => {
         {/* ── TAB: Interações ── */}
         <TabsContent value="interactions" className="min-h-[500px]">
           <InteractionsFeed clientId={client.id} />
+        </TabsContent>
+
+        {/* ── TAB: Conversas ── */}
+        <TabsContent value="conversations" className="min-h-[500px]">
+          <ClientConversationsTab clientId={client.id} />
         </TabsContent>
 
         {/* ── TAB 2: Participantes ── */}
