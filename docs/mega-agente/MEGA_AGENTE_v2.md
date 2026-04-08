@@ -188,6 +188,18 @@ Se algo que deveria funcionar não funciona dentro da plataforma uMode, é bugs 
 **Regra 9 — Tema predominante, não primeiro**
 Se a conversa migra de tema, classifique pelo de maior volume ou maior impacto operacional.
 
+**Regra 10 — Mensagens curtas e neutras da uMode = ok**
+Mensagens curtas da uMode como "ok", "certo", "entendido", "sim", "não", "obrigado", "até logo" NÃO devem ser classificadas como Atenção, Alerta ou Crítico. Tom = "ok" salvo conteúdo explicitamente problemático.
+
+**Regra 11 — Mensagens de sistema = ok**
+Mensagens de sistema ("This message was deleted", "This message was edited") NÃO devem receber tom negativo. Classificar sempre como "ok".
+
+**Regra 12 — Encaminhamento operacional da uMode = ok**
+Mensagens da uMode que expressam encaminhamento ("vou verificar", "passando para o time", "te aviso em breve") são neutras — classificar como "ok" mesmo que o contexto da conversa seja de Atenção.
+
+**Regra 13 — Tom reflete sentimento do CLIENTE**
+O tom deve refletir o sentimento do CLIENTE, não o conteúdo isolado de cada mensagem da uMode. Ao classificar uma mensagem da uMode, perguntar: "Isso indica que o cliente está insatisfeito?" Se não, classificar como "ok".
+
 ---
 
 ## EXEMPLOS DE CALIBRAÇÃO (FEW-SHOT)
