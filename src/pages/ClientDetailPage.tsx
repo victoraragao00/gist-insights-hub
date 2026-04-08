@@ -26,7 +26,9 @@ import {
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ChevronRight, MoreHorizontal, Loader2, AlertCircle, Plus, Copy, RefreshCw, Link2, X } from "lucide-react";
+import { ChevronRight, MoreHorizontal, Loader2, AlertCircle, Plus, Copy, RefreshCw, Link2, X, BarChart2, ChevronDown, MessageSquare } from "lucide-react";
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
+import { Separator } from "@/components/ui/separator";
 import { Tooltip as ShadTooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { InteractionsFeed } from "@/components/InteractionsFeed";
