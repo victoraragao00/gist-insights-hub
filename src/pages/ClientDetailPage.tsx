@@ -321,6 +321,25 @@ const ClientDetailPage = () => {
   const interactions = interactionsData?.list ?? [];
   const interactionsTotalCount = interactionsData?.totalCount ?? 0;
 
+  // Dedicated query for non-ok interactions (fixes empty table on page 1)
+  const { data: nonOkData = [] } = useQuery<Interaction[]>({
+    queryKey: ["detail_non_ok_interactions", user?.id, clientId, thirtyDaysAgo],
+    enabled: !!clientId && !!user?.id,
+    staleTime: 5 * 60_000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("interactions")
+        .select("id, tone, occurred_at, sender_raw, sender_side, content, channel, is_out_of_scope, theme, conversation_id")
+        .eq("client_id", clientId!)
+        .gte("occurred_at", thirtyDaysAgo)
+        .in("tone", ["atencao", "alerta", "critico"])
+        .order("occurred_at", { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      return (data ?? []) as Interaction[];
+    },
+  });
+
   const { data: auditRules = [] } = useQuery<AuditRule[]>({
     queryKey: ["detail_audit_rules", user?.id, clientId],
     enabled: !!clientId && !!user?.id,
