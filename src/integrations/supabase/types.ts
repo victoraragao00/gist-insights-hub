@@ -1590,6 +1590,19 @@ export type Database = {
           sender_side: string
         }[]
       }
+      get_client_conversations_with_status: {
+        Args: { p_client_id: string }
+        Returns: {
+          contact_name: string
+          conversation_id: string
+          last_message: string
+          last_occurred_at: string
+          last_sender_side: string
+          status: string
+          total_messages: number
+          worst_tone: string
+        }[]
+      }
       get_client_public_demands: { Args: { p_token: string }; Returns: Json }
       get_demand_analytics: {
         Args: { p_client_id?: string; p_days?: number }
