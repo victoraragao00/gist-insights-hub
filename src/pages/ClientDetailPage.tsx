@@ -311,7 +311,7 @@ const ClientDetailPage = () => {
       const to = (pageInteractions + 1) * PAGE_SIZE - 1;
       const { data, error, count } = await supabase
         .from("interactions")
-        .select("id, tone, occurred_at, sender_raw, sender_side, content, channel, is_out_of_scope", { count: "exact" })
+        .select("id, tone, occurred_at, sender_raw, sender_side, content, channel, is_out_of_scope, theme, conversation_id", { count: "exact" })
         .eq("client_id", clientId!)
         .gte("occurred_at", thirtyDaysAgo)
         .order("occurred_at", { ascending: false })
