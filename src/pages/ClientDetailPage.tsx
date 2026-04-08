@@ -26,7 +26,9 @@ import {
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ChevronRight, MoreHorizontal, Loader2, AlertCircle, Plus, Copy, RefreshCw, Link2, X } from "lucide-react";
+import { ChevronRight, MoreHorizontal, Loader2, AlertCircle, Plus, Copy, RefreshCw, Link2, X, BarChart2, ChevronDown, MessageSquare } from "lucide-react";
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
+import { Separator } from "@/components/ui/separator";
 import { Tooltip as ShadTooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { InteractionsFeed } from "@/components/InteractionsFeed";
@@ -241,6 +243,10 @@ const ClientDetailPage = () => {
   const [activeTab, setActiveTab] = useState("overview");
   const [selectedTone, setSelectedTone] = useState("todos");
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [isGraficosOpen, setIsGraficosOpen] = useState(true);
+  const [isConversasOpen, setIsConversasOpen] = useState(true);
+  const [isInteracoesOpen, setIsInteracoesOpen] = useState(false);
+  const [expandedConversation, setExpandedConversation] = useState<string | null>(null);
 
   const thirtyDaysAgo = useMemo(
     () => new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(), []
@@ -724,15 +730,6 @@ const ClientDetailPage = () => {
             <AgendaCountBadge clientId={client.id} />
           </TabsTrigger>
           <TabsTrigger value="rfis">RFIs</TabsTrigger>
-          <TabsTrigger value="interactions">Interações</TabsTrigger>
-          <TabsTrigger value="conversations" className="relative">
-            Conversas
-            {conversationsNoReplyCount > 0 && (
-              <span className="ml-1.5 inline-flex items-center justify-center rounded-full bg-orange-500 text-white text-[10px] font-bold min-w-[18px] h-[18px] px-1">
-                {conversationsNoReplyCount}
-              </span>
-            )}
-          </TabsTrigger>
           <TabsTrigger value="participants">Participantes ({participantsTotalCount})</TabsTrigger>
           <TabsTrigger value="channels">Canais ({bindings.length})</TabsTrigger>
           <TabsTrigger value="documents">Documentos</TabsTrigger>
@@ -742,6 +739,16 @@ const ClientDetailPage = () => {
 
         {/* ── TAB 1: Visão Geral ── */}
         <TabsContent value="overview" className="space-y-6">
+          {/* Section 1: Gráficos e KPIs */}
+          <Collapsible open={isGraficosOpen} onOpenChange={setIsGraficosOpen}>
+            <CollapsibleTrigger className="flex items-center justify-between w-full py-3 px-1 hover:bg-muted/30 rounded-lg transition-colors">
+              <div className="flex items-center gap-2">
+                <BarChart2 className="h-4 w-4 text-muted-foreground" />
+                <span className="font-medium text-sm">Gráficos e KPIs</span>
+              </div>
+              <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${isGraficosOpen ? "rotate-180" : ""}`} />
+            </CollapsibleTrigger>
+            <CollapsibleContent className="space-y-6 pt-2">
           {/* KPI Row */}
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
             <KPICard label="Total de Interações" value={String(totalInteractionsCount)} sub="histórico completo" />
@@ -900,7 +907,12 @@ const ClientDetailPage = () => {
                           <TableRow
                             key={conv.conversation_id}
                             className="cursor-pointer hover:bg-muted/50 transition-colors"
-                            onClick={() => setActiveTab("interactions")}
+                            onClick={() => {
+                              setIsInteracoesOpen(true);
+                              setTimeout(() => {
+                                document.getElementById("section-interacoes")?.scrollIntoView({ behavior: "smooth" });
+                              }, 100);
+                            }}
                           >
                             <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                               {formatDistanceToNow(new Date(conv.last_occurred_at), { addSuffix: true, locale: ptBR })}
@@ -966,6 +978,55 @@ const ClientDetailPage = () => {
               </div>
             </div>
           )}
+            </CollapsibleContent>
+          </Collapsible>
+
+          <Separator />
+
+          {/* Section 2: Conversas */}
+          <Collapsible open={isConversasOpen} onOpenChange={setIsConversasOpen}>
+            <CollapsibleTrigger className="flex items-center justify-between w-full py-3 px-1 hover:bg-muted/30 rounded-lg transition-colors">
+              <div className="flex items-center gap-2">
+                <MessageSquare className="h-4 w-4 text-muted-foreground" />
+                <span className="font-medium text-sm">Conversas</span>
+                {conversationsNoReplyCount > 0 && (
+                  <span className="ml-1 inline-flex items-center justify-center rounded-full bg-orange-500 text-white text-[10px] font-bold min-w-[18px] h-[18px] px-1">
+                    {conversationsNoReplyCount}
+                  </span>
+                )}
+              </div>
+              <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${isConversasOpen ? "rotate-180" : ""}`} />
+            </CollapsibleTrigger>
+            <CollapsibleContent className="pt-2">
+              <ClientConversationsTab
+                clientId={client.id}
+                expandedConversation={expandedConversation}
+                onToggleExpand={(id) => setExpandedConversation((prev) => prev === id ? null : id)}
+                onViewFullConversation={() => {
+                  setIsInteracoesOpen(true);
+                  setTimeout(() => {
+                    document.getElementById("section-interacoes")?.scrollIntoView({ behavior: "smooth" });
+                  }, 100);
+                }}
+              />
+            </CollapsibleContent>
+          </Collapsible>
+
+          <Separator />
+
+          {/* Section 3: Interações */}
+          <Collapsible open={isInteracoesOpen} onOpenChange={setIsInteracoesOpen}>
+            <CollapsibleTrigger className="flex items-center justify-between w-full py-3 px-1 hover:bg-muted/30 rounded-lg transition-colors" id="section-interacoes">
+              <div className="flex items-center gap-2">
+                <MessageSquare className="h-4 w-4 text-muted-foreground" />
+                <span className="font-medium text-sm">Interações</span>
+              </div>
+              <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${isInteracoesOpen ? "rotate-180" : ""}`} />
+            </CollapsibleTrigger>
+            <CollapsibleContent className="min-h-[500px] pt-2">
+              <InteractionsFeed clientId={client.id} />
+            </CollapsibleContent>
+          </Collapsible>
         </TabsContent>
 
         {/* ── TAB: Demandas ── */}
@@ -1108,15 +1169,6 @@ const ClientDetailPage = () => {
           <ClientRfisTab clientId={client.id} clientName={client.name} />
         </TabsContent>
 
-        {/* ── TAB: Interações ── */}
-        <TabsContent value="interactions" className="min-h-[500px]">
-          <InteractionsFeed clientId={client.id} />
-        </TabsContent>
-
-        {/* ── TAB: Conversas ── */}
-        <TabsContent value="conversations" className="min-h-[500px]">
-          <ClientConversationsTab clientId={client.id} />
-        </TabsContent>
 
         {/* ── TAB 2: Participantes ── */}
         <TabsContent value="participants" className="space-y-6">

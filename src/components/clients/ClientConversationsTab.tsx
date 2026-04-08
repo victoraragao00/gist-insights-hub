@@ -1,12 +1,13 @@
 import { useMemo, useState } from "react";
 import { useClientConversationsStatus, type ConversationWithStatus } from "@/hooks/useClientConversationsStatus";
+import { useConversationMessages } from "@/hooks/useConversationMessages";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { MessageSquare } from "lucide-react";
+import { MessageSquare, ChevronDown } from "lucide-react";
 
 const STATUS_CONFIG = {
   sem_resposta: {
@@ -54,9 +55,12 @@ function stripHtml(html: string): string {
 
 interface Props {
   clientId: string;
+  expandedConversation?: string | null;
+  onToggleExpand?: (id: string) => void;
+  onViewFullConversation?: () => void;
 }
 
-export default function ClientConversationsTab({ clientId }: Props) {
+export default function ClientConversationsTab({ clientId, expandedConversation, onToggleExpand, onViewFullConversation }: Props) {
   const { data, isLoading } = useClientConversationsStatus(clientId);
   const [filter, setFilter] = useState<StatusFilter>("todos");
 
@@ -124,7 +128,13 @@ export default function ClientConversationsTab({ clientId }: Props) {
       ) : (
         <div className="space-y-2">
           {filtered.map((conv) => (
-            <ConversationItem key={conv.conversation_id} conv={conv} />
+            <ConversationItem
+              key={conv.conversation_id}
+              conv={conv}
+              isExpanded={expandedConversation === conv.conversation_id}
+              onToggle={onToggleExpand ? () => onToggleExpand(conv.conversation_id) : undefined}
+              onViewFull={onViewFullConversation}
+            />
           ))}
         </div>
       )}
@@ -132,46 +142,123 @@ export default function ClientConversationsTab({ clientId }: Props) {
   );
 }
 
-function ConversationItem({ conv }: { conv: ConversationWithStatus }) {
+function ConversationItem({ conv, isExpanded, onToggle, onViewFull }: {
+  conv: ConversationWithStatus;
+  isExpanded?: boolean;
+  onToggle?: () => void;
+  onViewFull?: () => void;
+}) {
   const statusCfg = STATUS_CONFIG[conv.status] ?? STATUS_CONFIG.em_andamento;
   const toneCfg = TONE_CONFIG[conv.worst_tone] ?? TONE_CONFIG.ok;
   const preview = conv.last_message ? stripHtml(conv.last_message).slice(0, 120) : "Sem conteúdo";
 
   return (
-    <div className="flex items-start gap-3 rounded-lg border p-3 hover:bg-muted/30 transition-colors">
-      <Avatar className="h-10 w-10 shrink-0 mt-0.5">
-        <AvatarFallback className="text-xs font-semibold bg-primary/10 text-primary">
-          {getInitials(conv.contact_name)}
-        </AvatarFallback>
-      </Avatar>
+    <div>
+      <div
+        className={`flex items-start gap-3 rounded-lg border p-3 transition-colors ${onToggle ? "cursor-pointer hover:bg-muted/30" : "hover:bg-muted/30"} ${isExpanded ? "border-primary/30 bg-muted/20" : ""}`}
+        onClick={onToggle}
+      >
+        <Avatar className="h-10 w-10 shrink-0 mt-0.5">
+          <AvatarFallback className="text-xs font-semibold bg-primary/10 text-primary">
+            {getInitials(conv.contact_name)}
+          </AvatarFallback>
+        </Avatar>
 
-      <div className="flex-1 min-w-0 space-y-1">
-        {/* Row 1 */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-medium text-sm truncate">
-            {conv.contact_name ?? "Contato desconhecido"}
-          </span>
-          <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${statusCfg.className}`}>
-            {statusCfg.label}
-          </Badge>
-          <span className="text-xs text-muted-foreground ml-auto whitespace-nowrap">
-            {formatDistanceToNow(new Date(conv.last_occurred_at), { addSuffix: true, locale: ptBR })}
-          </span>
-        </div>
+        <div className="flex-1 min-w-0 space-y-1">
+          {/* Row 1 */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-medium text-sm truncate">
+              {conv.contact_name ?? "Contato desconhecido"}
+            </span>
+            <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${statusCfg.className}`}>
+              {statusCfg.label}
+            </Badge>
+            <span className="text-xs text-muted-foreground ml-auto whitespace-nowrap">
+              {formatDistanceToNow(new Date(conv.last_occurred_at), { addSuffix: true, locale: ptBR })}
+            </span>
+            {onToggle && (
+              <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+            )}
+          </div>
 
-        {/* Row 2 */}
-        <p className="text-xs text-muted-foreground line-clamp-2">{preview}</p>
+          {/* Row 2 */}
+          <p className="text-xs text-muted-foreground line-clamp-2">{preview}</p>
 
-        {/* Row 3 */}
-        <div className="flex items-center gap-2">
-          <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${toneCfg.className}`}>
-            {toneCfg.label}
-          </Badge>
-          <span className="text-[11px] text-muted-foreground">
-            {conv.total_messages} mensagens
-          </span>
+          {/* Row 3 */}
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${toneCfg.className}`}>
+              {toneCfg.label}
+            </Badge>
+            <span className="text-[11px] text-muted-foreground">
+              {conv.total_messages} mensagens
+            </span>
+          </div>
         </div>
       </div>
+
+      {/* Expanded messages */}
+      {isExpanded && (
+        <ConversationMessages conversationId={conv.conversation_id} onViewFull={onViewFull} />
+      )}
+    </div>
+  );
+}
+
+function ConversationMessages({ conversationId, onViewFull }: { conversationId: string; onViewFull?: () => void }) {
+  const { data: messages, isLoading } = useConversationMessages(conversationId);
+
+  if (isLoading) {
+    return (
+      <div className="mt-2 ml-12 space-y-2 border-l-2 border-border pl-3">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <Skeleton key={i} className="h-12 w-full rounded" />
+        ))}
+      </div>
+    );
+  }
+
+  if (!messages || messages.length === 0) {
+    return (
+      <div className="mt-2 ml-12 border-l-2 border-border pl-3 py-2">
+        <p className="text-xs text-muted-foreground">Nenhuma mensagem encontrada.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-2 ml-12 space-y-2 border-l-2 border-border pl-3">
+      {messages.map((msg) => (
+        <div key={msg.id} className="space-y-0.5">
+          <div className="flex items-center gap-2">
+            <Badge className={msg.sender_side === "umode"
+              ? "bg-blue-50 text-blue-600 border-blue-200 text-xs"
+              : "bg-orange-50 text-orange-600 border-orange-200 text-xs"
+            } variant="outline">
+              {msg.sender_side === "umode" ? "uMode" : "Cliente"}
+            </Badge>
+            <span className="text-xs text-muted-foreground">{msg.sender_raw}</span>
+            <span className="text-xs text-muted-foreground ml-auto">
+              {formatDistanceToNow(new Date(msg.occurred_at), { addSuffix: true, locale: ptBR })}
+            </span>
+          </div>
+          <p
+            className="text-xs text-foreground line-clamp-3"
+            dangerouslySetInnerHTML={{ __html: msg.content ?? "—" }}
+          />
+        </div>
+      ))}
+
+      {onViewFull && (
+        <button
+          className="text-xs text-primary hover:underline mt-1"
+          onClick={(e) => {
+            e.stopPropagation();
+            onViewFull();
+          }}
+        >
+          Ver conversa completa →
+        </button>
+      )}
     </div>
   );
 }
