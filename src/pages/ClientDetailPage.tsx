@@ -369,6 +369,7 @@ const ClientDetailPage = () => {
     () =>
       toneTrend?.map((d) => ({
         ...d,
+        rawDay: d.day,
         day: new Date(d.day + "T00:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }),
       })) ?? [],
     [toneTrend]
