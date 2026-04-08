@@ -630,9 +630,18 @@ const ClientDetailPage = () => {
             <span className={`inline-flex items-center rounded-sm px-2 py-0.5 text-xs font-medium ${STATUS_CONFIG[client.status]?.className ?? ""}`}>
               {STATUS_CONFIG[client.status]?.label ?? client.status}
             </span>
-            <Badge variant="outline" className={`text-xs border-0 ${dominantTone.className}`}>
-              {dominantTone.label}
-            </Badge>
+            <TooltipProvider>
+              <ShadTooltip>
+                <TooltipTrigger asChild>
+                  <Badge variant="outline" className={`text-xs border-0 cursor-help ${dominantTone.className}`}>
+                    {dominantTone.label}
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs text-xs">
+                  {TONE_RUBRIC[stats.dominant_tone] ?? stats.dominant_tone}
+                </TooltipContent>
+              </ShadTooltip>
+            </TooltipProvider>
           </div>
           {client.status === "inativo" && (
             <div className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
