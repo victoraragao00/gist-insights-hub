@@ -760,41 +760,90 @@ const ClientDetailPage = () => {
           {/* Recent non-ok */}
           <Card className="border border-border rounded-xl">
             <CardHeader className="pb-3">
-              <CardTitle className="text-base font-semibold">Últimas ocorrências de tom não-ok</CardTitle>
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <CardTitle className="text-base font-semibold">Últimas ocorrências de tom não-ok</CardTitle>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">Filtrar por tom:</span>
+                  {["todos", "atencao", "alerta", "critico"].map((t) => (
+                    <Button
+                      key={t}
+                      variant={selectedTone === t ? "default" : "outline"}
+                      size="sm"
+                      className="h-7 text-xs capitalize"
+                      onClick={() => setSelectedTone(t)}
+                    >
+                      {t === "todos" ? "Todos" : t.charAt(0).toUpperCase() + t.slice(1)}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+              {selectedDate && (
+                <div className="flex items-center gap-2 mt-2">
+                  <Badge variant="secondary" className="text-xs gap-1">
+                    Filtrando: {new Date(selectedDate + "T00:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" })}
+                    <button onClick={() => setSelectedDate(null)} className="ml-1 hover:text-foreground">
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                </div>
+              )}
             </CardHeader>
             <CardContent>
               {nonOkInteractions.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Nenhuma ocorrência recente.</p>
+                <p className="text-sm text-muted-foreground">Nenhuma ocorrência {selectedTone !== "todos" || selectedDate ? "com esse filtro" : "recente"}.</p>
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Data</TableHead>
-                      <TableHead>Remetente</TableHead>
-                      <TableHead>Mensagem</TableHead>
-                      <TableHead>Tom</TableHead>
-                      <TableHead>Canal</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {nonOkInteractions.map((i) => {
-                      const tCfg = TONE_CONFIG[i.tone ?? "ok"] ?? TONE_CONFIG.ok;
-                      return (
-                        <TableRow key={i.id} className="cursor-default">
-                          <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
-                            {formatDate(i.occurred_at)}
-                          </TableCell>
-                          <TableCell className="text-sm">{i.sender_raw ?? "—"}</TableCell>
-                          <TableCell className="text-sm max-w-xs truncate">{i.content?.slice(0, 150) ?? "—"}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className={`text-xs border-0 ${tCfg.className}`}>{tCfg.label}</Badge>
-                          </TableCell>
-                          <TableCell className="text-base">{CHANNEL_ICONS[i.channel] ?? "📡"}</TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
+                <TooltipProvider>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Data</TableHead>
+                        <TableHead>Remetente</TableHead>
+                        <TableHead>Mensagem</TableHead>
+                        <TableHead>Tom</TableHead>
+                        <TableHead>Tema</TableHead>
+                        <TableHead>Canal</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {nonOkInteractions.map((i) => {
+                        const tCfg = TONE_CONFIG[i.tone ?? "ok"] ?? TONE_CONFIG.ok;
+                        return (
+                          <TableRow
+                            key={i.id}
+                            className="cursor-pointer hover:bg-muted/50 transition-colors"
+                            onClick={() => setActiveTab("interactions")}
+                          >
+                            <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                              {formatDate(i.occurred_at)}
+                            </TableCell>
+                            <TableCell className="text-sm">{i.sender_raw ?? "—"}</TableCell>
+                            <TableCell className="text-sm max-w-xs">
+                              <span className="line-clamp-2" dangerouslySetInnerHTML={{ __html: i.content ?? "—" }} />
+                            </TableCell>
+                            <TableCell>
+                              <ShadTooltip>
+                                <TooltipTrigger asChild>
+                                  <Badge variant="outline" className={`text-xs border-0 cursor-help ${tCfg.className}`}>{tCfg.label}</Badge>
+                                </TooltipTrigger>
+                                <TooltipContent side="top" className="max-w-xs text-xs">
+                                  {getToneTooltip(i.tone ?? "ok", i.theme)}
+                                </TooltipContent>
+                              </ShadTooltip>
+                            </TableCell>
+                            <TableCell>
+                              {i.theme ? (
+                                <Badge variant="secondary" className="text-xs bg-muted text-muted-foreground">{i.theme}</Badge>
+                              ) : (
+                                <span className="text-muted-foreground">—</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-base">{CHANNEL_ICONS[i.channel] ?? "📡"}</TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </TooltipProvider>
               )}
             </CardContent>
           </Card>
