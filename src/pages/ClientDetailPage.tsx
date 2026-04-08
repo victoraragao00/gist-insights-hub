@@ -288,6 +288,12 @@ const ClientDetailPage = () => {
   const participants = participantsData?.list ?? [];
   const participantsTotalCount = participantsData?.totalCount ?? 0;
 
+  const { data: conversationsData } = useClientConversationsStatus(client?.id);
+  const conversationsNoReplyCount = useMemo(
+    () => (conversationsData ?? []).filter((c) => c.status === "sem_resposta").length,
+    [conversationsData]
+  );
+
   const { data: bindings = [] } = useQuery<ChannelBinding[]>({
     queryKey: ["detail_bindings", user?.id, clientId],
     enabled: !!clientId && !!user?.id,
