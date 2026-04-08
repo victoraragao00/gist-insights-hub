@@ -739,6 +739,16 @@ const ClientDetailPage = () => {
 
         {/* ── TAB 1: Visão Geral ── */}
         <TabsContent value="overview" className="space-y-6">
+          {/* Section 1: Gráficos e KPIs */}
+          <Collapsible open={isGraficosOpen} onOpenChange={setIsGraficosOpen}>
+            <CollapsibleTrigger className="flex items-center justify-between w-full py-3 px-1 hover:bg-muted/30 rounded-lg transition-colors">
+              <div className="flex items-center gap-2">
+                <BarChart2 className="h-4 w-4 text-muted-foreground" />
+                <span className="font-medium text-sm">Gráficos e KPIs</span>
+              </div>
+              <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${isGraficosOpen ? "rotate-180" : ""}`} />
+            </CollapsibleTrigger>
+            <CollapsibleContent className="space-y-6 pt-2">
           {/* KPI Row */}
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
             <KPICard label="Total de Interações" value={String(totalInteractionsCount)} sub="histórico completo" />
@@ -897,7 +907,12 @@ const ClientDetailPage = () => {
                           <TableRow
                             key={conv.conversation_id}
                             className="cursor-pointer hover:bg-muted/50 transition-colors"
-                            onClick={() => setActiveTab("interactions")}
+                            onClick={() => {
+                              setIsInteracoesOpen(true);
+                              setTimeout(() => {
+                                document.getElementById("section-interacoes")?.scrollIntoView({ behavior: "smooth" });
+                              }, 100);
+                            }}
                           >
                             <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                               {formatDistanceToNow(new Date(conv.last_occurred_at), { addSuffix: true, locale: ptBR })}
@@ -963,6 +978,55 @@ const ClientDetailPage = () => {
               </div>
             </div>
           )}
+            </CollapsibleContent>
+          </Collapsible>
+
+          <Separator />
+
+          {/* Section 2: Conversas */}
+          <Collapsible open={isConversasOpen} onOpenChange={setIsConversasOpen}>
+            <CollapsibleTrigger className="flex items-center justify-between w-full py-3 px-1 hover:bg-muted/30 rounded-lg transition-colors">
+              <div className="flex items-center gap-2">
+                <MessageSquare className="h-4 w-4 text-muted-foreground" />
+                <span className="font-medium text-sm">Conversas</span>
+                {conversationsNoReplyCount > 0 && (
+                  <span className="ml-1 inline-flex items-center justify-center rounded-full bg-orange-500 text-white text-[10px] font-bold min-w-[18px] h-[18px] px-1">
+                    {conversationsNoReplyCount}
+                  </span>
+                )}
+              </div>
+              <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${isConversasOpen ? "rotate-180" : ""}`} />
+            </CollapsibleTrigger>
+            <CollapsibleContent className="pt-2">
+              <ClientConversationsTab
+                clientId={client.id}
+                expandedConversation={expandedConversation}
+                onToggleExpand={(id) => setExpandedConversation((prev) => prev === id ? null : id)}
+                onViewFullConversation={() => {
+                  setIsInteracoesOpen(true);
+                  setTimeout(() => {
+                    document.getElementById("section-interacoes")?.scrollIntoView({ behavior: "smooth" });
+                  }, 100);
+                }}
+              />
+            </CollapsibleContent>
+          </Collapsible>
+
+          <Separator />
+
+          {/* Section 3: Interações */}
+          <Collapsible open={isInteracoesOpen} onOpenChange={setIsInteracoesOpen}>
+            <CollapsibleTrigger className="flex items-center justify-between w-full py-3 px-1 hover:bg-muted/30 rounded-lg transition-colors" id="section-interacoes">
+              <div className="flex items-center gap-2">
+                <MessageSquare className="h-4 w-4 text-muted-foreground" />
+                <span className="font-medium text-sm">Interações</span>
+              </div>
+              <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${isInteracoesOpen ? "rotate-180" : ""}`} />
+            </CollapsibleTrigger>
+            <CollapsibleContent className="min-h-[500px] pt-2">
+              <InteractionsFeed clientId={client.id} />
+            </CollapsibleContent>
+          </Collapsible>
         </TabsContent>
 
         {/* ── TAB: Demandas ── */}
