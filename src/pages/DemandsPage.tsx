@@ -21,6 +21,8 @@ import { KanbanColumn } from "@/components/demands/KanbanColumn";
 import { DemandDetailSheet } from "@/components/demands/DemandDetailSheet";
 import { CreateDemandDialog } from "@/components/demands/CreateDemandDialog";
 import { useExportDemandsCSV } from "@/hooks/useExportDemandsCSV";
+import { SlaView } from "@/components/demands/SlaView";
+import { useSlaDemandsBoard } from "@/hooks/useSla";
 
 // ── Filter Combobox ──
 
