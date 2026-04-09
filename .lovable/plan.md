@@ -1,35 +1,47 @@
 
 
-## Plan: Aba SLA nas Configurações
+## Plan: Clarificar SLA nas Configurações de Colunas
 
-### 1. Novo hook — `src/hooks/useSlaConfigs.ts`
+### Contexto
 
-- `useSlaConfigs(clientId?)` — query com `staleTime: 60_000`, filtra por `client_id.is.null` (global) ou `or(client_id.eq.X, client_id.is.null)` (cliente)
-- `useUpsertSlaConfig()` — `useMutation` com `onConflict: "client_id,priority"`, invalida `["sla_configs"]`, toast sonner
-- `useResetSlaConfig()` — `useMutation` que deleta override do cliente, invalida queries, toast sonner
+O badge "Início" (`triggers_started_at`) nas colunas indica onde o cronômetro do SLA para. O usuário quer que fique explícito que o SLA começa na criação do ticket e encerra quando entra na coluna marcada com "Início".
 
-### 2. Novo componente — `src/components/settings/SlaSettingsTab.tsx`
+### Alterações em `src/components/demands/ColumnSettingsTab.tsx`
 
-- Busca lista de clientes via query simples em `clients`
-- **Seção Global**: Tabela com 4 prioridades (urgent/high/medium/low), inputs numéricos, botão "Salvar padrões" com `isDirty` check
-- **Seção por Cliente**: Select de cliente + tabela com coluna "Origem" (badge Global/Personalizado) + botão Reset para overrides + botão "Salvar configuração do cliente"
-- `useMemo` para separar globalConfigs vs clientConfigs
-- Draft state (`globalDraft`, `clientDraft`) para detectar dirty
+**1. Adicionar explicação de SLA na `CardDescription` (linha 203-205)**
 
-### 3. Integrar em `src/pages/SettingsPage.tsx`
+Trocar a descrição atual por um texto que inclua a regra de SLA:
 
-- Linha 632: adicionar `{isAdmin && <TabsTrigger value="sla">SLA</TabsTrigger>}`
-- Linha 1131 (após users TabsContent): adicionar `{isAdmin && <TabsContent value="sla"><SlaSettingsTab /></TabsContent>}`
-- Import `SlaSettingsTab`
+```
+Arraste para reordenar, clique no nome para editar.
+O SLA de primeira resposta inicia quando o ticket é criado e encerra quando ele entra na coluna marcada com "Início SLA".
+```
+
+**2. Renomear badges para clareza (linhas 99-108)**
+
+- Badge `triggers_started_at`: trocar label de "Início" para "Início SLA" (com tooltip explicando: "O SLA de primeira resposta encerra quando o ticket entra nesta coluna")
+- Badge `triggers_finished_at`: manter "Fim"
+
+Envolver cada badge com `Tooltip` para que ao passar o mouse o usuário veja a explicação completa.
+
+**3. Adicionar callout informativo abaixo da lista de colunas**
+
+Um `Alert` discreto com ícone `Clock` explicando:
+
+> **Como funciona o SLA:** O cronômetro de primeira resposta começa automaticamente quando o ticket é criado. Ele para quando o ticket é movido para a coluna marcada como "Início SLA" (ex: A Fazer). Configure os limites de tempo na aba SLA.
+
+**4. Imports adicionais**
+
+- `Tooltip, TooltipTrigger, TooltipContent, TooltipProvider` de `@/components/ui/tooltip`
+- `Alert, AlertDescription` de `@/components/ui/alert`
+- `Clock` de `lucide-react`
 
 ### Files changed
 
 | Action | File |
 |--------|------|
-| New | `src/hooks/useSlaConfigs.ts` |
-| New | `src/components/settings/SlaSettingsTab.tsx` |
-| Edit | `src/pages/SettingsPage.tsx` (tab trigger + content + import) |
+| Edit | `src/components/demands/ColumnSettingsTab.tsx` |
 
 ### No changes to
-- Migrations, RLS, edge functions, `src/integrations/supabase/*`, `.env`
+- Migrations, RLS, hooks, edge functions, `src/integrations/supabase/*`, `.env`
 
