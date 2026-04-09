@@ -32,6 +32,7 @@ import { AreaSettingsTab } from "@/components/demands/AreaSettingsTab";
 import { UserManagementTab } from "@/components/settings/UserManagementTab";
 import { AgendaSettingsTab } from "@/components/settings/AgendaSettingsTab";
 import { RfiStatusSettingsTab } from "@/components/settings/RfiStatusSettingsTab";
+import { SlaSettingsTab } from "@/components/settings/SlaSettingsTab";
 
 // ── Types ──────────────────────────────────────────────
 
@@ -630,6 +631,7 @@ const SettingsPage = () => {
           {isAdmin && <TabsTrigger value="agendas">Pautas</TabsTrigger>}
           {isAdmin && <TabsTrigger value="rfi-statuses">Status RFI</TabsTrigger>}
           {isAdmin && <TabsTrigger value="users">Equipe & Acessos</TabsTrigger>}
+          {isAdmin && <TabsTrigger value="sla">SLA</TabsTrigger>}
         </TabsList>
 
         {isAdmin && (
@@ -1128,6 +1130,11 @@ const SettingsPage = () => {
         {isAdmin && (
           <TabsContent value="users">
             <UserManagementTab />
+          </TabsContent>
+        )}
+        {isAdmin && (
+          <TabsContent value="sla">
+            <SlaSettingsTab />
           </TabsContent>
         )}
       </Tabs>
