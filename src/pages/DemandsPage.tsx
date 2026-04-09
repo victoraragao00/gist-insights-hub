@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, ChevronsUpDown, Check, Download } from "lucide-react";
+import { Plus, ChevronsUpDown, Check, Download, Clock, LayoutGrid } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useClient } from "@/context/ClientContext";
@@ -21,6 +21,8 @@ import { KanbanColumn } from "@/components/demands/KanbanColumn";
 import { DemandDetailSheet } from "@/components/demands/DemandDetailSheet";
 import { CreateDemandDialog } from "@/components/demands/CreateDemandDialog";
 import { useExportDemandsCSV } from "@/hooks/useExportDemandsCSV";
+import { SlaView } from "@/components/demands/SlaView";
+import { useSlaDemandsBoard } from "@/hooks/useSla";
 
 // ── Filter Combobox ──
 
@@ -83,6 +85,11 @@ const DemandsPage = () => {
   const { data: types = [] } = useDemandTypes();
   const { data: areas = [] } = useDemandAreas();
   const exportCSVMutation = useExportDemandsCSV();
+  const { data: slaDemands = [] } = useSlaDemandsBoard();
+  const slaVencidos = slaDemands.filter((d) => d.sla_status === "vencido").length;
+
+  // View toggle
+  const [view, setView] = useState<"kanban" | "sla">("kanban");
 
   // Filters
   const [search, setSearch] = useState("");
@@ -186,6 +193,25 @@ const DemandsPage = () => {
         <h1 className="text-2xl font-bold text-foreground">Demandas</h1>
         <div className="flex items-center gap-2">
           <Button
+            variant={view === "kanban" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setView("kanban")}
+          >
+            <LayoutGrid className="h-4 w-4 mr-1" /> Kanban
+          </Button>
+          <Button
+            variant={view === "sla" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setView("sla")}
+          >
+            <Clock className="h-4 w-4 mr-1" /> SLA
+            {slaVencidos > 0 && (
+              <span className="ml-1.5 bg-destructive text-destructive-foreground text-xs rounded-full px-1.5">
+                {slaVencidos}
+              </span>
+            )}
+          </Button>
+          <Button
             variant="outline"
             size="sm"
             onClick={() => exportCSVMutation.mutate(filters)}
@@ -199,100 +225,100 @@ const DemandsPage = () => {
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-wrap gap-3">
-        <Input
-          placeholder="Buscar por título..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="h-9 w-56"
-        />
+      {/* SLA View */}
+      {view === "sla" && <SlaView />}
 
-        {/* Client combobox */}
-        <FilterCombobox
-          value={filterClient}
-          onValueChange={setFilterClient}
-          placeholder="Cliente"
-          searchPlaceholder="Buscar cliente..."
-          options={[
-            { value: "all", label: "Todos" },
-            ...clients.map((c) => ({ value: c.id, label: c.name })),
-          ]}
-          className="w-44"
-        />
-
-        {/* Type combobox */}
-        <FilterCombobox
-          value={filterType}
-          onValueChange={setFilterType}
-          placeholder="Tipo"
-          searchPlaceholder="Buscar tipo..."
-          options={[
-            { value: "all", label: "Todos" },
-            ...types.map((t) => ({ value: t.id, label: t.name })),
-          ]}
-          className="w-40"
-        />
-
-        {/* Priority combobox */}
-        <FilterCombobox
-          value={filterPriority}
-          onValueChange={setFilterPriority}
-          placeholder="Prioridade"
-          searchPlaceholder="Buscar prioridade..."
-          options={[
-            { value: "all", label: "Todas" },
-            { value: "urgent", label: "Urgente" },
-            { value: "high", label: "Alta" },
-            { value: "medium", label: "Média" },
-            { value: "low", label: "Baixa" },
-          ]}
-          className="w-36"
-        />
-
-        {/* Area combobox */}
-        <FilterCombobox
-          value={filterArea}
-          onValueChange={setFilterArea}
-          placeholder="Área"
-          searchPlaceholder="Buscar área..."
-          options={[
-            { value: "all", label: "Todas" },
-            ...areas.map((a) => ({ value: a.id, label: a.name })),
-          ]}
-          className="w-36"
-        />
-      </div>
-
-      {/* Kanban Board */}
-      {isLoading ? (
-        <div className="flex gap-4 overflow-x-auto pb-4">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="min-w-64 space-y-3">
-              <Skeleton className="h-6 w-32 animate-shimmer" />
-              <Skeleton className="h-24 w-full animate-shimmer" />
-              <Skeleton className="h-24 w-full animate-shimmer" />
-            </div>
-          ))}
-        </div>
-      ) : demands.length === 0 && columns.length > 0 && (filters.search || filters.client_id || filters.demand_type_id || filters.priority) ? (
-        <div className="text-center py-16 text-muted-foreground">
-          Nenhuma demanda encontrada com os filtros selecionados
-        </div>
-      ) : (
-        <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
-          <div className="flex gap-4 overflow-x-auto pb-4">
-            {columns.map((col) => (
-              <KanbanColumn
-                key={col.id}
-                column={col}
-                demands={demandsByColumn.get(col.id) ?? []}
-                onCardClick={handleCardClick}
-                onAddClick={handleAddClick}
-              />
-            ))}
+      {/* Kanban View */}
+      {view === "kanban" && (
+        <>
+          {/* Filters */}
+          <div className="flex flex-wrap gap-3">
+            <Input
+              placeholder="Buscar por título..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="h-9 w-56"
+            />
+            <FilterCombobox
+              value={filterClient}
+              onValueChange={setFilterClient}
+              placeholder="Cliente"
+              searchPlaceholder="Buscar cliente..."
+              options={[
+                { value: "all", label: "Todos" },
+                ...clients.map((c) => ({ value: c.id, label: c.name })),
+              ]}
+              className="w-44"
+            />
+            <FilterCombobox
+              value={filterType}
+              onValueChange={setFilterType}
+              placeholder="Tipo"
+              searchPlaceholder="Buscar tipo..."
+              options={[
+                { value: "all", label: "Todos" },
+                ...types.map((t) => ({ value: t.id, label: t.name })),
+              ]}
+              className="w-40"
+            />
+            <FilterCombobox
+              value={filterPriority}
+              onValueChange={setFilterPriority}
+              placeholder="Prioridade"
+              searchPlaceholder="Buscar prioridade..."
+              options={[
+                { value: "all", label: "Todas" },
+                { value: "urgent", label: "Urgente" },
+                { value: "high", label: "Alta" },
+                { value: "medium", label: "Média" },
+                { value: "low", label: "Baixa" },
+              ]}
+              className="w-36"
+            />
+            <FilterCombobox
+              value={filterArea}
+              onValueChange={setFilterArea}
+              placeholder="Área"
+              searchPlaceholder="Buscar área..."
+              options={[
+                { value: "all", label: "Todas" },
+                ...areas.map((a) => ({ value: a.id, label: a.name })),
+              ]}
+              className="w-36"
+            />
           </div>
-        </DndContext>
+
+          {/* Kanban Board */}
+          {isLoading ? (
+            <div className="flex gap-4 overflow-x-auto pb-4">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="min-w-64 space-y-3">
+                  <Skeleton className="h-6 w-32 animate-shimmer" />
+                  <Skeleton className="h-24 w-full animate-shimmer" />
+                  <Skeleton className="h-24 w-full animate-shimmer" />
+                </div>
+              ))}
+            </div>
+          ) : demands.length === 0 && columns.length > 0 && (filters.search || filters.client_id || filters.demand_type_id || filters.priority) ? (
+            <div className="text-center py-16 text-muted-foreground">
+              Nenhuma demanda encontrada com os filtros selecionados
+            </div>
+          ) : (
+            <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
+              <div className="flex gap-4 overflow-x-auto pb-4">
+                {columns.map((col) => (
+                  <KanbanColumn
+                    key={col.id}
+                    column={col}
+                    demands={demandsByColumn.get(col.id) ?? []}
+                    onCardClick={handleCardClick}
+                    onAddClick={handleAddClick}
+                  />
+                ))}
+              </div>
+            </DndContext>
+          )}
+        </>
       )}
 
       {/* Detail Sheet */}
