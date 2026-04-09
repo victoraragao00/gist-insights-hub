@@ -1464,6 +1464,7 @@ export type Database = {
           name: string
           position: number
           triggers_finished_at: boolean | null
+          triggers_sla_response_at: boolean | null
           triggers_started_at: boolean | null
         }
         Insert: {
@@ -1473,6 +1474,7 @@ export type Database = {
           name: string
           position: number
           triggers_finished_at?: boolean | null
+          triggers_sla_response_at?: boolean | null
           triggers_started_at?: boolean | null
         }
         Update: {
@@ -1482,6 +1484,7 @@ export type Database = {
           name?: string
           position?: number
           triggers_finished_at?: boolean | null
+          triggers_sla_response_at?: boolean | null
           triggers_started_at?: boolean | null
         }
         Relationships: []
