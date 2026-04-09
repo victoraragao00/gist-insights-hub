@@ -1,47 +1,100 @@
 
 
-## Plan: Clarificar SLA nas Configurações de Colunas
+## Plan: 4 marcadores configuráveis nas colunas — Demanda (Início/Fim) + SLA (Início/Fim)
 
-### Contexto
+### Contexto atual
 
-O badge "Início" (`triggers_started_at`) nas colunas indica onde o cronômetro do SLA para. O usuário quer que fique explícito que o SLA começa na criação do ticket e encerra quando entra na coluna marcada com "Início".
+A tabela `ticket_columns` tem 2 flags booleanas:
+- `triggers_started_at` — hoje serve tanto como "início de desenvolvimento" quanto "fim do SLA de resposta"
+- `triggers_finished_at` — "fim da demanda"
 
-### Alterações em `src/components/demands/ColumnSettingsTab.tsx`
+O usuário quer **4 marcadores independentes e configuráveis**:
 
-**1. Adicionar explicação de SLA na `CardDescription` (linha 203-205)**
+| Marcador | Significado | Exemplo |
+|----------|------------|---------|
+| Início Demanda | Cronômetro de desenvolvimento inicia | "Em Progresso" |
+| Fim Demanda | Demanda concluída | "Concluído" |
+| Início SLA | SLA de resposta começa (criação do ticket — implícito, mas marcador visual) | Criação |
+| Fim SLA | SLA de resposta encerra | "A Fazer" |
 
-Trocar a descrição atual por um texto que inclua a regra de SLA:
+Na prática, o **Início do SLA** é sempre na criação do ticket (não precisa de coluna), então precisamos de 1 novo campo: `triggers_sla_response_at` (booleano) para marcar onde o SLA de resposta **encerra**.
 
+### 1. Migration — Novo campo na tabela `ticket_columns`
+
+```sql
+ALTER TABLE public.ticket_columns
+  ADD COLUMN IF NOT EXISTS triggers_sla_response_at BOOLEAN DEFAULT false;
 ```
-Arraste para reordenar, clique no nome para editar.
-O SLA de primeira resposta inicia quando o ticket é criado e encerra quando ele entra na coluna marcada com "Início SLA".
+
+Atualizar o trigger `mark_sla_first_response` para usar `triggers_sla_response_at` em vez de `triggers_started_at`:
+
+```sql
+CREATE OR REPLACE FUNCTION public.mark_sla_first_response()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+  IF NEW.column_id != OLD.column_id AND NEW.sla_first_response_at IS NULL THEN
+    IF EXISTS (
+      SELECT 1 FROM ticket_columns
+      WHERE id = NEW.column_id AND triggers_sla_response_at = true
+    ) THEN
+      NEW.sla_first_response_at = now();
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$;
 ```
 
-**2. Renomear badges para clareza (linhas 99-108)**
+Também migrar dados existentes: copiar o valor atual de `triggers_started_at` para `triggers_sla_response_at` para não perder configuração.
 
-- Badge `triggers_started_at`: trocar label de "Início" para "Início SLA" (com tooltip explicando: "O SLA de primeira resposta encerra quando o ticket entra nesta coluna")
-- Badge `triggers_finished_at`: manter "Fim"
+### 2. Edit `src/components/demands/ColumnSettingsTab.tsx`
 
-Envolver cada badge com `Tooltip` para que ao passar o mouse o usuário veja a explicação completa.
+Separar os badges em dois grupos visuais:
 
-**3. Adicionar callout informativo abaixo da lista de colunas**
+**Badges de Demanda:**
+- `triggers_started_at` → badge "Início Dev" (tooltip: "Cronômetro de desenvolvimento inicia quando o ticket entra nesta coluna")
+- `triggers_finished_at` → badge "Fim" (tooltip: "Marca o ticket como concluído")
 
-Um `Alert` discreto com ícone `Clock` explicando:
+**Badge de SLA:**
+- `triggers_sla_response_at` → badge "Fim SLA" (tooltip: "O SLA de primeira resposta encerra quando o ticket entra nesta coluna")
 
-> **Como funciona o SLA:** O cronômetro de primeira resposta começa automaticamente quando o ticket é criado. Ele para quando o ticket é movido para a coluna marcada como "Início SLA" (ex: A Fazer). Configure os limites de tempo na aba SLA.
+Adicionar botões de toggle para cada marcador em cada linha de coluna — clicar no badge ativa/desativa o marcador (com mutation de update).
 
-**4. Imports adicionais**
+Atualizar o Alert informativo:
+> **Cronômetros:** O SLA de resposta inicia na criação do ticket e encerra na coluna marcada "Fim SLA". O desenvolvimento inicia na coluna "Início Dev" e encerra na coluna "Fim".
 
-- `Tooltip, TooltipTrigger, TooltipContent, TooltipProvider` de `@/components/ui/tooltip`
-- `Alert, AlertDescription` de `@/components/ui/alert`
-- `Clock` de `lucide-react`
+### 3. New hook — `useUpdateColumnTriggers`
+
+Em `src/hooks/useManageColumns.ts`, adicionar mutation para atualizar os 3 flags booleanos de uma coluna:
+
+```typescript
+export function useUpdateColumnTriggers() {
+  // mutate({ id, field, value }) → supabase.update({ [field]: value })
+  // Quando ativar um flag exclusivo (triggers_started_at, triggers_sla_response_at, triggers_finished_at),
+  // desativar o mesmo flag em todas as outras colunas primeiro
+}
+```
+
+### 4. Edit `src/hooks/useDemands.ts` — `useMoveDemand`
+
+Manter a lógica existente de `triggers_started_at`/`triggers_finished_at` para cronômetro de demanda (sem mudança). O SLA já é tratado pelo trigger no banco via `triggers_sla_response_at`.
+
+### 5. Update `src/components/demands/SlaView.tsx` e `src/hooks/useSla.ts`
+
+Sem mudanças necessárias — a RPC `get_demands_with_sla` já usa o trigger do banco. A migration atualiza o trigger para usar o novo campo.
+
+### 6. Update Alert/descrição no `ColumnSettingsTab`
+
+Atualizar texto explicativo para refletir os 4 marcadores.
 
 ### Files changed
 
 | Action | File |
 |--------|------|
-| Edit | `src/components/demands/ColumnSettingsTab.tsx` |
+| Migration | Add `triggers_sla_response_at` + update trigger + migrate data |
+| Edit | `src/components/demands/ColumnSettingsTab.tsx` (3 badges configuráveis com toggle) |
+| Edit | `src/hooks/useManageColumns.ts` (nova mutation `useUpdateColumnTriggers`) |
 
 ### No changes to
-- Migrations, RLS, hooks, edge functions, `src/integrations/supabase/*`, `.env`
+- `useDemands` move logic, `useSla.ts`, `SlaView.tsx`, other pages, `src/integrations/supabase/*`, `.env`
 
