@@ -86,6 +86,34 @@ export function useReorderColumns() {
   });
 }
 
+export function useUpdateColumnTriggers() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: { id: string; field: "triggers_started_at" | "triggers_finished_at" | "triggers_sla_response_at"; value: boolean }) => {
+      // If activating, first deactivate the same flag on all other columns (exclusive)
+      if (input.value) {
+        const { error: resetErr } = await supabase
+          .from("ticket_columns")
+          .update({ [input.field]: false })
+          .neq("id", input.id);
+        if (resetErr) throw resetErr;
+      }
+
+      const { error } = await supabase
+        .from("ticket_columns")
+        .update({ [input.field]: input.value })
+        .eq("id", input.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ticket_columns"] });
+      toast.success("Marcador atualizado");
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Erro ao atualizar marcador"),
+  });
+}
+
 export function useDeleteColumn() {
   const queryClient = useQueryClient();
 

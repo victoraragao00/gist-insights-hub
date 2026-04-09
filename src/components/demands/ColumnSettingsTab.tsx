@@ -23,10 +23,10 @@ import {
 } from "@/components/ui/select";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { GripVertical, Plus, Trash2, Play, Flag, Clock } from "lucide-react";
+import { GripVertical, Plus, Trash2, Play, Flag, Clock, Timer } from "lucide-react";
 import { useTicketColumns } from "@/hooks/useDemands";
 import {
-  useAddColumn, useRenameColumn, useReorderColumns, useDeleteColumn,
+  useAddColumn, useRenameColumn, useReorderColumns, useDeleteColumn, useUpdateColumnTriggers,
   type ColumnHasTicketsError,
 } from "@/hooks/useManageColumns";
 import type { Tables } from "@/integrations/supabase/types";
@@ -34,14 +34,61 @@ import { cn } from "@/lib/utils";
 
 const PRESET_COLORS = ["#6B7280", "#3B82F6", "#F59E0B", "#8B5CF6", "#06B6D4", "#10B981", "#EF4444"];
 
+type TriggerField = "triggers_started_at" | "triggers_finished_at" | "triggers_sla_response_at";
+
+function TriggerBadge({
+  active,
+  label,
+  tooltip,
+  icon: Icon,
+  variant,
+  onToggle,
+}: {
+  active: boolean;
+  label: string;
+  tooltip: string;
+  icon: React.ElementType;
+  variant: "default" | "outline";
+  onToggle: () => void;
+}) {
+  return (
+    <TooltipProvider delayDuration={200}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Badge
+            variant={active ? "default" : "outline"}
+            className={cn(
+              "text-xs gap-0.5 cursor-pointer select-none transition-colors",
+              !active && "opacity-40 hover:opacity-70"
+            )}
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggle();
+            }}
+          >
+            <Icon className="h-3 w-3" /> {label}
+          </Badge>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-[240px] text-center">
+          {tooltip}
+          <br />
+          <span className="text-muted-foreground text-[10px]">Clique para {active ? "desativar" : "ativar"}</span>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
 function SortableColumnRow({
   column,
   onRename,
   onDelete,
+  onToggleTrigger,
 }: {
-  column: Tables<"ticket_columns">;
+  column: Tables<"ticket_columns"> & { triggers_sla_response_at?: boolean | null };
   onRename: (id: string, name: string) => void;
   onDelete: (col: Tables<"ticket_columns">) => void;
+  onToggleTrigger: (id: string, field: TriggerField, value: boolean) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: column.id });
   const [editing, setEditing] = useState(false);
@@ -97,35 +144,31 @@ function SortableColumnRow({
         </span>
       )}
 
-      <div className="flex items-center gap-1.5">
-        {column.triggers_started_at && (
-          <TooltipProvider delayDuration={200}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Badge variant="outline" className="text-xs gap-0.5 cursor-help">
-                  <Play className="h-3 w-3" /> Início SLA
-                </Badge>
-              </TooltipTrigger>
-              <TooltipContent side="top" className="max-w-[220px] text-center">
-                O SLA de primeira resposta encerra quando o ticket entra nesta coluna
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        )}
-        {column.triggers_finished_at && (
-          <TooltipProvider delayDuration={200}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Badge variant="outline" className="text-xs gap-0.5 cursor-help">
-                  <Flag className="h-3 w-3" /> Fim
-                </Badge>
-              </TooltipTrigger>
-              <TooltipContent side="top" className="max-w-[220px] text-center">
-                Marca o ticket como concluído e registra a data de finalização
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        )}
+      <div className="flex items-center gap-1">
+        <TriggerBadge
+          active={!!column.triggers_started_at}
+          label="Início Dev"
+          tooltip="Cronômetro de desenvolvimento inicia quando o ticket entra nesta coluna"
+          icon={Play}
+          variant={column.triggers_started_at ? "default" : "outline"}
+          onToggle={() => onToggleTrigger(column.id, "triggers_started_at", !column.triggers_started_at)}
+        />
+        <TriggerBadge
+          active={!!column.triggers_finished_at}
+          label="Fim"
+          tooltip="Marca o ticket como concluído e registra a data de finalização"
+          icon={Flag}
+          variant={column.triggers_finished_at ? "default" : "outline"}
+          onToggle={() => onToggleTrigger(column.id, "triggers_finished_at", !column.triggers_finished_at)}
+        />
+        <TriggerBadge
+          active={!!(column as any).triggers_sla_response_at}
+          label="Fim SLA"
+          tooltip="O SLA de primeira resposta encerra quando o ticket entra nesta coluna"
+          icon={Timer}
+          variant={(column as any).triggers_sla_response_at ? "default" : "outline"}
+          onToggle={() => onToggleTrigger(column.id, "triggers_sla_response_at", !(column as any).triggers_sla_response_at)}
+        />
       </div>
 
       <Button
@@ -146,6 +189,7 @@ export function ColumnSettingsTab() {
   const renameMutation = useRenameColumn();
   const reorderMutation = useReorderColumns();
   const deleteMutation = useDeleteColumn();
+  const triggerMutation = useUpdateColumnTriggers();
 
   const [newName, setNewName] = useState("");
   const [newColor, setNewColor] = useState(PRESET_COLORS[0]);
@@ -155,7 +199,6 @@ export function ColumnSettingsTab() {
   const [ticketCount, setTicketCount] = useState(0);
   const [moveToId, setMoveToId] = useState("");
   const [showMoveDialog, setShowMoveDialog] = useState(false);
-  const [showSimpleDelete, setShowSimpleDelete] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -175,6 +218,10 @@ export function ColumnSettingsTab() {
 
   const handleRename = (id: string, name: string) => {
     renameMutation.mutate({ id, name });
+  };
+
+  const handleToggleTrigger = (id: string, field: TriggerField, value: boolean) => {
+    triggerMutation.mutate({ id, field, value });
   };
 
   const handleDelete = (col: Tables<"ticket_columns">) => {
@@ -221,7 +268,7 @@ export function ColumnSettingsTab() {
         <CardHeader className="pb-3">
           <CardTitle className="text-base font-semibold">Colunas do Board</CardTitle>
           <CardDescription>
-            Arraste para reordenar, clique no nome para editar. O SLA de primeira resposta inicia quando o ticket é criado e encerra quando ele entra na coluna marcada com "Início SLA".
+            Arraste para reordenar, clique no nome para editar. Clique nos badges para configurar os marcadores de cada coluna.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -233,6 +280,7 @@ export function ColumnSettingsTab() {
                   column={col}
                   onRename={handleRename}
                   onDelete={handleDelete}
+                  onToggleTrigger={handleToggleTrigger}
                 />
               ))}
             </SortableContext>
@@ -270,7 +318,7 @@ export function ColumnSettingsTab() {
       <Alert className="border-border">
         <Clock className="h-4 w-4" />
         <AlertDescription className="text-xs text-muted-foreground">
-          <strong>Como funciona o SLA:</strong> O cronômetro de primeira resposta começa automaticamente quando o ticket é criado. Ele para quando o ticket é movido para a coluna marcada como "Início SLA" (ex: A Fazer). Configure os limites de tempo na aba SLA.
+          <strong>Cronômetros:</strong> O SLA de resposta inicia na criação do ticket e encerra na coluna marcada <strong>"Fim SLA"</strong>. O desenvolvimento inicia na coluna <strong>"Início Dev"</strong> e encerra na coluna <strong>"Fim"</strong>. Configure os limites de tempo na aba SLA.
         </AlertDescription>
       </Alert>
 
