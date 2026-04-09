@@ -812,6 +812,7 @@ export type Database = {
           position: number
           priority: Database["public"]["Enums"]["demand_priority"]
           resolution: string | null
+          sla_first_response_at: string | null
           started_at: string | null
           title: string
         }
@@ -840,6 +841,7 @@ export type Database = {
           position?: number
           priority?: Database["public"]["Enums"]["demand_priority"]
           resolution?: string | null
+          sla_first_response_at?: string | null
           started_at?: string | null
           title: string
         }
@@ -868,6 +870,7 @@ export type Database = {
           position?: number
           priority?: Database["public"]["Enums"]["demand_priority"]
           resolution?: string | null
+          sla_first_response_at?: string | null
           started_at?: string | null
           title?: string
         }
@@ -1362,6 +1365,41 @@ export type Database = {
           },
         ]
       }
+      sla_configs: {
+        Row: {
+          client_id: string | null
+          created_at: string
+          hours_limit: number
+          id: string
+          priority: string
+          updated_at: string
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string
+          hours_limit: number
+          id?: string
+          priority: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string
+          hours_limit?: number
+          id?: string
+          priority?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sla_configs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sync_jobs: {
         Row: {
           client_id: string | null
@@ -1607,6 +1645,28 @@ export type Database = {
       get_demand_analytics: {
         Args: { p_client_id?: string; p_days?: number }
         Returns: Json
+      }
+      get_demands_with_sla: {
+        Args: { p_user_id: string }
+        Returns: {
+          assignee_name: string
+          cancellation_reason: string
+          client_id: string
+          client_name: string
+          column_id: string
+          column_name: string
+          created_at: string
+          id: string
+          is_blocked: boolean
+          priority: string
+          sla_elapsed_hours: number
+          sla_first_response_at: string
+          sla_hours_limit: number
+          sla_percent_used: number
+          sla_remaining_hours: number
+          sla_status: string
+          title: string
+        }[]
       }
       get_users_with_permissions: {
         Args: never
