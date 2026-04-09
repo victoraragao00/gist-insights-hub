@@ -193,6 +193,25 @@ const DemandsPage = () => {
         <h1 className="text-2xl font-bold text-foreground">Demandas</h1>
         <div className="flex items-center gap-2">
           <Button
+            variant={view === "kanban" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setView("kanban")}
+          >
+            <LayoutGrid className="h-4 w-4 mr-1" /> Kanban
+          </Button>
+          <Button
+            variant={view === "sla" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setView("sla")}
+          >
+            <Clock className="h-4 w-4 mr-1" /> SLA
+            {slaVencidos > 0 && (
+              <span className="ml-1.5 bg-destructive text-destructive-foreground text-xs rounded-full px-1.5">
+                {slaVencidos}
+              </span>
+            )}
+          </Button>
+          <Button
             variant="outline"
             size="sm"
             onClick={() => exportCSVMutation.mutate(filters)}
