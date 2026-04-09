@@ -1,8 +1,8 @@
-# CONTEXT.md — Estado do Projeto (v28 — 2026-04-07)
+# CONTEXT.md — Estado do Projeto (v29 — 2026-04-09)
 
 > Mantido pelo Claude Code ao final de cada sessao. Lido por todos os agentes para manter contexto.
 >
-> last_updated: 2026-04-07
+> last_updated: 2026-04-09
 > last_updated_by: Lovable
 
 ---
@@ -39,7 +39,7 @@
 8 migrations criando o modelo de dados completo:
 
 **Tabelas criadas:**
-- `ticket_columns` — colunas do Kanban (name, position, color, triggers_started_at, triggers_finished_at)
+- `ticket_columns` — colunas do Kanban (name, position, color, triggers_started_at, triggers_finished_at, triggers_sla_response_at)
 - `demand_types` — tipos de demanda (name, color, icon, active, position)
 - `demands` — demandas/tickets (title, description, expected_result, client_id, demand_type_id, priority ENUM, column_id, position, assignee TEXT, notes, is_blocked, blocker_reason, started_at, finished_at, area_id, assignee_id, rfi_url, created_by)
 - `demand_activities` — log de auditoria (demand_id, event_type ENUM, description, from_value, to_value)
@@ -68,7 +68,7 @@
 
 **Componentes:** DemandCard, KanbanColumn, CreateDemandDialog, DemandDetailSheet (inline editing + attachments + timeline)
 
-**Settings (admin-only, 3 tabs):** ColumnSettingsTab (DnD reorder, trigger badges), AreaSettingsTab (CRUD + color picker), AssigneeSettingsTab (CRUD + soft delete)
+**Settings (admin-only, 3 tabs):** ColumnSettingsTab (DnD reorder, 3 trigger badges configuráveis: Início Dev / Fim / Fim SLA), AreaSettingsTab (CRUD + color picker), AssigneeSettingsTab (CRUD + soft delete)
 
 **Filtros:** 5 combobox filters (Search 3+ chars, Client, Type, Priority, Area)
 
@@ -80,7 +80,7 @@
 - `useDemandAssignees.ts` — CRUD assignees
 - `useDemandAttachments.ts` — file upload (Supabase Storage), add link, delete
 - `useDemandNotifications.ts` — Realtime subscription (supabase.channel), mark read
-- `useManageColumns.ts` — CRUD colunas + reorder
+- `useManageColumns.ts` — CRUD colunas + reorder + useUpdateColumnTriggers (toggle exclusivo de marcadores)
 
 **staleTime:** Dados estaticos = 300s (5min). Dados dinamicos = 30s.
 
@@ -698,6 +698,10 @@ gist-insights-hub/
 38. **Concluido:** Fase 9 — process-meeting-transcription migrado para Lovable AI Gateway (google/gemini-2.5-flash) (2026-04-07)
 39. **Concluido:** Fase 9 — Analise de IA por demanda: resolution + demand_ai_analyses + analyze-demand Edge Function (2026-04-07)
 40. **Concluido:** Fase 9 — Fix validacao process-meeting-transcription: aceita processar sem transcricao desde que tenha objetivo/contexto/proximos passos (2026-04-07)
-41. **Pendente:** Lovable S6 — Edge function deliver-audit-alerts (baixa prioridade)
-42. **Pendente:** Testar notificacoes in-app com 2 usuarios simultaneos
-43. **Fase 8:** Insights IA avancados
+41. **Concluido:** SLA — Monitoramento de SLA de primeira resposta: sla_configs + get_demands_with_sla RPC + trigger mark_sla_first_response + SlaView + aba SLA em Settings (2026-04-09)
+42. **Concluido:** SLA — 4 marcadores configuráveis nas colunas: triggers_started_at (Início Dev), triggers_finished_at (Fim), triggers_sla_response_at (Fim SLA) — toggle exclusivo por tipo, tooltips explicativos, useUpdateColumnTriggers (2026-04-09)
+43. **Concluido:** UX — Badges sender_side na tabela de ocorrências + agrupamento por conversa + contact_name + aba Conversas colapsável na ClientDetailPage (2026-04-09)
+44. **Concluido:** Fix — useClientDemands select com joins completos (demand_types, ticket_columns, demand_areas, user_profiles, clients) (2026-04-09)
+45. **Pendente:** Lovable S6 — Edge function deliver-audit-alerts (baixa prioridade)
+46. **Pendente:** Testar notificacoes in-app com 2 usuarios simultaneos
+47. **Fase 8:** Insights IA avancados
