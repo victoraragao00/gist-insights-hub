@@ -85,6 +85,11 @@ const DemandsPage = () => {
   const { data: types = [] } = useDemandTypes();
   const { data: areas = [] } = useDemandAreas();
   const exportCSVMutation = useExportDemandsCSV();
+  const { data: slaDemands = [] } = useSlaDemandsBoard();
+  const slaVencidos = slaDemands.filter((d) => d.sla_status === "vencido").length;
+
+  // View toggle
+  const [view, setView] = useState<"kanban" | "sla">("kanban");
 
   // Filters
   const [search, setSearch] = useState("");
