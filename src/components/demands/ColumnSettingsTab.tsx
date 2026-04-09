@@ -21,7 +21,9 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { GripVertical, Plus, Trash2, Play, Flag } from "lucide-react";
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { GripVertical, Plus, Trash2, Play, Flag, Clock } from "lucide-react";
 import { useTicketColumns } from "@/hooks/useDemands";
 import {
   useAddColumn, useRenameColumn, useReorderColumns, useDeleteColumn,
@@ -97,14 +99,32 @@ function SortableColumnRow({
 
       <div className="flex items-center gap-1.5">
         {column.triggers_started_at && (
-          <Badge variant="outline" className="text-xs gap-0.5">
-            <Play className="h-3 w-3" /> Início
-          </Badge>
+          <TooltipProvider delayDuration={200}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge variant="outline" className="text-xs gap-0.5 cursor-help">
+                  <Play className="h-3 w-3" /> Início SLA
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-[220px] text-center">
+                O SLA de primeira resposta encerra quando o ticket entra nesta coluna
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         )}
         {column.triggers_finished_at && (
-          <Badge variant="outline" className="text-xs gap-0.5">
-            <Flag className="h-3 w-3" /> Fim
-          </Badge>
+          <TooltipProvider delayDuration={200}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge variant="outline" className="text-xs gap-0.5 cursor-help">
+                  <Flag className="h-3 w-3" /> Fim
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-[220px] text-center">
+                Marca o ticket como concluído e registra a data de finalização
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         )}
       </div>
 
@@ -201,7 +221,7 @@ export function ColumnSettingsTab() {
         <CardHeader className="pb-3">
           <CardTitle className="text-base font-semibold">Colunas do Board</CardTitle>
           <CardDescription>
-            Arraste para reordenar, clique no nome para editar. Colunas com tickets não podem ser excluídas diretamente.
+            Arraste para reordenar, clique no nome para editar. O SLA de primeira resposta inicia quando o ticket é criado e encerra quando ele entra na coluna marcada com "Início SLA".
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -246,6 +266,13 @@ export function ColumnSettingsTab() {
           </div>
         </CardContent>
       </Card>
+
+      <Alert className="border-border">
+        <Clock className="h-4 w-4" />
+        <AlertDescription className="text-xs text-muted-foreground">
+          <strong>Como funciona o SLA:</strong> O cronômetro de primeira resposta começa automaticamente quando o ticket é criado. Ele para quando o ticket é movido para a coluna marcada como "Início SLA" (ex: A Fazer). Configure os limites de tempo na aba SLA.
+        </AlertDescription>
+      </Alert>
 
       {/* Move tickets dialog */}
       <Dialog open={showMoveDialog} onOpenChange={setShowMoveDialog}>
