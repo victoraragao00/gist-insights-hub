@@ -1,16 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import type { Tables } from "@/integrations/supabase/types";
 
-export interface ClientDemand {
-  id: string;
-  title: string;
-  priority: string;
-  is_blocked: boolean | null;
-  created_at: string | null;
-  demand_types: { name: string; color: string | null; icon: string | null } | null;
-  ticket_columns: { name: string; color: string | null; triggers_finished_at: boolean | null } | null;
-  demand_areas: { name: string; color: string | null } | null;
-  user_profiles: { full_name: string | null; email: string | null } | null;
+export interface ClientDemand extends Tables<"demands"> {
+  clients?: { id: string; name: string } | null;
+  demand_types?: { id: string; name: string; color: string | null; icon: string | null } | null;
+  ticket_columns?: { id: string; name: string; color: string | null; triggers_started_at: boolean | null; triggers_finished_at: boolean | null } | null;
+  demand_areas?: { id: string; name: string; color: string | null } | null;
+  user_profiles?: { id: string; full_name: string | null; email: string | null } | null;
 }
 
 export function useClientDemands(clientId: string | undefined) {
@@ -22,11 +19,12 @@ export function useClientDemands(clientId: string | undefined) {
       const { data, error } = await supabase
         .from("demands")
         .select(
-          `id, title, priority, is_blocked, created_at,
-           demand_types(name, color, icon),
-           ticket_columns(name, color, triggers_finished_at),
-           demand_areas(name, color),
-           user_profiles!assignee_id(full_name, email)`
+          `*,
+           clients(id, name),
+           demand_types(id, name, color, icon),
+           ticket_columns(id, name, color, triggers_started_at, triggers_finished_at),
+           demand_areas(id, name, color),
+           user_profiles!assignee_id(id, full_name, email)`
         )
         .eq("client_id", clientId!)
         .order("created_at", { ascending: false })
