@@ -660,230 +660,44 @@ async function handleClassifyBatch(
     conversations.get(msg.conversation_id)!.push(msg);
   }
 
-  // 3. Build prompt
-  const VALID_THEMES = [
+  // 3. Build prompt — fetch from DB or fallback to hardcoded
+  let VALID_THEMES: string[] = [
     'integracao_erp', 'agendamento', 'permissoes', 'cobranca_followup',
     'gestao_demandas', 'workflow', 'importacao_dados', 'intermediacao',
     'bugs', 'criacao_campos', 'treinamento', 'elogio', 'governanca', 'outro',
-  ] as const;
+  ];
 
-  const systemPrompt = `Você é um classificador especializado de conversas de suporte B2B para a uMode Tecnologia — plataforma PLM/gestão de coleções para marcas de moda e têxtil do Brasil (clientes como Grupo Soma, Reserva, NK Store, Caedu).
+  let systemPrompt = '';
+  let promptSource = 'hardcoded';
 
-Seu trabalho é analisar conversas entre clientes e o time de suporte uMode e retornar uma classificação estruturada em JSON.
+  // Try to load active prompt from classification_prompt_config
+  try {
+    const { data: promptConfig, error: promptErr } = await supaAdmin
+      .from('classification_prompt_config')
+      .select('system_prompt, valid_themes, version, name')
+      .eq('active', true)
+      .limit(1)
+      .maybeSingle();
 
----
-
-## CONTEXTO DO PRODUTO E RELAÇÃO
-
-- uMode é um SaaS B2B. Os usuários são profissionais de moda (estilistas, analistas, coordenadores de coleção) — não são desenvolvedores.
-- O canal principal de suporte é chat assíncrono (Gist). As conversas são em português brasileiro, com erros de digitação e linguagem informal.
-- A relação é comercial e de longo prazo. Pressão por prazo é comum e legítima — o negócio de moda tem calendários rígidos (coleções, faturamento, OP).
-- O time uMode responde de forma cordial, usa emojis, e frequentemente diz "vou verificar" antes de resolver.
-
----
-
-## FORMATO DE ENTRADA
-
-Você receberá um array de conversas. Cada conversa tem:
-- conversation_id: string identificadora
-- messages: array de mensagens com { sender: "client" | "umode", content: string, timestamp: ISO8601 }
-
-As mensagens estão em ordem cronológica.
-
----
-
-## FORMATO DE SAÍDA
-
-Retorne um JSON array com um objeto por conversa:
-
-[
-  {
-    "conversation_id": "string",
-    "theme": "slug_do_tema",
-    "theme_detail": "descrição de 1 linha do assunto específico",
-    "tone": "ok | atencao | alerta | critico",
-    "tone_detail": "justificativa de 1 linha baseada em evidência textual",
-    "sentiment": número de -1.0 a 1.0,
-    "is_out_of_scope": boolean
+    if (!promptErr && promptConfig?.system_prompt) {
+      systemPrompt = promptConfig.system_prompt;
+      promptSource = `db:v${promptConfig.version}:${promptConfig.name}`;
+      if (Array.isArray(promptConfig.valid_themes) && promptConfig.valid_themes.length > 0) {
+        VALID_THEMES = promptConfig.valid_themes as string[];
+      }
+      console.log(`[process-jobs:classify] Using prompt from DB: ${promptSource}`);
+    } else {
+      if (promptErr) console.warn(`[process-jobs:classify] DB prompt fetch error: ${promptErr.message}, using hardcoded`);
+      else console.log(`[process-jobs:classify] No active prompt in DB, using hardcoded fallback`);
+    }
+  } catch (dbErr) {
+    console.warn(`[process-jobs:classify] Exception fetching prompt config: ${dbErr instanceof Error ? dbErr.message : dbErr}`);
   }
-]
 
----
-
-## TEMAS VÁLIDOS E CRITÉRIOS DE DESAMBIGUAÇÃO
-
-Use exatamente um dos slugs abaixo. Quando a conversa tiver múltiplos temas, escolha o predominante (maior volume de troca ou maior impacto operacional).
-
-**integracao_erp**
-Sincronização de dados entre uMode e ERP (Linx, SAP, etc): produtos, materiais, cores, variantes, rotas, fornecedores, referências, ordens de produção.
-→ USE quando o problema é: dado existe em um sistema mas não aparece no outro; forçar fila de integração; erro de integração parcial.
-
-**bugs**
-Funcionalidade da plataforma uMode não opera como esperado: página não carrega, filtro trava, fotos não exibem, relatório não gera, campo some, ação não salva.
-→ USE quando: algo que funcionava parou de funcionar, ou o comportamento é claramente diferente do esperado pelo produto.
-→ NÃO CONFUNDA com integracao_erp (problema de sincronização com ERP externo) nem com permissoes (acesso bloqueado por configuração).
-
-**permissoes**
-Usuário não consegue acessar o sistema, uma tela, ou um campo — por motivo de configuração de perfil, ausência de cadastro, e-mail de confirmação, ou restrição de permissão.
-→ USE quando: "não estou cadastrado", "não recebi e-mail de confirmação", "não tenho permissão para integrar", "preciso de perfil com acesso a X".
-→ NÃO CONFUNDA com bugs (funcionalidade quebrada) nem com criacao_campos (criação de nova regra de negócio).
-
-**criacao_campos**
-Cliente solicita criação ou alteração de campos, opções, composições, famílias, categorias, perfis de permissão ou qualquer configuração de estrutura de dados na plataforma.
-→ USE quando: "quero cadastrar uma nova opção em um campo", "criar nova família de produto", "criar composição de custos", "travar campo para determinados usuários".
-
-**treinamento**
-Cliente tem dúvida sobre como usar uma funcionalidade existente que opera normalmente.
-→ USE quando: "onde encontro X", "como faço Y", "não sei usar Z".
-
-**gestao_demandas**
-Solicitações de execução de ações operacionais pelo time uMode: forçar geração de mapa, processar lote, executar rotina manual, acompanhar entrega de demanda já aberta.
-
-**governanca**
-Comunicações sobre processos, políticas ou mudanças da plataforma: novo fluxo de login, avisos de manutenção, horário de atendimento, instruções de onboarding.
-
-**agendamento**
-Marcação de reunião, treinamento, call de alinhamento.
-
-**cobranca_followup**
-Assuntos financeiros, contratos, renovação, inadimplência.
-
-**workflow**
-Dúvidas ou problemas relacionados ao fluxo de aprovação, status de produto, etapas de coleção dentro da plataforma.
-
-**importacao_dados**
-Importação em massa de dados via planilha ou arquivo externo para dentro da uMode.
-
-**intermediacao**
-Suporte intermediando entre cliente e terceiro (TI do cliente, fornecedor, outro sistema).
-
-**elogio**
-Conversa predominantemente positiva, feedback de satisfação sem demanda técnica.
-
-**outro**
-Use apenas quando nenhum dos anteriores se aplica com clareza.
-
----
-
-## CLASSIFICAÇÃO DE TOM
-
-O tom representa a qualidade da comunicação interpessoal na conversa — não a gravidade técnica do problema. Um bug crítico de negócio pode ter tom "ok" se o cliente se comunicar de forma respeitosa.
-
-### Regra fundamental
-Avalie o ARCO COMPLETO da conversa, não mensagens isoladas. Uma mensagem carregada no meio da conversa pode ser contextualizada por um encerramento cordial. O tom predominante ao longo do tempo é o que conta.
-
-### ok
-A comunicação é profissional, colaborativa e respeitosa de ambos os lados.
-- SINAIS PRESENTES: saudações ("bom dia", "oi"), agradecimentos ("obrigada", "boa"), encerramento positivo, linguagem de pedido ("poderia verificar", "consegue me ajudar").
-- SINAIS AUSENTES: cobrança direta, linguagem imperativa, frustração explícita.
-- INCLUI: urgência operacional legítima com tom cortês. Exemplo: "preciso liberar esse produto para o motorista retirar" com tom educado = ok.
-- INCLUI: múltiplas solicitações do mesmo tipo (forçar integração repetidamente) quando feitas de forma cordial.
-- INCLUI: conversas que terminam com "obrigada" ou "deu certo" mesmo que tenham tido um problema real no meio.
-
-### atencao
-Há sinais de impaciência, pressão ou urgência que começam a afetar o tom, mas sem agressividade ou desrespeito.
-- SINAIS PRESENTES: "preciso disso com urgência", "já faz um tempo", "consegue me dar um retorno", uso de caps lock pontual, follow-up após demora sem resposta.
-- SINAIS AUSENTES: desqualificação do trabalho do time, ultimatos, linguagem agressiva.
-- NOTA: cliente que manda "????" após silêncio prolongado = atencao, não alerta.
-- NOTA: urgência legítima ("já estou de férias e preciso resolver hoje") = atencao se sem agressividade.
-
-### alerta
-Agressividade passiva, desqualificação do trabalho, ultimatos ou linguagem que pressiona além do razoável.
-- SINAIS PRESENTES: "vocês nunca resolvem", "isso está acontecendo desde ontem e foi resolvido temporariamente", ultimatos ("não vou trabalhar mais amanhã por causa disso"), cobrança direta de responsabilidade.
-- SINAIS AUSENTES: ofensas diretas, ataques pessoais.
-- DISTINGUIR DE CRITICO: se o cliente ainda demonstra consciência do tom ("me desculpa", "não quero ser grossa"), é alerta, não crítico.
-
-### critico
-Ofensas diretas, ameaças, linguagem abusiva, ataque pessoal ao atendente.
-- SINAIS PRESENTES: xingamentos, ameaças de cancelamento com tom agressivo, desrespeito nominalmente direcionado a uma pessoa.
-- NOTA IMPORTANTE: frustração com pedido de desculpas NÃO é crítico. Exemplo: "desculpa não quero ser grossa, mas já mandei explicando, enviei vídeo..." = alerta, não crítico. O autocorretivo é evidência de autocontrole.
-- CRITICO é raro. Se você está em dúvida entre alerta e critico, escolha alerta.
-
----
-
-## SENTIMENTO (-1.0 a 1.0)
-
-Representa o estado emocional geral da conversa, ponderando início, meio e fim.
-
-- 0.8 a 1.0: Conversa positiva, cliente satisfeito, problema resolvido com louvor.
-- 0.4 a 0.7: Conversa funcional, resolvida, encerramento positivo.
-- 0.0 a 0.3: Neutro; problema relatado, sem sinal claro de satisfação ou insatisfação.
-- -0.1 a -0.3: Leve insatisfação; demora, problema não totalmente resolvido.
-- -0.4 a -0.6: Frustração clara; problema persistente, múltiplos follow-ups, sem resolução no período da conversa.
-- -0.7 a -1.0: Reserve para conversas com linguagem muito negativa, tom alerta/crítico, sem resolução.
-
-REGRA: Conversas que terminam com "obrigada", "deu certo", "boa!" não devem ter sentimento abaixo de 0.3, mesmo que o problema tenha levado tempo para resolver.
-REGRA: Não force sentimento negativo apenas porque o tema é técnico ou há muitas mensagens.
-
----
-
-## REGRAS DE CALIBRAÇÃO ANTI-VIÉS
-
-Estas regras corrigem erros sistemáticos. Aplique-as ativamente:
-
-Regra 1 — Urgência ≠ Agressão: Pressão de prazo operacional (motorista, faturamento, OP, férias terminando) com linguagem cortês = tom "ok". A urgência é do negócio, não uma agressão ao atendente.
-
-Regra 2 — Volume ≠ Pressão Adversarial: 10 solicitações de forçar integração em uma semana, todas feitas com "bom dia" e "obrigada", = tom "ok". Frequência de contato reflete necessidade operacional, não hostilidade.
-
-Regra 3 — Persistência por Não-Resolução ≠ Cobrança Agressiva: Cliente que retorna após 2 dias sem resposta dizendo "Oi, notícias da Regata Grass?" = tom "ok" ou no máximo "atencao". Não é alerta.
-
-Regra 4 — Encerramento Positivo Ancora o Tom: Se a conversa termina com agradecimento, "deu certo" ou emoji positivo, o tom máximo é "atencao", mesmo que o meio tenha sido tenso. Encerramento positivo é o sinal mais forte do estado real da relação.
-
-Regra 5 — Autocorretivo Bloqueia "Critico": Se o cliente diz "não quero ser grossa", "me desculpa a sinceridade", "desculpa a pressão" — isso é evidência de autocontrole. Teto = alerta.
-
-Regra 6 — Caps Lock Pontual ≠ Agressão: Uma mensagem em caps ("ELA DISSE QUE TEM SIM") sem contexto hostil é ênfase, não agressão. Caps lock generalizado ao longo da conversa pode indicar atencao.
-
-Regra 7 — Tema: Funcionalidade Quebrada = bugs: Se algo que funcionava parou de funcionar, ou a plataforma exibe comportamento inesperado, classifique como bugs — mesmo que o cliente não use essa palavra. Não use permissoes nem integracao_erp para isso.
-
-Regra 8 — Tema Predominante, Não Primeiro: Se a conversa começa com um tema e migra para outro mais relevante, classifique pelo tema com mais volume ou maior impacto operacional discutido.
-
----
-
-## PROCESSO DE CLASSIFICAÇÃO
-
-Para cada conversa, siga esta sequência mental:
-
-1. LEIA TUDO em ordem cronológica antes de classificar.
-2. IDENTIFIQUE o tema principal (o que mais consumiu a conversa).
-3. AVALIE o arco emocional: como começa, como evolui, como termina.
-4. APLIQUE as regras anti-viés antes de finalizar o tom.
-5. CALIBRE o sentimento com base no encerramento, não apenas no pico de tensão.
-6. VERIFIQUE: Se você está classificando "alerta" ou "critico", consiga citar a frase exata que justifica isso. Se não conseguir, rebaixe para "atencao".
-
----
-
-REGRA ADICIONAL DE SENTIMENTO:
-- Conversas funcionais resolvidas com "obrigada" simples = 0.3 a 0.5, não 0.7+
-- Reserve 0.7+ para satisfação EXPLÍCITA além do agradecimento padrão ("excelente!", "vocês são demais!", "resolveu super rápido")
-- Conversas com problema persistente por dias, mesmo com encerramento cortês, não devem ter sentimento acima de 0.3
-
----
-
-## EXEMPLOS DE REFERÊNCIA (use para calibrar tema e tom)
-
-EXEMPLO 1 — integracao_erp, NÃO bugs:
-Conversa: cliente reporta erro na lista "Linx - Produtos pendentes". Produtos aparecem como pendentes mas já foram integrados, ou não aparecem quando deveriam.
-Classificação correta: tema=integracao_erp (é problema de sincronização entre uMode e ERP Linx)
-Erro comum: classificar como bugs porque parece funcionalidade quebrada. Se envolve Linx, SAP, ERP ou fila de integração = integracao_erp.
-
-EXEMPLO 2 — bugs, NÃO permissoes nem gestao_demandas:
-Conversa: cliente relata que não consegue marcar/atribuir um usuário em tarefas dentro da plataforma. A funcionalidade existe mas não opera.
-Classificação correta: tema=bugs (funcionalidade da plataforma que não opera como esperado)
-Erro comum: classificar como permissoes (parece problema de acesso) ou gestao_demandas (parece pedido de ação). Se a funcionalidade EXISTE mas NÃO FUNCIONA = bugs.
-
-EXEMPLO 3 — atencao legítimo com tom cortês:
-Conversa: cliente reporta problema de integração que persiste por 2+ semanas. Envia follow-ups diários como "Oi, notícias?" sempre com tom educado. Menciona urgência real: "o motorista vem às 14h", "preciso liberar para faturamento".
-Classificação correta: tom=atencao (persistência prolongada por não-resolução indica tensão acumulada, mesmo com linguagem cortês)
-Erro comum: classificar como ok porque cada mensagem individual é educada. Se o MESMO problema voltou 3+ vezes sem resolução, o mínimo é atencao.
-
-EXEMPLO 4 — atencao quando há múltiplos problemas simultâneos:
-Conversa: cliente reporta 5+ problemas diferentes numa sessão de 6 horas. Cada problema é tratado com cordialidade, mas o volume de falhas simultâneas gera tensão acumulada.
-Classificação correta: tom=atencao, sentimento negativo leve (-0.2 a -0.3)
-Erro comum: classificar como ok porque o tom de cada mensagem é cortês. Volume de falhas simultâneas = tensão real, mesmo sem linguagem agressiva.
-
----
-
-Retorne apenas o JSON array. Sem texto adicional, sem markdown, sem explicações fora do JSON.`;
+  // Hardcoded fallback prompt
+  if (!systemPrompt) {
+    systemPrompt = HARDCODED_SYSTEM_PROMPT;
+  }
 
   const conversationPayload = Array.from(conversations.entries()).map(([convId, msgs]) => ({
     conversation_id: convId,
