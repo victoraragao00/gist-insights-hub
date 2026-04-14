@@ -129,5 +129,8 @@ export async function createDemandNotification(input: {
   }));
 
   const { error } = await supabase.from("demand_notifications").insert(rows);
-  if (error) console.error("Notification insert error:", error.message);
+  if (error) {
+    console.error("Notification insert error:", error.message);
+    toast.error("Falha ao enviar notificações");
+  }
 }

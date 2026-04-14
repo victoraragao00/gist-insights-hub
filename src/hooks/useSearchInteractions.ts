@@ -27,7 +27,7 @@ export function useSearchInteractions(params: SearchParams) {
   const { query, clientId, tone, page = 0, limit = 20 } = params;
 
   return useQuery({
-    queryKey: ["search-interactions", user?.id, query, clientId, tone, page],
+    queryKey: ["search-interactions", user?.id, query, clientId, tone, page, limit],
     queryFn: async (): Promise<SearchResult[]> => {
       const { data, error } = await supabase.rpc("search_interactions", {
         p_user_id: user!.id,
