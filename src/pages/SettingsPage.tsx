@@ -33,6 +33,7 @@ import { UserManagementTab } from "@/components/settings/UserManagementTab";
 import { AgendaSettingsTab } from "@/components/settings/AgendaSettingsTab";
 import { RfiStatusSettingsTab } from "@/components/settings/RfiStatusSettingsTab";
 import { SlaSettingsTab } from "@/components/settings/SlaSettingsTab";
+import { ClassifierSettingsTab } from "@/components/settings/ClassifierSettingsTab";
 
 // ── Types ──────────────────────────────────────────────
 
@@ -632,6 +633,7 @@ const SettingsPage = () => {
           {isAdmin && <TabsTrigger value="rfi-statuses">Status RFI</TabsTrigger>}
           {isAdmin && <TabsTrigger value="users">Equipe & Acessos</TabsTrigger>}
           {isAdmin && <TabsTrigger value="sla">SLA</TabsTrigger>}
+          {isAdmin && <TabsTrigger value="classifier">Classificador IA</TabsTrigger>}
         </TabsList>
 
         {isAdmin && (
@@ -1135,6 +1137,11 @@ const SettingsPage = () => {
         {isAdmin && (
           <TabsContent value="sla">
             <SlaSettingsTab />
+          </TabsContent>
+        )}
+        {isAdmin && (
+          <TabsContent value="classifier">
+            <ClassifierSettingsTab />
           </TabsContent>
         )}
       </Tabs>

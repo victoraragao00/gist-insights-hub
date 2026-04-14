@@ -591,6 +591,32 @@ async function handleIngestHistorical(
   };
 }
 
+// ── Hardcoded fallback prompt (used when DB has no active config) ──
+
+const HARDCODED_SYSTEM_PROMPT = `Você é um classificador especializado de conversas de suporte B2B para a uMode Tecnologia — plataforma PLM/gestão de coleções para marcas de moda e têxtil do Brasil (clientes como Grupo Soma, Reserva, NK Store, Caedu).
+
+Seu trabalho é analisar conversas entre clientes e o time de suporte uMode e retornar uma classificação estruturada em JSON.
+
+---
+
+## FORMATO DE SAÍDA
+
+Retorne um JSON array com um objeto por conversa:
+
+[
+  {
+    "conversation_id": "string",
+    "theme": "slug_do_tema",
+    "theme_detail": "descrição de 1 linha do assunto específico",
+    "tone": "ok | atencao | alerta | critico",
+    "tone_detail": "justificativa de 1 linha baseada em evidência textual",
+    "sentiment": número de -1.0 a 1.0,
+    "is_out_of_scope": boolean
+  }
+]
+
+Retorne apenas o JSON array. Sem texto adicional, sem markdown, sem explicações fora do JSON.`;
+
 // ── Classify Batch Handler (conversation-level) ──
 
 const CLASSIFY_CONV_BATCH_SIZE = 10; // 10 conversations per batch
