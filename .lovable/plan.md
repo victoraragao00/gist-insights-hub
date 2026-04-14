@@ -1,66 +1,103 @@
 
 
-## Plan: Correção definitiva — Full sync semanal + re-resolução de órfãos + re-ingestão de participantes com 0 interações
+## Auditoria Completa — CX Hub uMode (2026-04-14)
 
-### Diagnóstico confirmado
+### Metodologia
 
-| Dado | Valor |
-|------|-------|
-| Amanda Lunardelli em `participants` | **Inexistente** |
-| Participantes órfãos (`client_id IS NULL`) | **168** |
-| Participantes Lofty Style mapeados | 20 (todos com 0 interações exceto Amanda Rego) |
-| Causa raiz | Sync incremental com `since_timestamp` nunca revisita contatos antigos |
+Auditoria contra: AGENTS.md (Checklist CTO m1-m13, anti-padroes, IA stack), CLAUDE.md (regras criticas), PRD (principio "IA stack: Gemini + fallback Claude, nunca OpenAI"), e a instrucao explicita do usuario de que **Lovable AI Gateway e PROIBIDO**.
 
-O matching de slugs funciona para `loftystyle` (sem hífen). O problema real é que Amanda nunca foi alcançada pelo sync incremental porque seu `last_seen_at` era anterior ao `since_timestamp`.
+---
 
-### Alterações
+### CRITICO — Uso proibido do Lovable AI Gateway
 
-#### 1. `schedule-sync/index.ts` — Full sync semanal
+3 Edge Functions usam `https://ai.gateway.lovable.dev` + `LOVABLE_API_KEY` em vez de Gemini API diretamente via `GEMINI_API_KEY` (com fallback `CLAUDE_API_KEY`):
 
-Adicionar lógica para verificar se o último full sync (job `sync_contacts` sem `since_timestamp`) tem mais de 7 dias. Se sim, criar o job **sem** `since_timestamp`, forçando varredura completa.
+| Arquivo | Uso atual | Correção |
+|---------|-----------|----------|
+| `supabase/functions/summarize-conversation/index.ts` | Lovable AI Gateway (`google/gemini-2.5-flash`) | Migrar para `generativelanguage.googleapis.com` com `GEMINI_API_KEY` |
+| `supabase/functions/analyze-demand/index.ts` | Lovable AI Gateway (`google/gemini-2.5-flash`) | Migrar para `generativelanguage.googleapis.com` com `GEMINI_API_KEY` |
+| `supabase/functions/process-meeting-transcription/index.ts` | Lovable AI Gateway (`google/gemini-2.5-flash`) | Migrar para `generativelanguage.googleapis.com` com `GEMINI_API_KEY` |
 
-Também criar um job `ingest_historical` sem `since_timestamp` quando o full sync for disparado, garantindo que conversas antigas sejam re-ingeridas.
+**Nota:** `auth-email-hook/index.ts` usa `LOVABLE_API_KEY` para autenticacao de webhook (nao para IA) — este uso e aceitavel e nao sera alterado.
 
-#### 2. `process-jobs/index.ts` — Re-resolução de órfãos
+**Nota:** `process-jobs/index.ts` (classify-batch) ja usa `GEMINI_API_KEY` corretamente — e o padrao a seguir.
 
-No final de `handleSyncContacts`, adicionar etapa que:
-1. Busca participantes com `client_id IS NULL` e `side = 'client'`
-2. Para cada um, tenta resolver via email/domínio no `identifiers` usando a mesma lógica de matching
-3. Atualiza o `client_id` quando encontrar match
+---
 
-Também adicionar normalização de hífens no matching de domínio (linha 281):
-```typescript
-const normSlug = existingSlug.replace(/-/g, '');
-const normDomain = domainSlug.replace(/-/g, '');
-if (normSlug.includes(normDomain) || normDomain.includes(normSlug))
+### MEDIO — Violacoes do Checklist CTO (m1)
+
+**`as any` residuais (36 ocorrencias em 4 arquivos):**
+
+| Arquivo | Ocorrencias | Justificativa |
+|---------|-------------|---------------|
+| `ColumnSettingsTab.tsx` | 3x `(column as any).triggers_sla_response_at` | Tipo `triggers_sla_response_at` ausente no types.ts auto-gerado — aguarda regeneracao |
+| `DemandDetailSheet.tsx` | 4x `(demand as any).resolution` | Campo `resolution` ausente no tipo auto-gerado |
+| `CreateDemandDialog.tsx` | 1x `(data as any)?.id` | Tipo de retorno de mutation nao tipado |
+| `useClientConversationsStatus.ts` | 1x `as any` em RPC name | RPC nao reconhecida pelo tipo auto-gerado |
+
+**`as never` residuais (27 ocorrencias em 4 arquivos):**
+
+| Arquivo | Causa |
+|---------|-------|
+| `useUsers.ts` | RPC `get_users_with_permissions` nao tipada |
+| `useUserRole.ts` | Tabela `user_profiles` nao no tipo auto-gerado |
+| `useUserManagement.ts` | Idem |
+| `AgendaSettingsTab.tsx` | Cast duplo para contornar tipo de `value` |
+
+**Diagnostico:** A maioria destes `as any`/`as never` existe porque o `types.ts` auto-gerado nao inclui tabelas/RPCs recentes. A solucao e regenerar os tipos — nao corrigir manualmente.
+
+---
+
+### BAIXO — Conformidade OK
+
+| Item | Status |
+|------|--------|
+| m2: ErrorBoundary em toda rota | OK — todas as 10 rotas protegidas |
+| m3: Toast unico (sonner) | OK |
+| m4: staleTime > 0 | OK (verificado em hooks principais) |
+| m8: Erros Supabase tratados | OK nas 3 edge functions |
+| m11: Zero imports nao usados | OK (corrigido em DT-1) |
+| m12: Paginacao | OK (InteractionsFeed com .limit(500)) |
+
+---
+
+### Plano de Correcoes
+
+#### 1. Migrar 3 Edge Functions de Lovable AI Gateway para Gemini API direta (CRITICO)
+
+Seguir o padrao ja usado em `process-jobs/index.ts` (classify-batch):
+
+```text
+Antes:
+  fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    headers: { Authorization: `Bearer ${LOVABLE_API_KEY}` },
+    body: { model: "google/gemini-2.5-flash", messages: [...] }
+  })
+
+Depois:
+  fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+    body: { contents: [...], generationConfig: { temperature: 0.3, maxOutputTokens: 1024 } }
+  })
 ```
 
-#### 3. `process-jobs/index.ts` — Aumentar limite de participantes
+Cada funcao recebera:
+- Substituicao do endpoint e formato de request/response (OpenAI format → Gemini format)
+- Fallback para `CLAUDE_API_KEY` via `https://api.anthropic.com/v1/messages` caso `GEMINI_API_KEY` falhe
+- Remocao de toda referencia a `LOVABLE_API_KEY` (exceto `auth-email-hook`)
 
-Atualmente busca apenas 1000 participantes (linha 394). Aumentar para 5000 para garantir cobertura completa.
+**Arquivos editados:**
+- `supabase/functions/summarize-conversation/index.ts`
+- `supabase/functions/analyze-demand/index.ts`
+- `supabase/functions/process-meeting-transcription/index.ts`
 
-#### 4. Migration — Fix imediato para Amanda
+#### 2. Regenerar tipos Supabase (MEDIO)
 
-Consultar a API do Gist para encontrar o `gist_id` da Amanda não é possível via migration. Em vez disso, o próximo full sync (sem `since_timestamp`) vai automaticamente descobrir e mapear a Amanda.
+Apos a correcao das edge functions, solicitar regeneracao do `types.ts` para eliminar os `as any`/`as never` residuais. Isso resolvera os casts em `ColumnSettingsTab`, `DemandDetailSheet`, `useUserRole`, etc.
 
-Para forçar a execução imediata, o plano inclui um trigger manual do `schedule-sync` após o deploy.
+**Nenhum arquivo editado manualmente** — depende de regeneracao automatica.
 
-### Garantias
+### Nenhuma alteracao em
 
-| Preocupação | Garantia |
-|-------------|----------|
-| Perda de dados existentes | Zero — `ON CONFLICT DO NOTHING` na ingestão, `upsert` nos participantes |
-| Dados anteriores a hoje no Gist | Full sync semanal sem `since_timestamp` varre **todos** os contatos |
-| Órfãos acumulados | Re-resolução automática a cada sync |
-| Participantes sem interações | Full sync + ingestão sem `since_timestamp` traz conversas antigas |
-
-### Files changed
-
-| Action | File |
-|--------|------|
-| Edit | `supabase/functions/schedule-sync/index.ts` (full sync semanal) |
-| Edit | `supabase/functions/process-jobs/index.ts` (normalização de hífens + re-resolução de órfãos + limite de participantes) |
-
-### No changes to
-- Migrations, RLS, frontend, `src/integrations/supabase/*`, `.env`
+- Migrations, RLS, `.env`, `src/integrations/supabase/*`, frontend (alem do que depende da regeneracao de tipos)
+- `auth-email-hook/index.ts` (uso de `LOVABLE_API_KEY` e para autenticacao de webhook, nao IA)
 
