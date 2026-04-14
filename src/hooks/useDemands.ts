@@ -62,8 +62,9 @@ export function useDemandTypes() {
 }
 
 export function useDemands(filters?: DemandFilters) {
+  const { user } = useAuth();
   return useQuery({
-    queryKey: ["demands", filters],
+    queryKey: ["demands", user?.id, filters],
     staleTime: 30_000,
     queryFn: async () => {
       let query = supabase
@@ -146,7 +147,7 @@ export function useCreateDemand() {
         description: "Demanda criada",
         created_by: user?.id ?? null,
       });
-      if (actError) console.error("Activity log error:", actError.message);
+      if (actError) console.warn("[useDemands] Activity log failed:", actError.message);
 
       return data;
     },
