@@ -1,100 +1,66 @@
 
 
-## Plan: 4 marcadores configuráveis nas colunas — Demanda (Início/Fim) + SLA (Início/Fim)
+## Plan: Correção definitiva — Full sync semanal + re-resolução de órfãos + re-ingestão de participantes com 0 interações
 
-### Contexto atual
+### Diagnóstico confirmado
 
-A tabela `ticket_columns` tem 2 flags booleanas:
-- `triggers_started_at` — hoje serve tanto como "início de desenvolvimento" quanto "fim do SLA de resposta"
-- `triggers_finished_at` — "fim da demanda"
+| Dado | Valor |
+|------|-------|
+| Amanda Lunardelli em `participants` | **Inexistente** |
+| Participantes órfãos (`client_id IS NULL`) | **168** |
+| Participantes Lofty Style mapeados | 20 (todos com 0 interações exceto Amanda Rego) |
+| Causa raiz | Sync incremental com `since_timestamp` nunca revisita contatos antigos |
 
-O usuário quer **4 marcadores independentes e configuráveis**:
+O matching de slugs funciona para `loftystyle` (sem hífen). O problema real é que Amanda nunca foi alcançada pelo sync incremental porque seu `last_seen_at` era anterior ao `since_timestamp`.
 
-| Marcador | Significado | Exemplo |
-|----------|------------|---------|
-| Início Demanda | Cronômetro de desenvolvimento inicia | "Em Progresso" |
-| Fim Demanda | Demanda concluída | "Concluído" |
-| Início SLA | SLA de resposta começa (criação do ticket — implícito, mas marcador visual) | Criação |
-| Fim SLA | SLA de resposta encerra | "A Fazer" |
+### Alterações
 
-Na prática, o **Início do SLA** é sempre na criação do ticket (não precisa de coluna), então precisamos de 1 novo campo: `triggers_sla_response_at` (booleano) para marcar onde o SLA de resposta **encerra**.
+#### 1. `schedule-sync/index.ts` — Full sync semanal
 
-### 1. Migration — Novo campo na tabela `ticket_columns`
+Adicionar lógica para verificar se o último full sync (job `sync_contacts` sem `since_timestamp`) tem mais de 7 dias. Se sim, criar o job **sem** `since_timestamp`, forçando varredura completa.
 
-```sql
-ALTER TABLE public.ticket_columns
-  ADD COLUMN IF NOT EXISTS triggers_sla_response_at BOOLEAN DEFAULT false;
-```
+Também criar um job `ingest_historical` sem `since_timestamp` quando o full sync for disparado, garantindo que conversas antigas sejam re-ingeridas.
 
-Atualizar o trigger `mark_sla_first_response` para usar `triggers_sla_response_at` em vez de `triggers_started_at`:
+#### 2. `process-jobs/index.ts` — Re-resolução de órfãos
 
-```sql
-CREATE OR REPLACE FUNCTION public.mark_sla_first_response()
-RETURNS TRIGGER LANGUAGE plpgsql AS $$
-BEGIN
-  IF NEW.column_id != OLD.column_id AND NEW.sla_first_response_at IS NULL THEN
-    IF EXISTS (
-      SELECT 1 FROM ticket_columns
-      WHERE id = NEW.column_id AND triggers_sla_response_at = true
-    ) THEN
-      NEW.sla_first_response_at = now();
-    END IF;
-  END IF;
-  RETURN NEW;
-END;
-$$;
-```
+No final de `handleSyncContacts`, adicionar etapa que:
+1. Busca participantes com `client_id IS NULL` e `side = 'client'`
+2. Para cada um, tenta resolver via email/domínio no `identifiers` usando a mesma lógica de matching
+3. Atualiza o `client_id` quando encontrar match
 
-Também migrar dados existentes: copiar o valor atual de `triggers_started_at` para `triggers_sla_response_at` para não perder configuração.
-
-### 2. Edit `src/components/demands/ColumnSettingsTab.tsx`
-
-Separar os badges em dois grupos visuais:
-
-**Badges de Demanda:**
-- `triggers_started_at` → badge "Início Dev" (tooltip: "Cronômetro de desenvolvimento inicia quando o ticket entra nesta coluna")
-- `triggers_finished_at` → badge "Fim" (tooltip: "Marca o ticket como concluído")
-
-**Badge de SLA:**
-- `triggers_sla_response_at` → badge "Fim SLA" (tooltip: "O SLA de primeira resposta encerra quando o ticket entra nesta coluna")
-
-Adicionar botões de toggle para cada marcador em cada linha de coluna — clicar no badge ativa/desativa o marcador (com mutation de update).
-
-Atualizar o Alert informativo:
-> **Cronômetros:** O SLA de resposta inicia na criação do ticket e encerra na coluna marcada "Fim SLA". O desenvolvimento inicia na coluna "Início Dev" e encerra na coluna "Fim".
-
-### 3. New hook — `useUpdateColumnTriggers`
-
-Em `src/hooks/useManageColumns.ts`, adicionar mutation para atualizar os 3 flags booleanos de uma coluna:
-
+Também adicionar normalização de hífens no matching de domínio (linha 281):
 ```typescript
-export function useUpdateColumnTriggers() {
-  // mutate({ id, field, value }) → supabase.update({ [field]: value })
-  // Quando ativar um flag exclusivo (triggers_started_at, triggers_sla_response_at, triggers_finished_at),
-  // desativar o mesmo flag em todas as outras colunas primeiro
-}
+const normSlug = existingSlug.replace(/-/g, '');
+const normDomain = domainSlug.replace(/-/g, '');
+if (normSlug.includes(normDomain) || normDomain.includes(normSlug))
 ```
 
-### 4. Edit `src/hooks/useDemands.ts` — `useMoveDemand`
+#### 3. `process-jobs/index.ts` — Aumentar limite de participantes
 
-Manter a lógica existente de `triggers_started_at`/`triggers_finished_at` para cronômetro de demanda (sem mudança). O SLA já é tratado pelo trigger no banco via `triggers_sla_response_at`.
+Atualmente busca apenas 1000 participantes (linha 394). Aumentar para 5000 para garantir cobertura completa.
 
-### 5. Update `src/components/demands/SlaView.tsx` e `src/hooks/useSla.ts`
+#### 4. Migration — Fix imediato para Amanda
 
-Sem mudanças necessárias — a RPC `get_demands_with_sla` já usa o trigger do banco. A migration atualiza o trigger para usar o novo campo.
+Consultar a API do Gist para encontrar o `gist_id` da Amanda não é possível via migration. Em vez disso, o próximo full sync (sem `since_timestamp`) vai automaticamente descobrir e mapear a Amanda.
 
-### 6. Update Alert/descrição no `ColumnSettingsTab`
+Para forçar a execução imediata, o plano inclui um trigger manual do `schedule-sync` após o deploy.
 
-Atualizar texto explicativo para refletir os 4 marcadores.
+### Garantias
+
+| Preocupação | Garantia |
+|-------------|----------|
+| Perda de dados existentes | Zero — `ON CONFLICT DO NOTHING` na ingestão, `upsert` nos participantes |
+| Dados anteriores a hoje no Gist | Full sync semanal sem `since_timestamp` varre **todos** os contatos |
+| Órfãos acumulados | Re-resolução automática a cada sync |
+| Participantes sem interações | Full sync + ingestão sem `since_timestamp` traz conversas antigas |
 
 ### Files changed
 
 | Action | File |
 |--------|------|
-| Migration | Add `triggers_sla_response_at` + update trigger + migrate data |
-| Edit | `src/components/demands/ColumnSettingsTab.tsx` (3 badges configuráveis com toggle) |
-| Edit | `src/hooks/useManageColumns.ts` (nova mutation `useUpdateColumnTriggers`) |
+| Edit | `supabase/functions/schedule-sync/index.ts` (full sync semanal) |
+| Edit | `supabase/functions/process-jobs/index.ts` (normalização de hífens + re-resolução de órfãos + limite de participantes) |
 
 ### No changes to
-- `useDemands` move logic, `useSla.ts`, `SlaView.tsx`, other pages, `src/integrations/supabase/*`, `.env`
+- Migrations, RLS, frontend, `src/integrations/supabase/*`, `.env`
 
