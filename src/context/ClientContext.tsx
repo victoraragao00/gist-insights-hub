@@ -66,13 +66,28 @@ function formatElapsed(ms: number): string {
   return `${min}min ${sec}s`;
 }
 
+const JOB_LABELS: Record<string, string> = {
+  sync_contacts: 'Contatos (global)',
+  ingest_historical: 'Histórico (global)',
+  classify_batch: 'Classificação IA',
+  transcribe_audio: 'Transcrição',
+};
+
 function computeJobProgress(job: SyncJobRecord): number {
   if (TERMINAL_STATUSES.has(job.status)) return 100;
   const progress = job.progress as Record<string, unknown> | null;
-  if (!progress) return 0;
+  if (!progress) return job.status === 'running' ? 5 : 0;
+
+  // Page-based progress (sync_contacts, ingest_historical)
   const page = (progress.next_page as number) || 0;
-  const total = (progress.total_pages as number) || 0;
-  if (total > 0 && page > 0) return Math.min(Math.round((page / total) * 100), 95);
+  const totalPages = (progress.total_pages as number) || 0;
+  if (totalPages > 0 && page > 0) return Math.min(Math.round((page / totalPages) * 100), 95);
+
+  // Conversation-based progress (classify_batch)
+  const processed = (progress.conversations_processed as number) || (progress.batches_processed as number) || 0;
+  const totalConvs = (progress.total_conversations as number) || 0;
+  if (totalConvs > 0 && processed > 0) return Math.min(Math.round((processed / totalConvs) * 100), 95);
+
   return job.status === 'running' ? 10 : 0;
 }
 
@@ -88,7 +103,7 @@ function computeSyncState(jobs: SyncJobRecord[], startedAt: number | null): Sync
   const activeJob = jobs.find(j => j.status === 'running') || jobs.find(j => j.status === 'pending');
   let currentLabel: string | null = null;
   if (activeJob) {
-    currentLabel = activeJob.type === 'sync_contacts' ? 'Contatos (global)' : 'Histórico (global)';
+    currentLabel = JOB_LABELS[activeJob.type] ?? activeJob.type;
   }
 
   let elapsedDisplay: string | null = null;
