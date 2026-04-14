@@ -278,7 +278,9 @@ async function handleSyncContacts(
             const domainSlug = toSlug(domain.replace(/\.(com|net|org|io|co|com\.br|app|dev|tech)(\..+)?$/i, ''));
             let matched = false;
             for (const [existingSlug, client] of clientsBySlug) {
-              if (existingSlug.includes(domainSlug) || domainSlug.includes(existingSlug)) {
+              const normSlug = existingSlug.replace(/-/g, '');
+              const normDomain = domainSlug.replace(/-/g, '');
+              if (normSlug.includes(normDomain) || normDomain.includes(normSlug)) {
                 companyName = client.name;
                 slug = existingSlug;
                 matched = true;
