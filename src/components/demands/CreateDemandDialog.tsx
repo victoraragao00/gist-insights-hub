@@ -82,7 +82,7 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaul
       },
       {
         onSuccess: (data) => {
-          const newId = (data as any)?.id;
+          const newId = data?.id;
           if (newId) {
             setCreatedDemandId(newId);
           } else {

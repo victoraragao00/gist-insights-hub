@@ -47,7 +47,7 @@ export function AgendaSettingsTab() {
       for (const f of LOCKED_FIELDS) safeConfig[f] = "required";
       const { error } = await supabase
         .from("app_settings")
-        .update({ value: safeConfig as unknown as Record<string, string>, updated_at: new Date().toISOString() } as never)
+        .update({ value: safeConfig as unknown as Record<string, string>, updated_at: new Date().toISOString() })
         .eq("key", "agenda_required_fields");
       if (error) throw error;
     },

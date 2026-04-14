@@ -19,7 +19,7 @@ export function useClientConversationsStatus(clientId: string | undefined) {
     staleTime: 60_000,
     queryFn: async () => {
       const { data, error } = await supabase
-        .rpc("get_client_conversations_with_status" as any, { p_client_id: clientId! });
+        .rpc("get_client_conversations_with_status", { p_client_id: clientId! });
       if (error) throw error;
       return (data ?? []) as ConversationWithStatus[];
     },

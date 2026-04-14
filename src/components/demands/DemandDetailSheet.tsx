@@ -267,7 +267,7 @@ function DemandDetailContent({ demand, onClose }: { demand: DemandRow; onClose: 
   const [description, setDescription] = useState(demand.description ?? "");
   const [expectedResult, setExpectedResult] = useState(demand.expected_result ?? "");
   const [notes, setNotes] = useState(demand.notes ?? "");
-  const [resolution, setResolution] = useState((demand as any).resolution ?? "");
+  const [resolution, setResolution] = useState(demand.resolution ?? "");
   const [rfiSheetOpen, setRfiSheetOpen] = useState(false);
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [newLinkUrl, setNewLinkUrl] = useState("");
@@ -292,8 +292,8 @@ function DemandDetailContent({ demand, onClose }: { demand: DemandRow; onClose: 
     setDescription(demand.description ?? "");
     setExpectedResult(demand.expected_result ?? "");
     setNotes(demand.notes ?? "");
-    setResolution((demand as any).resolution ?? "");
-  }, [demand.id, demand.title, demand.description, demand.expected_result, demand.notes, (demand as any).resolution]);
+    setResolution(demand.resolution ?? "");
+  }, [demand.id, demand.title, demand.description, demand.expected_result, demand.notes, demand.resolution]);
 
   const saveField = useCallback((field: string, value: string, label: string) => {
     updateMutation.mutate({ id: demand.id, fields: { [field]: value || null }, fieldLabel: label });
@@ -595,7 +595,7 @@ function DemandDetailContent({ demand, onClose }: { demand: DemandRow; onClose: 
           value={resolution}
           onChange={(e) => setResolution(e.target.value)}
           onBlur={() => {
-            if (resolution !== ((demand as any).resolution ?? "")) saveField("resolution", resolution, "Resolução");
+            if (resolution !== (demand.resolution ?? "")) saveField("resolution", resolution, "Resolução");
           }}
           rows={2}
           placeholder="Como foi resolvido..."
