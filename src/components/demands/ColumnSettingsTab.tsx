@@ -162,12 +162,12 @@ function SortableColumnRow({
           onToggle={() => onToggleTrigger(column.id, "triggers_finished_at", !column.triggers_finished_at)}
         />
         <TriggerBadge
-          active={!!(column as any).triggers_sla_response_at}
+          active={!!column.triggers_sla_response_at}
           label="Fim SLA"
           tooltip="O SLA de primeira resposta encerra quando o ticket entra nesta coluna"
           icon={Timer}
-          variant={(column as any).triggers_sla_response_at ? "default" : "outline"}
-          onToggle={() => onToggleTrigger(column.id, "triggers_sla_response_at", !(column as any).triggers_sla_response_at)}
+          variant={column.triggers_sla_response_at ? "default" : "outline"}
+          onToggle={() => onToggleTrigger(column.id, "triggers_sla_response_at", !column.triggers_sla_response_at)}
         />
       </div>
 

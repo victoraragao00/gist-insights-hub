@@ -22,7 +22,7 @@ export function useUsers() {
   return useQuery<UserWithPermissions[]>({
     queryKey: ["users_with_permissions", user?.id],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("get_users_with_permissions" as never) as {
+      const { data, error } = await supabase.rpc("get_users_with_permissions") as {
         data: UserWithPermissions[] | null;
         error: { message?: string; code?: string } | null;
       };

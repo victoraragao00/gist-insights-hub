@@ -14,10 +14,10 @@ export function useUserRole() {
 
       // Primary: read from user_profiles
       const { data: profile, error: profileErr } = await supabase
-        .from("user_profiles" as never)
+        .from("user_profiles")
         .select("global_role, active")
         .eq("id", user.id)
-        .maybeSingle() as { data: { global_role: string; active: boolean } | null; error: unknown };
+        .maybeSingle();
 
       if (!profileErr && profile) {
         const role = (profile.global_role as UserRole) ?? "viewer";

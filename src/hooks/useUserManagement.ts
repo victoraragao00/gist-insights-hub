@@ -36,8 +36,8 @@ export function useUpdateUserRole() {
       }
 
       const { error } = await supabase
-        .from("user_profiles" as never)
-        .update({ global_role: newRole, updated_at: new Date().toISOString() } as never)
+        .from("user_profiles")
+        .update({ global_role: newRole, updated_at: new Date().toISOString() })
         .eq("id", targetUserId);
       if (error) throw error;
     },
@@ -125,8 +125,8 @@ export function useToggleUserActive() {
       }
 
       const { error } = await supabase
-        .from("user_profiles" as never)
-        .update({ active: !currentActive, updated_at: new Date().toISOString() } as never)
+        .from("user_profiles")
+        .update({ active: !currentActive, updated_at: new Date().toISOString() })
         .eq("id", targetUserId);
       if (error) throw error;
     },
