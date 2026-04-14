@@ -183,6 +183,42 @@ export type Database = {
           },
         ]
       }
+      classification_prompt_config: {
+        Row: {
+          active: boolean
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          notes: string | null
+          system_prompt: string
+          valid_themes: Json
+          version: number
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          system_prompt: string
+          valid_themes?: Json
+          version?: number
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          system_prompt?: string
+          valid_themes?: Json
+          version?: number
+        }
+        Relationships: []
+      }
       client_documents: {
         Row: {
           assignee_id: string | null
