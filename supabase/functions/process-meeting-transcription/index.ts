@@ -7,6 +7,70 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+/** Call Gemini API directly, fallback to Claude if Gemini fails */
+async function callAI(systemPrompt: string, userPrompt: string, maxTokens = 2048): Promise<string> {
+  const geminiKey = Deno.env.get("GEMINI_API_KEY");
+  const claudeKey = Deno.env.get("CLAUDE_API_KEY");
+
+  if (!geminiKey && !claudeKey) {
+    throw new Error("Neither GEMINI_API_KEY nor CLAUDE_API_KEY configured");
+  }
+
+  if (geminiKey) {
+    try {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [
+              { role: "user", parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] },
+            ],
+            generationConfig: { temperature: 0.3, maxOutputTokens: maxTokens },
+          }),
+          signal: AbortSignal.timeout(55000),
+        }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+        if (text) return text;
+      }
+      console.error("Gemini error:", res.status);
+    } catch (e) {
+      console.error("Gemini call failed:", e instanceof Error ? e.message : "unknown");
+    }
+  }
+
+  if (claudeKey) {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": claudeKey,
+        "anthropic-version": "2023-06-01",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: maxTokens,
+        system: systemPrompt,
+        messages: [{ role: "user", content: userPrompt }],
+      }),
+      signal: AbortSignal.timeout(45000),
+    });
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error("Claude error:", res.status, errText.slice(0, 200));
+      throw new Error(`Claude API error: ${res.status}`);
+    }
+    const data = await res.json();
+    return data?.content?.[0]?.text ?? "";
+  }
+
+  throw new Error("All AI providers failed");
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS")
     return new Response("ok", { headers: corsHeaders });
@@ -56,24 +120,7 @@ serve(async (req) => {
       ? `CONTEXTO DA REUNIÃO:\n${contextParts.join("\n")}\n\n`
       : "";
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
-
-    // Call Lovable AI Gateway
-    const aiRes = await fetch(
-      "https://ai.gateway.lovable.dev/v1/chat/completions",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
-          messages: [
-            {
-              role: "system",
-              content: `Você é um assistente executivo especializado em reuniões B2B de tecnologia.
+    const systemPrompt = `Você é um assistente executivo especializado em reuniões B2B de tecnologia.
 
 Analise a transcrição abaixo e retorne um JSON com exatamente esta estrutura (sem markdown, sem explicações):
 
@@ -88,41 +135,12 @@ Regras:
 - homework_umode: ações que a uMode precisa executar — seja específico
 - homework_client: ações que o cliente precisa executar — seja específico
 - Se não houver lições de casa para um lado, retorne array vazio []
-- Retorne APENAS o JSON, sem markdown, sem blocos de código`,
-            },
-            {
-              role: "user",
-              content: `${contextBlock}${transcription?.trim() ? `TRANSCRIÇÃO:\n${transcription}` : "Sem transcrição disponível."}`,
-            },
-          ],
-          temperature: 0.3,
-          max_tokens: 2048,
-        }),
-      }
-    );
+- Retorne APENAS o JSON, sem markdown, sem blocos de código`;
 
-    if (!aiRes.ok) {
-      const errText = await aiRes.text();
-      console.error("AI Gateway error:", aiRes.status, errText);
+    const userPrompt = `${contextBlock}${transcription?.trim() ? `TRANSCRIÇÃO:\n${transcription}` : "Sem transcrição disponível."}`;
 
-      if (aiRes.status === 429) {
-        return new Response(
-          JSON.stringify({ error: "Rate limit excedido. Tente novamente em alguns segundos." }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      if (aiRes.status === 402) {
-        return new Response(
-          JSON.stringify({ error: "Créditos de IA esgotados. Adicione créditos no workspace." }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
-      throw new Error(`AI Gateway error: ${aiRes.status}`);
-    }
-
-    const aiData = await aiRes.json();
-    const rawText = aiData.choices?.[0]?.message?.content ?? "";
+    // Call AI (Gemini + Claude fallback)
+    const rawText = await callAI(systemPrompt, userPrompt, 2048);
 
     // Parse JSON with recovery
     let parsed: {

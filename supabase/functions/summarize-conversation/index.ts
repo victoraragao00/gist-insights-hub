@@ -8,6 +8,72 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+/** Call Gemini API directly, fallback to Claude if Gemini fails */
+async function callAI(systemPrompt: string, userPrompt: string): Promise<string> {
+  const geminiKey = Deno.env.get("GEMINI_API_KEY");
+  const claudeKey = Deno.env.get("CLAUDE_API_KEY");
+
+  if (!geminiKey && !claudeKey) {
+    throw new Error("Neither GEMINI_API_KEY nor CLAUDE_API_KEY configured");
+  }
+
+  // Try Gemini first
+  if (geminiKey) {
+    try {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [
+              { role: "user", parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] },
+            ],
+            generationConfig: { temperature: 0.3, maxOutputTokens: 1024 },
+          }),
+          signal: AbortSignal.timeout(55000),
+        }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+        if (text) return text;
+      }
+      console.error("Gemini error:", res.status);
+    } catch (e) {
+      console.error("Gemini call failed:", e instanceof Error ? e.message : "unknown");
+    }
+  }
+
+  // Fallback to Claude
+  if (claudeKey) {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": claudeKey,
+        "anthropic-version": "2023-06-01",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 1024,
+        system: systemPrompt,
+        messages: [{ role: "user", content: userPrompt }],
+      }),
+      signal: AbortSignal.timeout(45000),
+    });
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error("Claude error:", res.status, errText.slice(0, 200));
+      throw new Error(`Claude API error: ${res.status}`);
+    }
+    const data = await res.json();
+    return data?.content?.[0]?.text ?? "";
+  }
+
+  throw new Error("All AI providers failed");
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -26,14 +92,6 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
-
-    if (!lovableApiKey) {
-      return new Response(JSON.stringify({ error: "LOVABLE_API_KEY not configured" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
 
     const userClient = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } },
@@ -58,7 +116,7 @@ serve(async (req) => {
       });
     }
 
-    // ── Fetch messages using service role (RLS bypass for reading interactions) ──
+    // ── Fetch messages using service role ──
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
 
     const { data: messages, error: msgErr } = await adminClient
@@ -103,7 +161,7 @@ serve(async (req) => {
       });
     }
 
-    // ── Call Lovable AI Gateway ──
+    // ── Call AI (Gemini + Claude fallback) ──
     const systemPrompt = `Você é um analista de CX da uMode, empresa de tecnologia para o mercado têxtil/moda.
 Analise a conversa entre a uMode e um cliente e gere um resumo estruturado em português com:
 
@@ -113,43 +171,7 @@ Analise a conversa entre a uMode e um cliente e gere um resumo estruturado em po
 
 Seja direto e objetivo. Máximo 4 linhas por item.`;
 
-    const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${lovableApiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: `Resuma esta conversa:\n${formatted}` },
-        ],
-        max_tokens: 1024,
-        temperature: 0.3,
-      }),
-    });
-
-    if (!aiRes.ok) {
-      const errText = await aiRes.text();
-      console.error("AI Gateway error:", aiRes.status, errText);
-      if (aiRes.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limit exceeded, tente novamente em instantes" }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (aiRes.status === 402) {
-        return new Response(JSON.stringify({ error: "Créditos de IA esgotados" }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      return new Response(JSON.stringify({ error: "AI processing failed" }), {
-        status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const aiData = await aiRes.json();
-    const summary = aiData?.choices?.[0]?.message?.content ?? "";
+    const summary = await callAI(systemPrompt, `Resuma esta conversa:\n${formatted}`);
 
     if (!summary) {
       return new Response(JSON.stringify({ error: "Empty AI response" }), {
