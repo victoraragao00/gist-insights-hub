@@ -278,7 +278,9 @@ async function handleSyncContacts(
             const domainSlug = toSlug(domain.replace(/\.(com|net|org|io|co|com\.br|app|dev|tech)(\..+)?$/i, ''));
             let matched = false;
             for (const [existingSlug, client] of clientsBySlug) {
-              if (existingSlug.includes(domainSlug) || domainSlug.includes(existingSlug)) {
+              const normSlug = existingSlug.replace(/-/g, '');
+              const normDomain = domainSlug.replace(/-/g, '');
+              if (normSlug.includes(normDomain) || normDomain.includes(normSlug)) {
                 companyName = client.name;
                 slug = existingSlug;
                 matched = true;
@@ -339,6 +341,49 @@ async function handleSyncContacts(
     }
   }
 
+  // Re-resolve orphan participants (client_id IS NULL, side = 'client')
+  if (!hasMore) {
+    try {
+      const { data: orphans } = await supaAdmin
+        .from('participants')
+        .select('id, identifiers')
+        .is('client_id', null)
+        .eq('side', 'client')
+        .not('identifiers', 'is', null)
+        .limit(500);
+
+      let orphansResolved = 0;
+      for (const orphan of (orphans ?? [])) {
+        if (!orphan.identifiers || !Array.isArray(orphan.identifiers)) continue;
+        // Try to find email in identifiers
+        const emailIdent = orphan.identifiers.find((i: any) => i.channel === 'email' && i.value);
+        const gistIdent = orphan.identifiers.find((i: any) => i.channel === 'gist' && i.value);
+
+        // If we have an email, try domain matching
+        if (emailIdent?.value?.includes('@')) {
+          const domain = emailIdent.value.split('@')[1].toLowerCase();
+          if (!GENERIC_DOMAINS.has(domain)) {
+            const domainSlug = toSlug(domain.replace(/\.(com|net|org|io|co|com\.br|app|dev|tech)(\..+)?$/i, ''));
+            for (const [existingSlug, client] of clientsBySlug) {
+              const normSlug = existingSlug.replace(/-/g, '');
+              const normDomain = domainSlug.replace(/-/g, '');
+              if (normSlug.includes(normDomain) || normDomain.includes(normSlug)) {
+                await supaAdmin.from('participants').update({ client_id: client.id }).eq('id', orphan.id);
+                orphansResolved++;
+                break;
+              }
+            }
+          }
+        }
+      }
+      if (orphansResolved > 0) {
+        console.log(`[process-jobs:contacts] Re-resolved ${orphansResolved} orphan participants`);
+      }
+    } catch (err) {
+      errors.push(`Orphan re-resolution: ${err instanceof Error ? err.message : 'Unknown'}`);
+    }
+  }
+
   // Inactivation (only on final batch)
   if (!hasMore && !skipInactivation) {
     const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
@@ -391,7 +436,7 @@ async function handleIngestHistorical(
   const bindingByClientId = new Map<string, any>();
   for (const b of (bindings ?? [])) bindingByClientId.set(b.client_id, b);
 
-  const { data: participants } = await supaAdmin.from('participants').select('id, client_id, side, identifiers').not('identifiers', 'is', null).limit(1000);
+  const { data: participants } = await supaAdmin.from('participants').select('id, client_id, side, identifiers').not('identifiers', 'is', null).limit(5000);
   const gistIdToParticipant = new Map<string, { participantId: string; clientId: string | null; side: string }>();
   for (const p of (participants ?? [])) {
     if (!p.identifiers) continue;

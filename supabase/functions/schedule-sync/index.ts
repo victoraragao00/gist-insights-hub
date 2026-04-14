@@ -45,23 +45,59 @@ Deno.serve(async (req) => {
 
     const results: Record<string, unknown> = {};
 
-    // 2. Create jobs for each type
+    // 2. Determine if we need a full sync (no since_timestamp)
+    // A full sync is triggered when the last completed sync_contacts job
+    // WITHOUT since_timestamp is older than 7 days (or never happened)
+    const FULL_SYNC_INTERVAL_DAYS = 7;
+    let forceFullSync = false;
+
+    const { data: lastFullSyncJob } = await supaAdmin
+      .from('sync_jobs')
+      .select('completed_at, payload')
+      .eq('type', 'sync_contacts')
+      .eq('status', 'completed')
+      .order('completed_at', { ascending: false })
+      .limit(50);
+
+    // Find the most recent full sync (one without since_timestamp in payload)
+    const lastFullSync = (lastFullSyncJob ?? []).find(
+      (j: any) => !j.payload?.since_timestamp
+    );
+
+    if (!lastFullSync) {
+      forceFullSync = true;
+      console.log('[schedule-sync] No previous full sync found, forcing full sync');
+    } else {
+      const daysSinceFullSync = (Date.now() - new Date(lastFullSync.completed_at).getTime()) / (1000 * 60 * 60 * 24);
+      if (daysSinceFullSync >= FULL_SYNC_INTERVAL_DAYS) {
+        forceFullSync = true;
+        console.log(`[schedule-sync] Last full sync was ${daysSinceFullSync.toFixed(1)} days ago, forcing full sync`);
+      }
+    }
+
+    // 3. Create jobs for each type
     const jobTypes = ['sync_contacts', 'ingest_historical', 'classify_batch'] as const;
 
     for (const jobType of jobTypes) {
-      // Get since_timestamp from last completed job of this type
-      const { data: lastJob } = await supaAdmin
-        .from('sync_jobs')
-        .select('completed_at')
-        .eq('type', jobType)
-        .eq('status', 'completed')
-        .order('completed_at', { ascending: false })
-        .limit(1)
-        .single();
-
       const payload: Record<string, unknown> = {};
-      if (lastJob?.completed_at) {
-        payload.since_timestamp = lastJob.completed_at;
+
+      if (forceFullSync && (jobType === 'sync_contacts' || jobType === 'ingest_historical')) {
+        // Full sync: do NOT set since_timestamp — this forces a complete scan
+        console.log(`[schedule-sync] Creating FULL ${jobType} job (no since_timestamp)`);
+      } else {
+        // Incremental: get since_timestamp from last completed job of this type
+        const { data: lastJob } = await supaAdmin
+          .from('sync_jobs')
+          .select('completed_at')
+          .eq('type', jobType)
+          .eq('status', 'completed')
+          .order('completed_at', { ascending: false })
+          .limit(1)
+          .single();
+
+        if (lastJob?.completed_at) {
+          payload.since_timestamp = lastJob.completed_at;
+        }
       }
 
       const { data: result, error: rpcErr } = await supaAdmin.rpc('create_job_if_none_active', {
@@ -77,11 +113,15 @@ Deno.serve(async (req) => {
       }
 
       const row = Array.isArray(result) ? result[0] : result;
-      results[jobType] = { job_id: row.job_id, already_running: row.already_running };
-      console.log(`[schedule-sync] ${jobType}: ${row.already_running ? 'already active' : 'created'} job ${row.job_id}`);
+      results[jobType] = {
+        job_id: row.job_id,
+        already_running: row.already_running,
+        full_sync: forceFullSync && (jobType === 'sync_contacts' || jobType === 'ingest_historical'),
+      };
+      console.log(`[schedule-sync] ${jobType}: ${row.already_running ? 'already active' : 'created'} job ${row.job_id}${forceFullSync && (jobType === 'sync_contacts' || jobType === 'ingest_historical') ? ' (FULL SYNC)' : ''}`);
     }
 
-    // 3. Fire-and-forget: trigger process-jobs to start immediately
+    // 4. Fire-and-forget: trigger process-jobs to start immediately
     const hasNewJob = Object.values(results).some(
       (r: any) => r?.job_id && !r?.already_running
     );
@@ -100,7 +140,7 @@ Deno.serve(async (req) => {
       } catch { /* ignore */ }
     }
 
-    return new Response(JSON.stringify({ success: true, results }), {
+    return new Response(JSON.stringify({ success: true, full_sync: forceFullSync, results }), {
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error) {
