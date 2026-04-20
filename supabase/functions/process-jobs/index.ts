@@ -649,7 +649,9 @@ async function handleClassifyBatch(
     .not('content', 'is', null)
     .neq('content', '')
     .not('conversation_id', 'is', null)
-    .gte('occurred_at', new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString())
+    // Janela fixa: classificar apenas mensagens de 2026 em diante (decisao do produto)
+    // Mensagens anteriores a 2026 sao consideradas historico arquivado e nao consomem creditos
+    .gte('occurred_at', '2026-01-01T00:00:00Z')
     .order('occurred_at', { ascending: false })
     .limit(200);
 
