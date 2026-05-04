@@ -170,8 +170,7 @@ const DemandsPage = () => {
   }, [demands, columns, moveMutation]);
 
   const handleCardClick = (demand: DemandRow) => {
-    setSelectedDemandId(demand.id);
-    setSheetOpen(true);
+    navigate(`/demands/${demand.id}`);
   };
 
   const handleAddClick = (columnId: string) => {
@@ -315,13 +314,6 @@ const DemandsPage = () => {
           )}
         </>
       )}
-
-      {/* Detail Sheet */}
-      <DemandDetailSheet
-        demand={selectedDemand}
-        open={sheetOpen}
-        onOpenChange={setSheetOpen}
-      />
 
       {/* Create Dialog */}
       <CreateDemandDialog
