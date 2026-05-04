@@ -50,7 +50,7 @@ import {
   type DemandComment,
 } from "@/hooks/useDemandComments";
 import { useDemandWatchers, useToggleWatcher } from "@/hooks/useDemandWatchers";
-import { useRfiByDemand, useCreateRfi, useRfiStatuses } from "@/hooks/useRfis";
+import { useRfiByDemand, useCreateRfi, useRfiStatuses, useDeleteRfi } from "@/hooks/useRfis";
 import { RfiDetailSheet } from "@/components/rfis/RfiDetailSheet";
 import { LinkConversationDialog } from "./LinkConversationDialog";
 import { useAuth } from "@/context/AuthContext";
@@ -248,6 +248,7 @@ export function DemandDetailContent({ demand, onClose }: { demand: DemandRow; on
   const toggleWatcherMutation = useToggleWatcher(demand.id);
   const { data: rfiData } = useRfiByDemand(demand.id);
   const createRfiMutation = useCreateRfi();
+  const deleteRfiMutation = useDeleteRfi();
   const { data: rfiStatuses = [] } = useRfiStatuses();
 
   const updateMutation = useUpdateDemand();
@@ -510,24 +511,53 @@ export function DemandDetailContent({ demand, onClose }: { demand: DemandRow; on
         <div className="space-y-1">
           <Label className="text-xs text-muted-foreground">RFI</Label>
           {rfiData ? (
-            <button
-              onClick={() => setRfiSheetOpen(true)}
-              className="w-full flex items-center justify-between gap-3 rounded-lg border bg-muted/30 px-3 py-2.5 text-left hover:bg-muted/50 transition-colors"
-            >
-              <div className="flex items-center gap-2 min-w-0">
-                <FileText className="h-4 w-4 text-primary shrink-0" />
-                <span className="font-mono font-semibold text-sm">{rfiData.rfi_number}</span>
-                {rfiData.rfi_statuses && (
-                  <Badge
-                    className="text-white text-xs"
-                    style={{ backgroundColor: (rfiData.rfi_statuses as { color: string | null }).color ?? undefined }}
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => setRfiSheetOpen(true)}
+                className="flex-1 flex items-center justify-between gap-3 rounded-lg border bg-muted/30 px-3 py-2.5 text-left hover:bg-muted/50 transition-colors"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <FileText className="h-4 w-4 text-primary shrink-0" />
+                  <span className="font-mono font-semibold text-sm">{rfiData.rfi_number}</span>
+                  {rfiData.rfi_statuses && (
+                    <Badge
+                      className="text-white text-xs"
+                      style={{ backgroundColor: (rfiData.rfi_statuses as { color: string | null }).color ?? undefined }}
+                    >
+                      {(rfiData.rfi_statuses as { name: string }).name}
+                    </Badge>
+                  )}
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+              </button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9 text-muted-foreground hover:text-destructive shrink-0"
+                    disabled={deleteRfiMutation.isPending}
+                    aria-label="Excluir RFI"
                   >
-                    {(rfiData.rfi_statuses as { name: string }).name}
-                  </Badge>
-                )}
-              </div>
-              <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-            </button>
+                    {deleteRfiMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Excluir este RFI?</AlertDialogTitle>
+                    <AlertDialogDescription>Esta ação não pode ser desfeita.</AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => deleteRfiMutation.mutate({ id: rfiData.id, demandId: demand.id })}
+                    >
+                      Excluir
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
           ) : (
             <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-muted-foreground/30 p-4">
               <FileText className="h-5 w-5 text-muted-foreground" />
