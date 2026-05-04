@@ -294,13 +294,11 @@ export function DemandSidebar({ demand, onActivityTabSelect, onClose }: DemandSi
         </div>
       </section>
 
-      <Separator />
-
       {/* RFI */}
-      <section className="space-y-2">
-        <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+      <section className="rounded-lg border border-border bg-card p-4 space-y-3">
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
           RFI
-        </Label>
+        </p>
         {rfiData ? (
           <div className="flex items-center gap-1.5">
             <button
@@ -352,18 +350,16 @@ export function DemandSidebar({ demand, onActivityTabSelect, onClose }: DemandSi
         )}
       </section>
 
-      <Separator />
-
       {/* Time tracking */}
-      <DemandTimeTrackingSection demandId={demand.id} />
-
-      <Separator />
+      <section className="rounded-lg border border-border bg-card p-4">
+        <DemandTimeTrackingSection demandId={demand.id} />
+      </section>
 
       {/* Bloqueio */}
-      <section className="space-y-2">
-        <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+      <section className="rounded-lg border border-border bg-card p-4 space-y-3">
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
           Bloqueio
-        </Label>
+        </p>
         {demand.is_blocked ? (
           <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 space-y-2">
             <div className="flex items-center justify-between">
@@ -403,14 +399,12 @@ export function DemandSidebar({ demand, onActivityTabSelect, onClose }: DemandSi
         )}
       </section>
 
-      <Separator />
-
       {/* Watchers */}
-      <section className="space-y-2">
+      <section className="rounded-lg border border-border bg-card p-4 space-y-3">
         <div className="flex items-center justify-between">
-          <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Observadores ({watchers.length})
-          </Label>
+          </p>
           <Button
             variant="outline" size="sm" className="h-7 text-xs"
             onClick={() => toggleWatcherMutation.mutate(isWatching)}
@@ -433,15 +427,13 @@ export function DemandSidebar({ demand, onActivityTabSelect, onClose }: DemandSi
         )}
       </section>
 
-      <Separator />
-
       {/* Recent activity */}
-      <section className="space-y-2">
+      <section className="rounded-lg border border-border bg-card p-4 space-y-3">
         <div className="flex items-center justify-between">
-          <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Atividade recente
-          </Label>
-          {activities.length > 5 && (
+          </p>
+          {activities.length > 0 && (
             <Button
               variant="link" size="sm" className="h-auto p-0 text-xs"
               onClick={onActivityTabSelect}
@@ -467,8 +459,6 @@ export function DemandSidebar({ demand, onActivityTabSelect, onClose }: DemandSi
           </div>
         )}
       </section>
-
-      <Separator />
 
       {/* Danger zone */}
       <section className="space-y-2">
