@@ -45,12 +45,12 @@ import { useClientToken, useGenerateClientToken } from "@/hooks/useClientToken";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { ChartContainer } from "@/components/ui/chart";
 import { CreateDemandDialog } from "@/components/demands/CreateDemandDialog";
-import { DemandDetailSheet } from "@/components/demands/DemandDetailSheet";
+// DemandDetailSheet removed — clicks navigate to /demands/:id
 import { ClientAgendasTab } from "@/components/agendas/ClientAgendasTab";
 import { ClientRfisTab } from "@/components/rfis/ClientRfisTab";
 import { ClientDocumentsTab } from "@/components/clients/ClientDocumentsTab";
 import { ClientRulesTab } from "@/components/clients/ClientRulesTab";
-import type { DemandRow } from "@/hooks/useDemands";
+
 import { TONE_CONFIG, TONE_CHART_COLORS, TONE_BAR_COLORS } from "@/lib/colorPalette";
 
 // ── Types ──
@@ -238,8 +238,6 @@ const ClientDetailPage = () => {
   const [pageInteractions, setPageInteractions] = useState(0);
   const [pageParticipants, setPageParticipants] = useState(0);
   const [createDemandOpen, setCreateDemandOpen] = useState(false);
-  const [selectedDemandId, setSelectedDemandId] = useState<string | null>(null);
-  const [demandSheetOpen, setDemandSheetOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
   const [selectedTone, setSelectedTone] = useState("todos");
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -398,10 +396,6 @@ const ClientDetailPage = () => {
   const clientDemandsOpen = clientDemandsData?.openCount ?? 0;
   const clientDemandsCompleted = clientDemandsData?.completedCount ?? 0;
   const clientDemandsBlocked = clientDemandsData?.blockedCount ?? 0;
-  const selectedDemand = useMemo(
-    () => (clientDemands as unknown as DemandRow[]).find((d) => d.id === selectedDemandId) ?? null,
-    [clientDemands, selectedDemandId]
-  );
   const toneTrendChartData = useMemo(
     () =>
       toneTrend?.map((d) => ({
@@ -1086,10 +1080,7 @@ const ClientDetailPage = () => {
             return (
               <button
                 key={d.id}
-                onClick={() => {
-                  setSelectedDemandId(d.id);
-                  setDemandSheetOpen(true);
-                }}
+                onClick={() => navigate(`/demands/${d.id}`)}
                 className="w-full text-left rounded-lg border border-border p-3 hover:bg-accent transition-colors space-y-1.5"
               >
                 <div className="flex items-start justify-between gap-2">
@@ -1142,14 +1133,6 @@ const ClientDetailPage = () => {
             defaultClientId={clientId}
           />
 
-          <DemandDetailSheet
-            demand={selectedDemand}
-            open={demandSheetOpen}
-            onOpenChange={(open) => {
-              setDemandSheetOpen(open);
-              if (!open) setSelectedDemandId(null);
-            }}
-          />
         </TabsContent>
 
         {/* ── TAB: Pautas ── */}

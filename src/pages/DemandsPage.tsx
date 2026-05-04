@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   DndContext, closestCorners, PointerSensor, useSensor, useSensors,
   type DragEndEvent,
@@ -18,7 +19,7 @@ import {
 } from "@/hooks/useDemands";
 import { useDemandAreas } from "@/hooks/useDemandAreas";
 import { KanbanColumn } from "@/components/demands/KanbanColumn";
-import { DemandDetailSheet } from "@/components/demands/DemandDetailSheet";
+// DemandDetailSheet still used elsewhere; navigation now opens dedicated page
 import { CreateDemandDialog } from "@/components/demands/CreateDemandDialog";
 import { useExportDemandsCSV } from "@/hooks/useExportDemandsCSV";
 import { SlaView } from "@/components/demands/SlaView";
@@ -110,13 +111,7 @@ const DemandsPage = () => {
   const { data: demands = [], isLoading: demandsLoading } = useDemands(filters);
   const moveMutation = useMoveDemand();
 
-  // Sheet state — store only ID to avoid stale object
-  const [selectedDemandId, setSelectedDemandId] = useState<string | null>(null);
-  const [sheetOpen, setSheetOpen] = useState(false);
-  const selectedDemand = useMemo(
-    () => (selectedDemandId ? demands.find((d) => d.id === selectedDemandId) ?? null : null),
-    [selectedDemandId, demands]
-  );
+  const navigate = useNavigate();
 
   // Create dialog
   const [createOpen, setCreateOpen] = useState(false);
@@ -175,8 +170,7 @@ const DemandsPage = () => {
   }, [demands, columns, moveMutation]);
 
   const handleCardClick = (demand: DemandRow) => {
-    setSelectedDemandId(demand.id);
-    setSheetOpen(true);
+    navigate(`/demands/${demand.id}`);
   };
 
   const handleAddClick = (columnId: string) => {
@@ -320,13 +314,6 @@ const DemandsPage = () => {
           )}
         </>
       )}
-
-      {/* Detail Sheet */}
-      <DemandDetailSheet
-        demand={selectedDemand}
-        open={sheetOpen}
-        onOpenChange={setSheetOpen}
-      />
 
       {/* Create Dialog */}
       <CreateDemandDialog

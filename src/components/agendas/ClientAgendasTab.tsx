@@ -1,18 +1,17 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Plus, ClipboardList, Loader2 } from "lucide-react";
-import { useMeetingAgendas, type MeetingAgendaWithClient } from "@/hooks/useMeetingAgendas";
+import { useMeetingAgendas } from "@/hooks/useMeetingAgendas";
 import { CreateAgendaDialog } from "@/components/agendas/CreateAgendaDialog";
-import { AgendaDetailSheet } from "@/components/agendas/AgendaDetailSheet";
 import { SatisfactionDisplay } from "@/components/agendas/SatisfactionPicker";
 
 export function ClientAgendasTab({ clientId }: { clientId: string }) {
   const { data: agendas = [], isLoading } = useMeetingAgendas({ clientId });
   const [createOpen, setCreateOpen] = useState(false);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [sheetOpen, setSheetOpen] = useState(false);
+  const navigate = useNavigate();
 
   return (
     <div className="space-y-4">
@@ -33,7 +32,11 @@ export function ClientAgendasTab({ clientId }: { clientId: string }) {
       ) : (
         <div className="grid gap-2">
           {agendas.map((a) => (
-            <Card key={a.id} className="cursor-pointer hover:shadow-md transition-shadow border border-border" onClick={() => { setSelectedId(a.id); setSheetOpen(true); }}>
+            <Card
+              key={a.id}
+              className="cursor-pointer hover:shadow-md transition-shadow border border-border"
+              onClick={() => navigate(`/agendas/${a.id}`)}
+            >
               <CardContent className="p-3 flex items-center gap-3">
                 <div className="flex-1 min-w-0">
                   <span className="text-sm font-medium truncate block">{a.title}</span>
@@ -53,7 +56,6 @@ export function ClientAgendasTab({ clientId }: { clientId: string }) {
       )}
 
       <CreateAgendaDialog open={createOpen} onOpenChange={setCreateOpen} defaultClientId={clientId} />
-      <AgendaDetailSheet agendaId={selectedId} open={sheetOpen} onOpenChange={setSheetOpen} />
     </div>
   );
 }
