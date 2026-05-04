@@ -315,6 +315,34 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaul
             <Label>Notas</Label>
             <Input value={notes} onChange={(e) => setNotes(e.target.value)} />
           </div>
+
+          {/* RFI URL + External Link */}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label>RFI URL</Label>
+              <Input
+                type="url"
+                value={rfiUrl}
+                onChange={(e) => setRfiUrl(e.target.value)}
+                placeholder="https://..."
+              />
+              <p className="text-[10px] text-muted-foreground">
+                Cria uma RFI vinculada à demanda com este link.
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Link externo</Label>
+              <Input
+                type="url"
+                value={externalLink}
+                onChange={(e) => setExternalLink(e.target.value)}
+                placeholder="https://..."
+              />
+              <p className="text-[10px] text-muted-foreground">
+                Adicionado como link nos anexos da demanda.
+              </p>
+            </div>
+          </div>
         </div>
 
         <DialogFooter className="mt-4">
