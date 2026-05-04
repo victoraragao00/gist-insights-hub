@@ -17,6 +17,7 @@ export interface DemandRow extends Tables<"demands"> {
   ticket_columns?: { name: string; color: string | null } | null;
   demand_areas?: { name: string; color: string | null } | null;
   user_profiles?: { full_name: string | null; email: string | null } | null;
+  total_hours?: number;
 }
 
 export interface DemandFilters {
