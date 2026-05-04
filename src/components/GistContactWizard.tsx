@@ -53,6 +53,7 @@ interface GistTeammate {
 interface ContactGroup {
   domain: string;
   company?: string;
+  grouped_by?: "company_name" | "domain";
   contacts: GistContact[];
   suggested_client_id?: string;
   suggested_client_name?: string;
@@ -63,6 +64,7 @@ interface DiscoveryPayload {
   teammates: GistTeammate[];
   total_contacts: number;
   total_teammates: number;
+  contacts_without_company?: number;
 }
 
 interface GroupMapping {
