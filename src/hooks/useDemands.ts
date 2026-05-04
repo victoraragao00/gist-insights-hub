@@ -130,7 +130,9 @@ export function useDemand(demandId: string | undefined) {
         .eq("id", demandId!)
         .maybeSingle();
       if (error) throw error;
-      return data as DemandRow | null;
+      const row = (data ?? null) as DemandRow | null;
+      if (row) await attachTotalHours([row]);
+      return row;
     },
   });
 }
