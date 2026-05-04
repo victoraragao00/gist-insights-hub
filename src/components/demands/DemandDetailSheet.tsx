@@ -1082,6 +1082,11 @@ export function DemandDetailContent({ demand, onClose }: { demand: DemandRow; on
 
       <Separator />
 
+      {/* Time tracking */}
+      <DemandTimeTrackingSection demandId={demand.id} />
+
+      <Separator />
+
       {/* Timeline */}
       <div className="space-y-2">
         <Label className="text-xs text-muted-foreground">Atividades</Label>
