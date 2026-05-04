@@ -1,7 +1,8 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Badge } from "@/components/ui/badge";
-import { Lock, Headphones, Bug, TrendingUp, Sparkles, Briefcase, Search } from "lucide-react";
+import { Lock, Headphones, Bug, TrendingUp, Sparkles, Briefcase, Search, Clock } from "lucide-react";
+import { formatHours } from "@/lib/formatHours";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import type { DemandRow, DemandPriority } from "@/hooks/useDemands";
