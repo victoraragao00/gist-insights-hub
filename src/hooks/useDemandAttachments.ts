@@ -7,7 +7,7 @@ export interface DemandAttachment {
   id: string;
   demand_id: string;
   type: "file" | "link";
-  url: string;
+  url: string; // for files = storage path; for links = absolute URL
   filename: string | null;
   size_bytes: number | null;
   mime_type: string | null;
@@ -33,6 +33,56 @@ export function useDemandAttachments(demandId: string) {
   });
 }
 
+/**
+ * Extract storage path from either a raw path ("demands/<id>/file.png")
+ * or a legacy public URL ("https://.../demand-attachments/demands/<id>/file.png").
+ */
+export function extractAttachmentPath(url: string): string {
+  const match = url.match(/demand-attachments\/(.+)$/);
+  return match ? match[1] : url;
+}
+
+/**
+ * Generate signed URLs for file attachments. Links are passed through as-is.
+ */
+export function useSignedAttachmentUrls(attachments: DemandAttachment[]) {
+  return useQuery({
+    queryKey: [
+      "demand_attachments_signed",
+      attachments.map((a) => a.id).join(","),
+    ],
+    staleTime: 30 * 60_000, // signed URLs valid 1h, refresh after 30min
+    enabled: attachments.length > 0,
+    queryFn: async () => {
+      const map: Record<string, string> = {};
+      const filePaths = attachments
+        .filter((a) => a.type === "file")
+        .map((a) => ({ id: a.id, path: extractAttachmentPath(a.url) }));
+
+      if (filePaths.length > 0) {
+        const { data, error } = await supabase.storage
+          .from("demand-attachments")
+          .createSignedUrls(
+            filePaths.map((f) => f.path),
+            3600,
+          );
+        if (error) throw error;
+        data?.forEach((entry, idx) => {
+          if (entry.signedUrl) map[filePaths[idx].id] = entry.signedUrl;
+        });
+      }
+
+      attachments
+        .filter((a) => a.type === "link")
+        .forEach((a) => {
+          map[a.id] = a.url;
+        });
+
+      return map;
+    },
+  });
+}
+
 export function useUploadAttachments() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -42,22 +92,20 @@ export function useUploadAttachments() {
       const results: DemandAttachment[] = [];
       for (const file of files) {
         const ts = Date.now();
-        const path = `demands/${demandId}/${ts}_${file.name}`;
+        const safeName = file.name.replace(/[^\w.\-]+/g, "_");
+        const path = `demands/${demandId}/${ts}_${safeName}`;
+
         const { error: uploadError } = await supabase.storage
           .from("demand-attachments")
-          .upload(path, file);
+          .upload(path, file, { cacheControl: "3600", upsert: false });
         if (uploadError) throw uploadError;
-
-        const { data: urlData } = supabase.storage
-          .from("demand-attachments")
-          .getPublicUrl(path);
 
         const { data, error } = await supabase
           .from("demand_attachments")
           .insert({
             demand_id: demandId,
             type: "file" as const,
-            url: urlData.publicUrl,
+            url: path, // store path, not public URL (bucket is private)
             filename: file.name,
             size_bytes: file.size,
             mime_type: file.type,
@@ -74,7 +122,8 @@ export function useUploadAttachments() {
       queryClient.invalidateQueries({ queryKey: ["demand_attachments", vars.demandId] });
       toast.success("Arquivo(s) enviado(s)");
     },
-    onError: (err) => toast.error(err instanceof Error ? err.message : "Erro ao enviar arquivo"),
+    onError: (err) =>
+      toast.error("Erro no upload: " + (err instanceof Error ? err.message : String(err))),
   });
 }
 
@@ -83,11 +132,12 @@ export function useAddLink() {
   const { user } = useAuth();
 
   return useMutation({
-    mutationFn: async ({ demandId, url }: { demandId: string; url: string }) => {
+    mutationFn: async ({ demandId, url, label }: { demandId: string; url: string; label?: string }) => {
       const { error } = await supabase.from("demand_attachments").insert({
         demand_id: demandId,
         type: "link" as const,
         url,
+        filename: label ?? null,
         created_by: user?.id ?? null,
       });
       if (error) throw error;
@@ -106,14 +156,11 @@ export function useDeleteAttachment() {
   return useMutation({
     mutationFn: async (attachment: DemandAttachment) => {
       if (attachment.type === "file" && attachment.url) {
-        // Extract storage path from URL
-        const match = attachment.url.match(/demand-attachments\/(.+)$/);
-        if (match) {
-          const { error: storageError } = await supabase.storage
-            .from("demand-attachments")
-            .remove([match[1]]);
-          if (storageError) console.error("Storage delete error:", storageError.message);
-        }
+        const path = extractAttachmentPath(attachment.url);
+        const { error: storageError } = await supabase.storage
+          .from("demand-attachments")
+          .remove([path]);
+        if (storageError) console.error("Storage delete error:", storageError.message);
       }
       const { error } = await supabase
         .from("demand_attachments")
