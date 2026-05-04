@@ -90,6 +90,23 @@ export function useDemands(filters?: DemandFilters) {
   });
 }
 
+export function useDemand(demandId: string | undefined) {
+  return useQuery({
+    queryKey: ["demand", demandId],
+    staleTime: 30_000,
+    enabled: !!demandId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("demands")
+        .select("*, clients(name), demand_types(name, color, icon), ticket_columns(name, color), demand_areas(name, color), user_profiles!assignee_id(full_name, email)")
+        .eq("id", demandId!)
+        .maybeSingle();
+      if (error) throw error;
+      return data as DemandRow | null;
+    },
+  });
+}
+
 export function useDemandActivities(demandId: string) {
   return useQuery({
     queryKey: ["demand_activities", demandId],
