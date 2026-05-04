@@ -269,35 +269,42 @@ async function handleSyncContacts(
         const contactLastSeen = parseLastSeen(contact.last_seen_at);
         let companyName: string | null = null;
         let slug: string | null = null;
+        let createdFromCompanyName = false;
 
-        const cpCompany = contact.custom_properties?.company_name;
-        if (cpCompany && typeof cpCompany === 'string' && cpCompany.trim()) {
-          companyName = cpCompany.trim();
-          slug = toSlug(companyName);
+        // Priority 1: company_name from Gist (root or custom_properties)
+        const rawCompany = (typeof contact.company_name === 'string' && contact.company_name.trim())
+          ? contact.company_name.trim()
+          : (typeof contact.custom_properties?.company_name === 'string' && contact.custom_properties.company_name.trim())
+            ? contact.custom_properties.company_name.trim()
+            : null;
+
+        if (rawCompany) {
+          companyName = rawCompany;
+          slug = toSlug(rawCompany);
+          createdFromCompanyName = true;
         }
 
+        // Priority 2: try to MATCH against an existing client by email domain (no creation)
         if (!slug && contact.email?.includes('@')) {
           const domain = contact.email.split('@')[1].toLowerCase();
           if (!GENERIC_DOMAINS.has(domain)) {
             const domainSlug = toSlug(domain.replace(/\.(com|net|org|io|co|com\.br|app|dev|tech)(\..+)?$/i, ''));
-            let matched = false;
             for (const [existingSlug, client] of clientsBySlug) {
               const normSlug = existingSlug.replace(/-/g, '');
               const normDomain = domainSlug.replace(/-/g, '');
               if (normSlug.includes(normDomain) || normDomain.includes(normSlug)) {
                 companyName = client.name;
                 slug = existingSlug;
-                matched = true;
                 break;
               }
             }
-            if (!matched) { companyName = domain; slug = toSlug(domain); }
           }
         }
 
+        // Priority 3: quarantine — never create a client from a domain
         if (!slug) { contactsUnresolved++; await upsertParticipant(contact, null); continue; }
 
-        const client = await findOrCreateClient(companyName!, slug);
+        const client = await findOrCreateClient(companyName!, slug, createdFromCompanyName);
         if (contactLastSeen) {
           const current = clientLastSeen.get(client.id);
           if (!current || contactLastSeen > current) clientLastSeen.set(client.id, contactLastSeen);
