@@ -186,18 +186,27 @@ export function DemandSidebar({ demand, onActivityTabSelect, onClose }: DemandSi
     }
   };
 
-  const recentActivities = activities.slice(0, 5);
+  const recentActivities = activities.slice(0, 3);
   const assigneeProfile = userProfiles.find((u) => u.id === demand.assignee_id);
 
-  return (
-    <aside className="w-full lg:w-[280px] lg:shrink-0 space-y-5">
-      {/* Details */}
-      <section className="space-y-3">
-        <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Detalhes
-        </Label>
+  const initialsOf = (name: string) =>
+    name
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((p) => p[0])
+      .slice(0, 2)
+      .join("")
+      .toUpperCase();
 
-        <div className="space-y-2">
+  return (
+    <aside className="w-full lg:w-[280px] lg:shrink-0 lg:bg-muted/20 lg:border-l lg:border-border lg:pl-4 space-y-4">
+      {/* Details */}
+      <section className="rounded-lg border border-border bg-card p-4 space-y-3">
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          Detalhes
+        </p>
+
+        <div className="space-y-0">
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground">Coluna</Label>
             <Select value={demand.column_id} onValueChange={handleColumnChange}>
