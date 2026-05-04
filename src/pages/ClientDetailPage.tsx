@@ -392,7 +392,12 @@ const ClientDetailPage = () => {
   }, [client, scores]);
 
   const { data: toneTrend, isLoading: toneTrendLoading } = useClientToneTrend(clientId ?? undefined);
-  const { data: clientDemands = [], isLoading: loadingDemands } = useClientDemands(clientId);
+  const { data: clientDemandsData, isLoading: loadingDemands } = useClientDemands(clientId);
+  const clientDemands = clientDemandsData?.demands ?? [];
+  const clientDemandsTotal = clientDemandsData?.totalCount ?? 0;
+  const clientDemandsOpen = clientDemandsData?.openCount ?? 0;
+  const clientDemandsCompleted = clientDemandsData?.completedCount ?? 0;
+  const clientDemandsBlocked = clientDemandsData?.blockedCount ?? 0;
   const selectedDemand = useMemo(
     () => (clientDemands as unknown as DemandRow[]).find((d) => d.id === selectedDemandId) ?? null,
     [clientDemands, selectedDemandId]
@@ -724,7 +729,7 @@ const ClientDetailPage = () => {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="bg-muted/50 flex-wrap h-auto">
           <TabsTrigger value="overview">Visão Geral</TabsTrigger>
-          <TabsTrigger value="demands">Demandas ({clientDemands.length})</TabsTrigger>
+          <TabsTrigger value="demands">Demandas ({clientDemandsTotal})</TabsTrigger>
           <TabsTrigger value="agendas" className="gap-1">
             Pautas
             <AgendaCountBadge clientId={client.id} />
@@ -1038,22 +1043,10 @@ const ClientDetailPage = () => {
             </div>
           ) : (
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <KPICard label="Total" value={String(clientDemands.length)} sub="demandas" />
-              <KPICard
-                label="Abertos"
-                value={String(clientDemands.filter((d) => !d.ticket_columns?.triggers_finished_at).length)}
-                sub="em andamento"
-              />
-              <KPICard
-                label="Concluídos"
-                value={String(clientDemands.filter((d) => d.ticket_columns?.triggers_finished_at).length)}
-                sub="finalizados"
-              />
-              <KPICard
-                label="Bloqueados"
-                value={String(clientDemands.filter((d) => d.is_blocked).length)}
-                sub="com bloqueio"
-              />
+              <KPICard label="Total" value={String(clientDemandsTotal)} sub="demandas" />
+              <KPICard label="Abertos" value={String(clientDemandsOpen)} sub="em andamento" />
+              <KPICard label="Concluídos" value={String(clientDemandsCompleted)} sub="finalizados" />
+              <KPICard label="Bloqueados" value={String(clientDemandsBlocked)} sub="com bloqueio" />
             </div>
           )}
 
