@@ -153,10 +153,15 @@ export function LinkConversationDialog({ demand, open, onOpenChange }: LinkConve
                   key={conv.conversation_id}
                   className="rounded-lg border border-border p-3 space-y-2"
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-mono text-muted-foreground truncate max-w-xs">
-                      {conv.conversation_id}
-                    </span>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-foreground truncate">
+                        {conv.contact_name || `Conversa ${conv.conversation_id}`}
+                      </p>
+                      <p className="text-[10px] font-mono text-muted-foreground truncate">
+                        {conv.conversation_id}
+                      </p>
+                    </div>
                     <Badge variant="outline" className="text-xs shrink-0">
                       {conv.message_count} msgs
                     </Badge>

@@ -10,13 +10,14 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Sparkles } from "lucide-react";
+import { Loader2, Sparkles, MessageSquarePlus } from "lucide-react";
 import { useCreateDemand, useTicketColumns, useDemandTypes, type DemandPriority } from "@/hooks/useDemands";
 import { useDemandAreas } from "@/hooks/useDemandAreas";
 import { useClient } from "@/context/ClientContext";
 import { useDemandAnalysis, useAnalyzeDemand } from "@/hooks/useDemandAnalysis";
 import { useCreateRfi, useUpdateRfi } from "@/hooks/useRfis";
 import { useAddLink } from "@/hooks/useDemandAttachments";
+import { LinkConversationDialog } from "@/components/demands/LinkConversationDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -64,6 +65,7 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaul
   const [rfiUrl, setRfiUrl] = useState("");
   const [externalLink, setExternalLink] = useState("");
   const [createdDemandId, setCreatedDemandId] = useState<string | null>(null);
+  const [showLinkDialog, setShowLinkDialog] = useState(false);
 
   const { data: analysis } = useDemandAnalysis(createdDemandId ?? undefined);
   const analyzeMutation = useAnalyzeDemand();
@@ -144,58 +146,99 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaul
     setRfiUrl("");
     setExternalLink("");
     setCreatedDemandId(null);
+    setShowLinkDialog(false);
+  };
+
+  const handleFinish = () => {
+    resetForm();
+    onOpenChange(false);
   };
 
   // Post-creation view
   if (createdDemandId) {
-    return (
-      <Dialog open={open} onOpenChange={(v) => { if (!v) { resetForm(); } onOpenChange(v); }}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Demanda Criada ✓</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              A demanda <span className="font-medium text-foreground">{title || "Nova Demanda"}</span> foi criada com sucesso.
-            </p>
+    const demandStub = { id: createdDemandId, client_id: clientId } as Parameters<typeof LinkConversationDialog>[0]["demand"];
 
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label className="text-xs text-muted-foreground">Análise IA</Label>
-                <Button
-                  variant="outline" size="sm" className="h-7 text-xs"
-                  onClick={() => analyzeMutation.mutate(createdDemandId)}
-                  disabled={analyzeMutation.isPending}
-                >
-                  {analyzeMutation.isPending
-                    ? <><Loader2 className="h-3 w-3 animate-spin mr-1" /> Analisando...</>
-                    : <><Sparkles className="h-3 w-3 mr-1" /> {analysis ? "Reanalisar" : "Analisar com IA"}</>
-                  }
-                </Button>
+    return (
+      <>
+        <Dialog
+          open={open && !showLinkDialog}
+          onOpenChange={(v) => { if (!v) handleFinish(); else onOpenChange(v); }}
+        >
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Demanda Criada ✓</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                A demanda <span className="font-medium text-foreground">{title || "Nova Demanda"}</span> foi criada com sucesso.
+              </p>
+
+              {/* Step 2 — optional: link a conversation */}
+              <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  <MessageSquarePlus className="h-4 w-4 text-primary" />
+                  <p className="text-sm font-medium">Deseja vincular uma conversa agora?</p>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Associe mensagens já existentes deste cliente à demanda.
+                </p>
+                <div className="flex gap-2 pt-1">
+                  <Button variant="outline" size="sm" className="flex-1" onClick={handleFinish}>
+                    Não, finalizar
+                  </Button>
+                  <Button size="sm" className="flex-1" onClick={() => setShowLinkDialog(true)}>
+                    Sim, vincular
+                  </Button>
+                </div>
               </div>
 
-              {analysis && (
-                <div className="rounded-lg border bg-primary/5 border-primary/20 p-3 space-y-3">
-                  <div className="space-y-1">
-                    <p className="text-xs font-medium text-primary">Problema identificado</p>
-                    <p className="text-xs text-foreground">{analysis.problem_summary}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs font-medium text-primary">Sugestão de resolução</p>
-                    <p className="text-xs text-foreground">{analysis.suggested_resolution}</p>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Gerado {formatDistanceToNow(new Date(analysis.generated_at), { addSuffix: true, locale: ptBR })}
-                  </p>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs text-muted-foreground">Análise IA</Label>
+                  <Button
+                    variant="outline" size="sm" className="h-7 text-xs"
+                    onClick={() => analyzeMutation.mutate(createdDemandId)}
+                    disabled={analyzeMutation.isPending}
+                  >
+                    {analyzeMutation.isPending
+                      ? <><Loader2 className="h-3 w-3 animate-spin mr-1" /> Analisando...</>
+                      : <><Sparkles className="h-3 w-3 mr-1" /> {analysis ? "Reanalisar" : "Analisar com IA"}</>
+                    }
+                  </Button>
                 </div>
-              )}
+
+                {analysis && (
+                  <div className="rounded-lg border bg-primary/5 border-primary/20 p-3 space-y-3">
+                    <div className="space-y-1">
+                      <p className="text-xs font-medium text-primary">Problema identificado</p>
+                      <p className="text-xs text-foreground">{analysis.problem_summary}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs font-medium text-primary">Sugestão de resolução</p>
+                      <p className="text-xs text-foreground">{analysis.suggested_resolution}</p>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Gerado {formatDistanceToNow(new Date(analysis.generated_at), { addSuffix: true, locale: ptBR })}
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-          <DialogFooter className="mt-4">
-            <Button onClick={() => { resetForm(); onOpenChange(false); }}>Fechar</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            <DialogFooter className="mt-4">
+              <Button onClick={handleFinish}>Fechar</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <LinkConversationDialog
+          demand={demandStub}
+          open={showLinkDialog}
+          onOpenChange={(v) => {
+            setShowLinkDialog(v);
+            if (!v) handleFinish();
+          }}
+        />
+      </>
     );
   }
 

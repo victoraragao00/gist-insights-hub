@@ -25,6 +25,7 @@ export interface ClientConversation {
   last_message_at: string;
   last_content: string | null;
   sender_side: string | null;
+  contact_name: string | null;
 }
 
 export interface ConversationMessage {
@@ -70,7 +71,32 @@ export function useClientConversations(clientId: string | undefined) {
         p_client_id: clientId!,
       });
       if (error) throw error;
-      return (data ?? []) as ClientConversation[];
+      const convs = (data ?? []) as ClientConversation[];
+      if (convs.length === 0) return convs;
+
+      // Enrich with contact_name from interactions (first sender_raw where sender_side='client')
+      const ids = convs.map((c) => c.conversation_id);
+      const { data: msgs, error: msgsErr } = await supabase
+        .from("interactions")
+        .select("conversation_id, sender_raw, sender_side, occurred_at")
+        .eq("client_id", clientId!)
+        .in("conversation_id", ids)
+        .order("occurred_at", { ascending: true });
+      if (msgsErr) throw msgsErr;
+
+      const nameByConv = new Map<string, string>();
+      for (const m of msgs ?? []) {
+        if (!m.conversation_id || !m.sender_raw) continue;
+        if (m.sender_side !== "client") continue;
+        if (!nameByConv.has(m.conversation_id)) {
+          nameByConv.set(m.conversation_id, m.sender_raw);
+        }
+      }
+
+      return convs.map((c) => ({
+        ...c,
+        contact_name: nameByConv.get(c.conversation_id) ?? null,
+      }));
     },
   });
 }
