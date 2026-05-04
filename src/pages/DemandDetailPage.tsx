@@ -1,13 +1,22 @@
+import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Loader2, ChevronLeft } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useDemand } from "@/hooks/useDemands";
-import { DemandDetailContent } from "@/components/demands/DemandDetailSheet";
+import { DemandHeader } from "@/components/demands/detail/DemandHeader";
+import { DemandSidebar } from "@/components/demands/detail/DemandSidebar";
+import { DemandContentTab } from "@/components/demands/detail/DemandContentTab";
+import { DemandConversationsTab } from "@/components/demands/detail/DemandConversationsTab";
+import { DemandActivityTab } from "@/components/demands/detail/DemandActivityTab";
+
+type TabValue = "content" | "conversations" | "activity";
 
 const DemandDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { data: demand, isLoading, isError } = useDemand(id);
+  const [activeTab, setActiveTab] = useState<TabValue>("content");
 
   if (isLoading) {
     return (
@@ -29,19 +38,39 @@ const DemandDetailPage = () => {
   }
 
   return (
-    <div className="max-w-5xl mx-auto p-6 space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => navigate("/demands")}
-          className="gap-1.5"
-        >
-          <ChevronLeft className="h-4 w-4" /> Demandas
-        </Button>
-      </div>
-      <div className="rounded-lg border border-border bg-card p-6">
-        <DemandDetailContent demand={demand} onClose={() => navigate("/demands")} />
+    <div className="max-w-6xl mx-auto p-6 space-y-6">
+      <DemandHeader demand={demand} />
+
+      <div className="flex flex-col lg:flex-row gap-6">
+        {/* Main panel — Tabs */}
+        <main className="flex-1 min-w-0">
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabValue)}>
+            <TabsList className="mb-4">
+              <TabsTrigger value="content">Conteúdo</TabsTrigger>
+              <TabsTrigger value="conversations">Conversas</TabsTrigger>
+              <TabsTrigger value="activity">Atividade</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="content" className="mt-0">
+              <DemandContentTab demand={demand} />
+            </TabsContent>
+
+            <TabsContent value="conversations" className="mt-0">
+              <DemandConversationsTab demand={demand} />
+            </TabsContent>
+
+            <TabsContent value="activity" className="mt-0">
+              <DemandActivityTab demandId={demand.id} />
+            </TabsContent>
+          </Tabs>
+        </main>
+
+        {/* Right sidebar */}
+        <DemandSidebar
+          demand={demand}
+          onActivityTabSelect={() => setActiveTab("activity")}
+          onClose={() => navigate("/demands")}
+        />
       </div>
     </div>
   );
