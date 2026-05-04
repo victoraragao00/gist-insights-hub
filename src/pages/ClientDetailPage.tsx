@@ -45,7 +45,7 @@ import { useClientToken, useGenerateClientToken } from "@/hooks/useClientToken";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { ChartContainer } from "@/components/ui/chart";
 import { CreateDemandDialog } from "@/components/demands/CreateDemandDialog";
-import { DemandDetailSheet } from "@/components/demands/DemandDetailSheet";
+// DemandDetailSheet removed — clicks navigate to /demands/:id
 import { ClientAgendasTab } from "@/components/agendas/ClientAgendasTab";
 import { ClientRfisTab } from "@/components/rfis/ClientRfisTab";
 import { ClientDocumentsTab } from "@/components/clients/ClientDocumentsTab";
@@ -238,8 +238,6 @@ const ClientDetailPage = () => {
   const [pageInteractions, setPageInteractions] = useState(0);
   const [pageParticipants, setPageParticipants] = useState(0);
   const [createDemandOpen, setCreateDemandOpen] = useState(false);
-  const [selectedDemandId, setSelectedDemandId] = useState<string | null>(null);
-  const [demandSheetOpen, setDemandSheetOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
   const [selectedTone, setSelectedTone] = useState("todos");
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -398,10 +396,6 @@ const ClientDetailPage = () => {
   const clientDemandsOpen = clientDemandsData?.openCount ?? 0;
   const clientDemandsCompleted = clientDemandsData?.completedCount ?? 0;
   const clientDemandsBlocked = clientDemandsData?.blockedCount ?? 0;
-  const selectedDemand = useMemo(
-    () => (clientDemands as unknown as DemandRow[]).find((d) => d.id === selectedDemandId) ?? null,
-    [clientDemands, selectedDemandId]
-  );
   const toneTrendChartData = useMemo(
     () =>
       toneTrend?.map((d) => ({
