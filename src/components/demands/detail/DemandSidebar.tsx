@@ -462,6 +462,7 @@ export function DemandSidebar({ demand, onActivityTabSelect, onClose }: DemandSi
 
       {/* Danger zone */}
       <section className="rounded-lg border border-border bg-card p-4 space-y-2">
+        <Button variant="outline" size="sm" className="w-full h-8 text-xs" onClick={() => setCancelDialogOpen(true)}>
           <X className="h-3 w-3 mr-1" /> Cancelar demanda
         </Button>
         <AlertDialog>
