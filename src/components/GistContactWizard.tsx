@@ -53,6 +53,7 @@ interface GistTeammate {
 interface ContactGroup {
   domain: string;
   company?: string;
+  grouped_by?: "company_name" | "domain";
   contacts: GistContact[];
   suggested_client_id?: string;
   suggested_client_name?: string;
@@ -63,6 +64,7 @@ interface DiscoveryPayload {
   teammates: GistTeammate[];
   total_contacts: number;
   total_teammates: number;
+  contacts_without_company?: number;
 }
 
 interface GroupMapping {
@@ -409,7 +411,10 @@ export function GistContactWizard({ open, onClose, mode, clientId }: GistContact
             <>
               <div className="flex items-center justify-between rounded-lg border bg-muted/30 px-4 py-2.5">
                 <span className="text-sm text-muted-foreground">
-                  {discoveryData.contact_groups.length} domínios encontrados
+                  {discoveryData.contact_groups.length} grupos encontrados
+                  {discoveryData.contacts_without_company
+                    ? ` · ${discoveryData.contacts_without_company} contatos sem empresa (ignorados)`
+                    : ""}
                 </span>
                 <Select onValueChange={handleBulkAction}>
                   <SelectTrigger className="w-[200px] h-8 text-xs">
@@ -441,12 +446,18 @@ export function GistContactWizard({ open, onClose, mode, clientId }: GistContact
                           <div className="flex items-center gap-2">
                             <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" />
                             <span className="font-medium text-sm truncate">
-                              {group.domain}
+                              {group.company || group.domain}
                             </span>
+                            {group.grouped_by === "company_name" && (
+                              <Badge variant="secondary" className="text-[10px] h-4 px-1.5 font-normal">
+                                Gist
+                              </Badge>
+                            )}
                           </div>
                           <p className="text-xs text-muted-foreground mt-0.5">
                             {group.contacts.length} contatos
-                            {group.company ? ` · ${group.company}` : ""}
+                            {group.company && group.grouped_by !== "company_name" ? ` · ${group.company}` : ""}
+                            {group.grouped_by === "domain" ? ` · domínio: ${group.domain}` : ""}
                           </p>
                         </div>
 
@@ -547,7 +558,7 @@ export function GistContactWizard({ open, onClose, mode, clientId }: GistContact
                     <div className="flex items-center justify-between">
                       <h4 className="text-sm font-semibold flex items-center gap-2">
                         <Building2 className="h-4 w-4 text-muted-foreground" />
-                        {group.domain}
+                        {group.company || group.domain}
                         <Badge variant="outline" className="text-xs font-normal">
                           → {label}
                         </Badge>

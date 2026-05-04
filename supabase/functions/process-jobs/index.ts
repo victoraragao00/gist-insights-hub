@@ -93,9 +93,11 @@ interface HandlerResult {
 // ── Gist types ──
 
 const GENERIC_DOMAINS = new Set([
-  'gmail.com', 'hotmail.com', 'outlook.com', 'yahoo.com', 'icloud.com',
-  'live.com', 'uol.com.br', 'bol.com.br', 'terra.com.br', 'proton.me',
-  'protonmail.com', 'aol.com', 'mail.com',
+  'gmail.com', 'hotmail.com', 'outlook.com', 'yahoo.com', 'yahoo.com.br',
+  'icloud.com', 'live.com', 'uol.com.br', 'bol.com.br', 'terra.com.br',
+  'proton.me', 'protonmail.com', 'aol.com', 'mail.com', 'me.com',
+  'msn.com', 'ymail.com', 'zoho.com', 'gmx.com', 'gmx.net',
+  'inbox.com', 'fastmail.com', 'tutanota.com',
 ]);
 
 interface GistContact {
@@ -103,6 +105,7 @@ interface GistContact {
   name: string;
   email: string;
   last_seen_at: number | string | null;
+  company_name?: string | null;
   custom_properties?: { company_name?: string; [k: string]: unknown };
 }
 
@@ -195,13 +198,14 @@ async function handleSyncContacts(
   const clientLastSeen = new Map<string, Date>();
   const newClientIds = new Set<string>();
 
-  async function findOrCreateClient(name: string, slug: string): Promise<ClientRecord> {
+  async function findOrCreateClient(name: string, slug: string, fromCompanyName = false): Promise<ClientRecord> {
     const existing = clientsBySlug.get(slug);
     if (existing) return existing;
 
+    const source = fromCompanyName ? 'gist_sync_company_name' : 'gist_sync';
     const { data: inserted, error: insertErr } = await supaAdmin
       .from('clients')
-      .upsert({ name, slug, active: true, metadata: { auto_created: true, source: 'gist_sync' } }, { onConflict: 'slug' })
+      .upsert({ name, slug, active: true, metadata: { auto_created: true, source } }, { onConflict: 'slug' })
       .select('id, name, slug, metadata')
       .single();
     if (insertErr) throw new Error(`Client upsert failed for ${slug}: ${insertErr.message}`);
@@ -266,35 +270,42 @@ async function handleSyncContacts(
         const contactLastSeen = parseLastSeen(contact.last_seen_at);
         let companyName: string | null = null;
         let slug: string | null = null;
+        let createdFromCompanyName = false;
 
-        const cpCompany = contact.custom_properties?.company_name;
-        if (cpCompany && typeof cpCompany === 'string' && cpCompany.trim()) {
-          companyName = cpCompany.trim();
-          slug = toSlug(companyName);
+        // Priority 1: company_name from Gist (root or custom_properties)
+        const rawCompany = (typeof contact.company_name === 'string' && contact.company_name.trim())
+          ? contact.company_name.trim()
+          : (typeof contact.custom_properties?.company_name === 'string' && contact.custom_properties.company_name.trim())
+            ? contact.custom_properties.company_name.trim()
+            : null;
+
+        if (rawCompany) {
+          companyName = rawCompany;
+          slug = toSlug(rawCompany);
+          createdFromCompanyName = true;
         }
 
+        // Priority 2: try to MATCH against an existing client by email domain (no creation)
         if (!slug && contact.email?.includes('@')) {
           const domain = contact.email.split('@')[1].toLowerCase();
           if (!GENERIC_DOMAINS.has(domain)) {
             const domainSlug = toSlug(domain.replace(/\.(com|net|org|io|co|com\.br|app|dev|tech)(\..+)?$/i, ''));
-            let matched = false;
             for (const [existingSlug, client] of clientsBySlug) {
               const normSlug = existingSlug.replace(/-/g, '');
               const normDomain = domainSlug.replace(/-/g, '');
               if (normSlug.includes(normDomain) || normDomain.includes(normSlug)) {
                 companyName = client.name;
                 slug = existingSlug;
-                matched = true;
                 break;
               }
             }
-            if (!matched) { companyName = domain; slug = toSlug(domain); }
           }
         }
 
+        // Priority 3: quarantine — never create a client from a domain
         if (!slug) { contactsUnresolved++; await upsertParticipant(contact, null); continue; }
 
-        const client = await findOrCreateClient(companyName!, slug);
+        const client = await findOrCreateClient(companyName!, slug, createdFromCompanyName);
         if (contactLastSeen) {
           const current = clientLastSeen.get(client.id);
           if (!current || contactLastSeen > current) clientLastSeen.set(client.id, contactLastSeen);
