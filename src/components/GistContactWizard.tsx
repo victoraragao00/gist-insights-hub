@@ -411,7 +411,10 @@ export function GistContactWizard({ open, onClose, mode, clientId }: GistContact
             <>
               <div className="flex items-center justify-between rounded-lg border bg-muted/30 px-4 py-2.5">
                 <span className="text-sm text-muted-foreground">
-                  {discoveryData.contact_groups.length} domínios encontrados
+                  {discoveryData.contact_groups.length} grupos encontrados
+                  {discoveryData.contacts_without_company
+                    ? ` · ${discoveryData.contacts_without_company} contatos sem empresa (ignorados)`
+                    : ""}
                 </span>
                 <Select onValueChange={handleBulkAction}>
                   <SelectTrigger className="w-[200px] h-8 text-xs">
