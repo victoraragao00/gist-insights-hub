@@ -49,6 +49,11 @@ export function DemandContentTab({ demand }: DemandContentTabProps) {
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [newLinkUrl, setNewLinkUrl] = useState("");
 
+  const descRef = useAutoResize(description);
+  const resultRef = useAutoResize(expectedResult);
+
+  const hasResolution = !!resolution && resolution.trim() !== "";
+
   useEffect(() => {
     setDescription(demand.description ?? "");
     setExpectedResult(demand.expected_result ?? "");
@@ -80,26 +85,28 @@ export function DemandContentTab({ demand }: DemandContentTabProps) {
       <div className="space-y-1.5">
         <Label className="text-xs text-muted-foreground">Descrição</Label>
         <Textarea
+          ref={descRef}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           onBlur={() => {
             if (description !== (demand.description ?? "")) saveField("description", description, "Descrição");
           }}
-          rows={4}
           placeholder="Descreva a demanda..."
+          className="resize-none overflow-hidden min-h-[80px]"
         />
       </div>
 
       <div className="space-y-1.5">
         <Label className="text-xs text-muted-foreground">Resultado esperado</Label>
         <Textarea
+          ref={resultRef}
           value={expectedResult}
           onChange={(e) => setExpectedResult(e.target.value)}
           onBlur={() => {
             if (expectedResult !== (demand.expected_result ?? "")) saveField("expected_result", expectedResult, "Resultado Esperado");
           }}
-          rows={3}
           placeholder="O que precisa ser entregue?"
+          className="resize-none overflow-hidden min-h-[80px]"
         />
       </div>
 
@@ -115,8 +122,22 @@ export function DemandContentTab({ demand }: DemandContentTabProps) {
         />
       </div>
 
-      <div className="space-y-1.5">
-        <Label className="text-xs text-emerald-700 dark:text-emerald-400">Resolução</Label>
+      <div
+        className={cn(
+          "rounded-md border p-3 transition-colors",
+          hasResolution
+            ? "border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/40"
+            : "border-border bg-background",
+        )}
+      >
+        <Label
+          className={cn(
+            "text-xs font-medium uppercase tracking-wide mb-2 block",
+            hasResolution ? "text-emerald-700 dark:text-emerald-400" : "text-muted-foreground",
+          )}
+        >
+          Resolução
+        </Label>
         <Textarea
           value={resolution}
           onChange={(e) => setResolution(e.target.value)}
@@ -125,7 +146,10 @@ export function DemandContentTab({ demand }: DemandContentTabProps) {
           }}
           rows={3}
           placeholder="Como foi resolvido..."
-          className="bg-emerald-50/40 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900 focus-visible:ring-emerald-500/30"
+          className={cn(
+            "border-0 bg-transparent p-0 resize-none focus-visible:ring-0 shadow-none",
+            hasResolution ? "text-emerald-900 dark:text-emerald-200" : "",
+          )}
         />
       </div>
 
