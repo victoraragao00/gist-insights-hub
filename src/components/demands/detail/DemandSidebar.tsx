@@ -274,11 +274,14 @@ export function DemandSidebar({ demand, onActivityTabSelect, onClose }: DemandSi
             >
               <SelectTrigger className="h-8">
                 {assigneeProfile ? (
-                  <AssigneeDisplay
-                    fullName={assigneeProfile.full_name}
-                    email={assigneeProfile.email}
-                    size="sm"
-                  />
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="w-5 h-5 rounded-full bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 text-[10px] font-medium flex items-center justify-center shrink-0">
+                      {initialsOf(assigneeProfile.full_name || assigneeProfile.email || "?")}
+                    </span>
+                    <span className="text-sm font-medium truncate">
+                      {assigneeProfile.full_name || assigneeProfile.email}
+                    </span>
+                  </div>
                 ) : (
                   <SelectValue placeholder="—" />
                 )}
