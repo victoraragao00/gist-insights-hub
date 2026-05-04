@@ -241,6 +241,7 @@ function DemandDetailContent({ demand, onClose }: { demand: DemandRow; onClose: 
   });
   const { data: activities = [] } = useDemandActivities(demand.id);
   const { data: attachments = [] } = useDemandAttachments(demand.id);
+  const { data: signedUrlMap = {} } = useSignedAttachmentUrls(attachments);
   const { data: linkedInteractions = [] } = useDemandInteractions(demand.id);
   const { data: comments = [] } = useDemandComments(demand.id);
   const { data: watchers = [] } = useDemandWatchers(demand.id);
