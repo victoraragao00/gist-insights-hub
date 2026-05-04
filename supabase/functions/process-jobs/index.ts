@@ -93,9 +93,11 @@ interface HandlerResult {
 // ── Gist types ──
 
 const GENERIC_DOMAINS = new Set([
-  'gmail.com', 'hotmail.com', 'outlook.com', 'yahoo.com', 'icloud.com',
-  'live.com', 'uol.com.br', 'bol.com.br', 'terra.com.br', 'proton.me',
-  'protonmail.com', 'aol.com', 'mail.com',
+  'gmail.com', 'hotmail.com', 'outlook.com', 'yahoo.com', 'yahoo.com.br',
+  'icloud.com', 'live.com', 'uol.com.br', 'bol.com.br', 'terra.com.br',
+  'proton.me', 'protonmail.com', 'aol.com', 'mail.com', 'me.com',
+  'msn.com', 'ymail.com', 'zoho.com', 'gmx.com', 'gmx.net',
+  'inbox.com', 'fastmail.com', 'tutanota.com',
 ]);
 
 interface GistContact {
