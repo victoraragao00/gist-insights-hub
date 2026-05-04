@@ -446,12 +446,18 @@ export function GistContactWizard({ open, onClose, mode, clientId }: GistContact
                           <div className="flex items-center gap-2">
                             <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" />
                             <span className="font-medium text-sm truncate">
-                              {group.domain}
+                              {group.company || group.domain}
                             </span>
+                            {group.grouped_by === "company_name" && (
+                              <Badge variant="secondary" className="text-[10px] h-4 px-1.5 font-normal">
+                                Gist
+                              </Badge>
+                            )}
                           </div>
                           <p className="text-xs text-muted-foreground mt-0.5">
                             {group.contacts.length} contatos
-                            {group.company ? ` · ${group.company}` : ""}
+                            {group.company && group.grouped_by !== "company_name" ? ` · ${group.company}` : ""}
+                            {group.grouped_by === "domain" ? ` · domínio: ${group.domain}` : ""}
                           </p>
                         </div>
 
