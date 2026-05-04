@@ -10,13 +10,14 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Sparkles } from "lucide-react";
+import { Loader2, Sparkles, MessageSquarePlus } from "lucide-react";
 import { useCreateDemand, useTicketColumns, useDemandTypes, type DemandPriority } from "@/hooks/useDemands";
 import { useDemandAreas } from "@/hooks/useDemandAreas";
 import { useClient } from "@/context/ClientContext";
 import { useDemandAnalysis, useAnalyzeDemand } from "@/hooks/useDemandAnalysis";
 import { useCreateRfi, useUpdateRfi } from "@/hooks/useRfis";
 import { useAddLink } from "@/hooks/useDemandAttachments";
+import { LinkConversationDialog } from "@/components/demands/LinkConversationDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -64,6 +65,7 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaul
   const [rfiUrl, setRfiUrl] = useState("");
   const [externalLink, setExternalLink] = useState("");
   const [createdDemandId, setCreatedDemandId] = useState<string | null>(null);
+  const [showLinkDialog, setShowLinkDialog] = useState(false);
 
   const { data: analysis } = useDemandAnalysis(createdDemandId ?? undefined);
   const analyzeMutation = useAnalyzeDemand();
