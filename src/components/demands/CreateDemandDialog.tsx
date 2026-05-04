@@ -15,6 +15,8 @@ import { useCreateDemand, useTicketColumns, useDemandTypes, type DemandPriority 
 import { useDemandAreas } from "@/hooks/useDemandAreas";
 import { useClient } from "@/context/ClientContext";
 import { useDemandAnalysis, useAnalyzeDemand } from "@/hooks/useDemandAnalysis";
+import { useCreateRfi, useUpdateRfi } from "@/hooks/useRfis";
+import { useAddLink } from "@/hooks/useDemandAttachments";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -45,6 +47,9 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaul
     },
   });
   const createMutation = useCreateDemand();
+  const createRfiMutation = useCreateRfi();
+  const updateRfiMutation = useUpdateRfi();
+  const addLinkMutation = useAddLink();
 
   const [title, setTitle] = useState("");
   const [clientId, setClientId] = useState(defaultClientId ?? "");
@@ -56,6 +61,8 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaul
   const [description, setDescription] = useState("");
   const [expectedResult, setExpectedResult] = useState("");
   const [notes, setNotes] = useState("");
+  const [rfiUrl, setRfiUrl] = useState("");
+  const [externalLink, setExternalLink] = useState("");
   const [createdDemandId, setCreatedDemandId] = useState<string | null>(null);
 
   const { data: analysis } = useDemandAnalysis(createdDemandId ?? undefined);
