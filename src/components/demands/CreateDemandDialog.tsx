@@ -15,6 +15,8 @@ import { useCreateDemand, useTicketColumns, useDemandTypes, type DemandPriority 
 import { useDemandAreas } from "@/hooks/useDemandAreas";
 import { useClient } from "@/context/ClientContext";
 import { useDemandAnalysis, useAnalyzeDemand } from "@/hooks/useDemandAnalysis";
+import { useCreateRfi, useUpdateRfi } from "@/hooks/useRfis";
+import { useAddLink } from "@/hooks/useDemandAttachments";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -45,6 +47,9 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaul
     },
   });
   const createMutation = useCreateDemand();
+  const createRfiMutation = useCreateRfi();
+  const updateRfiMutation = useUpdateRfi();
+  const addLinkMutation = useAddLink();
 
   const [title, setTitle] = useState("");
   const [clientId, setClientId] = useState(defaultClientId ?? "");
@@ -56,6 +61,8 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaul
   const [description, setDescription] = useState("");
   const [expectedResult, setExpectedResult] = useState("");
   const [notes, setNotes] = useState("");
+  const [rfiUrl, setRfiUrl] = useState("");
+  const [externalLink, setExternalLink] = useState("");
   const [createdDemandId, setCreatedDemandId] = useState<string | null>(null);
 
   const { data: analysis } = useDemandAnalysis(createdDemandId ?? undefined);
@@ -81,14 +88,43 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaul
         notes: notes || undefined,
       },
       {
-        onSuccess: (data) => {
+        onSuccess: async (data) => {
           const newId = data?.id;
-          if (newId) {
-            setCreatedDemandId(newId);
-          } else {
+          if (!newId) {
             onOpenChange(false);
             resetForm();
+            return;
           }
+
+          // Side-effects: optional RFI + external link.
+          // Do not block the post-creation view if either fails — toasts will surface errors.
+          const trimmedRfi = rfiUrl.trim();
+          const trimmedLink = externalLink.trim();
+
+          if (trimmedRfi) {
+            try {
+              const rfi = await createRfiMutation.mutateAsync({ demand_id: newId });
+              if (rfi?.id) {
+                await updateRfiMutation.mutateAsync({
+                  id: rfi.id,
+                  demandId: newId,
+                  fields: { link: trimmedRfi },
+                });
+              }
+            } catch {
+              /* toast already shown by mutation */
+            }
+          }
+
+          if (trimmedLink) {
+            try {
+              await addLinkMutation.mutateAsync({ demandId: newId, url: trimmedLink });
+            } catch {
+              /* toast already shown by mutation */
+            }
+          }
+
+          setCreatedDemandId(newId);
         },
       }
     );
@@ -105,6 +141,8 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaul
     setDescription("");
     setExpectedResult("");
     setNotes("");
+    setRfiUrl("");
+    setExternalLink("");
     setCreatedDemandId(null);
   };
 
@@ -276,6 +314,34 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaul
           <div className="space-y-1.5">
             <Label>Notas</Label>
             <Input value={notes} onChange={(e) => setNotes(e.target.value)} />
+          </div>
+
+          {/* RFI URL + External Link */}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label>RFI URL</Label>
+              <Input
+                type="url"
+                value={rfiUrl}
+                onChange={(e) => setRfiUrl(e.target.value)}
+                placeholder="https://..."
+              />
+              <p className="text-[10px] text-muted-foreground">
+                Cria uma RFI vinculada à demanda com este link.
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Link externo</Label>
+              <Input
+                type="url"
+                value={externalLink}
+                onChange={(e) => setExternalLink(e.target.value)}
+                placeholder="https://..."
+              />
+              <p className="text-[10px] text-muted-foreground">
+                Adicionado como link nos anexos da demanda.
+              </p>
+            </div>
           </div>
         </div>
 

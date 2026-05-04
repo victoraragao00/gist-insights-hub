@@ -36,6 +36,7 @@ import { useDemandAreas } from "@/hooks/useDemandAreas";
 import { useQuery } from "@tanstack/react-query";
 import {
   useDemandAttachments, useUploadAttachments, useAddLink, useDeleteAttachment,
+  useSignedAttachmentUrls,
 } from "@/hooks/useDemandAttachments";
 import {
   useDemandInteractions, useUnlinkInteraction,
@@ -240,6 +241,7 @@ function DemandDetailContent({ demand, onClose }: { demand: DemandRow; onClose: 
   });
   const { data: activities = [] } = useDemandActivities(demand.id);
   const { data: attachments = [] } = useDemandAttachments(demand.id);
+  const { data: signedUrlMap = {} } = useSignedAttachmentUrls(attachments);
   const { data: linkedInteractions = [] } = useDemandInteractions(demand.id);
   const { data: comments = [] } = useDemandComments(demand.id);
   const { data: watchers = [] } = useDemandWatchers(demand.id);
@@ -645,48 +647,69 @@ function DemandDetailContent({ demand, onClose }: { demand: DemandRow; onClose: 
           <p className="text-xs text-muted-foreground">Nenhum anexo</p>
         )}
 
-        {attachments.map((att) => (
-          <div key={att.id} className="flex items-center gap-2 text-xs group">
-            {att.type === "file" ? (
-              <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-            ) : (
-              <Link2 className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-            )}
-            <a
-              href={att.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-foreground hover:underline truncate flex-1"
-            >
-              {att.filename ?? att.url}
-            </a>
-            {att.size_bytes && (
-              <span className="text-muted-foreground shrink-0">{formatBytes(att.size_bytes)}</span>
-            )}
-            <ExternalLink className="h-3 w-3 text-muted-foreground shrink-0" />
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-5 w-5 opacity-0 group-hover:opacity-100">
-                  <X className="h-3 w-3" />
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Remover anexo?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    {att.type === "file" ? "O arquivo será excluído permanentemente." : "O link será removido."}
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction onClick={() => deleteAttachmentMutation.mutate(att)}>
-                    Remover
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </div>
-        ))}
+        {attachments.map((att) => {
+          const href = signedUrlMap[att.id] ?? (att.type === "link" ? att.url : "#");
+          const isImage = att.type === "file" && att.mime_type?.startsWith("image/");
+          return (
+            <div key={att.id} className="flex items-start gap-2 text-xs group">
+              {isImage && href !== "#" ? (
+                <a
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="shrink-0 rounded-md overflow-hidden border bg-muted"
+                  title={att.filename ?? ""}
+                >
+                  <img
+                    src={href}
+                    alt={att.filename ?? "imagem"}
+                    className="h-[120px] w-auto max-w-[180px] object-cover"
+                    loading="lazy"
+                  />
+                </a>
+              ) : att.type === "file" ? (
+                <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
+              ) : (
+                <Link2 className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
+              )}
+              <div className="flex-1 min-w-0 flex items-center gap-2">
+                <a
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-foreground hover:underline truncate flex-1"
+                >
+                  {att.filename ?? att.url}
+                </a>
+                {att.size_bytes && (
+                  <span className="text-muted-foreground shrink-0">{formatBytes(att.size_bytes)}</span>
+                )}
+                <ExternalLink className="h-3 w-3 text-muted-foreground shrink-0" />
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-5 w-5 opacity-0 group-hover:opacity-100">
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Remover anexo?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        {att.type === "file" ? "O arquivo será excluído permanentemente." : "O link será removido."}
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction onClick={() => deleteAttachmentMutation.mutate(att)}>
+                        Remover
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            </div>
+          );
+        })}
 
         {uploadMutation.isPending && (
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
