@@ -10,6 +10,7 @@ interface GistContact {
   name: string | null;
   email: string | null;
   company_name: string | null;
+  custom_properties?: { company_name?: string; [k: string]: unknown };
 }
 
 interface GistContactsResponse {
@@ -24,8 +25,10 @@ interface GistTeammate {
 }
 
 interface ContactGroup {
+  // Group key: company_name when available, otherwise the email domain
   domain: string;
   company?: string;
+  grouped_by: 'company_name' | 'domain';
   contacts: Array<{ id: number; name: string; email: string; company?: string }>;
   suggested_client_id?: string;
   suggested_client_name?: string;
