@@ -1,104 +1,91 @@
-## Problema
-
-Hoje **230 de 243 clientes** foram criados automaticamente, e quase todos usam o **domínio do email** como nome (ex: `loftystyle.com.br`, `aluno.ufsj.edu.br`, `yahoo.com`, `mclknit.com`). Isso polui a lista de Clientes e cria entidades sem valor de negócio.
-
-O Gist já tem o campo **`Company name`** como propriedade default do contato (visível em "Qualification → Company name", ex: "NK Store"). Esse é o campo correto para ser usado como nome do cliente.
-
-Diagnóstico do código atual:
-
-1. `gist-discover` (wizard de mapeamento) lê `contact.company_name` como campo raiz — **errado**. Por isso o wizard nunca mostra a empresa real, só o domínio.
-2. `process-jobs → handleSyncContacts` lê `contact.custom_properties?.company_name` — também provavelmente errado (no Gist, `company_name` é uma **default property**, não custom). Mesmo quando estiver presente, o fallback sempre cai no domínio do email — e é esse fallback que está criando todos os 230 clientes-lixo.
-3. Domínios genéricos (yahoo.com, zoho.com) escapam do filtro porque ele só compara em minúsculas e sem trims robustos — mas mesmo assim foram criados antes (ex: `yahoo.com`, `zoho.com`).
-
 ## Objetivo
 
-Mudar a fonte de verdade para criação/agrupamento de clientes:
-**1º** `company_name` do contato no Gist · **2º** matching com cliente existente por domínio · **3º** quarentena (sem criar cliente) — nunca mais criar cliente a partir do domínio.
+Corrigir o efeito colateral da limpeza anterior (PUKET inativado por engano) e ajustar o critério de proteção para que clientes com interações reais não sejam mais inativados em futuras execuções.
 
-## Mudanças
+## Diagnóstico
 
-### 1. Edge Function `gist-discover` (agrupamento do wizard)
+| Cliente | Status atual | Demandas | Agendas | Interações | Motivo |
+|---------|--------------|----------|---------|------------|--------|
+| `loftystyle.com.br` | **Ativo** | 51 | 67 | 1.297 | Protegido por ter demandas/agendas |
+| `puket.com.br` | **Inativo** | 0 | 0 | 61 | Removido — interações sozinhas não eram critério |
 
-- Corrigir leitura: `contact.company_name` (campo raiz é o correto pela doc oficial do Gist) **+** fallback para `contact.custom_properties?.company_name` por segurança.
-- **Mudar a chave de agrupamento de `domain` para `company_name`** quando disponível. Quando ausente, manter agrupamento por domínio (comportamento atual) para compatibilidade do wizard.
-- Adicionar contagem `contacts_without_company` no payload de retorno para o wizard exibir.
-- Manter o filtro de domínios genéricos.
+A regra anterior só protegia clientes com demandas/agendas/RFIs. Interações (mesmo 61) não contavam.
 
-### 2. Edge Function `process-jobs → handleSyncContacts`
+## Ações
 
-Nova lógica de resolução de cliente para cada contato (em ordem):
+### 1. Migration: reativar PUKET e ajustar critério de proteção
 
-1. **`company_name` presente** (raiz do contato OU `custom_properties.company_name`):
-   - `name = company_name.trim()`, `slug = toSlug(company_name)`.
-   - `findOrCreateClient(name, slug)` — cria com `metadata.source = 'gist_sync_company_name'`.
-2. **Sem `company_name`, com email** (não-genérico):
-   - **Tentar matchar com cliente existente** (manual ou já mapeado) por similaridade de domínio.
-   - **Se matchar**: vincular participante ao cliente existente.
-   - **Se NÃO matchar**: **quarentenar** (`upsertParticipant(contact, null)` + `contactsUnresolved++`). **Não criar mais clientes a partir de domínio.**
-3. **Sem `company_name` e sem email útil**: quarentena.
+```sql
+-- Reativar PUKET (tem 61 interações reais)
+UPDATE clients
+SET active = true
+WHERE id = '12abfda9-f8a2-48e5-ac9c-a23350c4f2d2';
 
-Ampliar `GENERIC_DOMAINS` para incluir provedores que já vazaram (`zoho.com`, `yahoo.com.br`, etc.) — lista revisada com base no banco atual.
-
-### 3. Migration de limpeza (clientes auto_created sem valor)
-
-Migration manual + idempotente:
-
-- Identificar clientes com `metadata->>'auto_created' = 'true'` AND `metadata->>'source' = 'gist_sync'` AND **sem demandas, sem agendas, sem RFIs vinculados** AND `slug` parecendo domínio (regex `\.(com|net|org|br|io|co|app|dev|tech)$` ou contém ponto).
-- Para cada um:
-  - Se tiver participantes, **desvincular** (`participants.client_id = NULL`) — vão para quarentena.
-  - **Marcar como `inactive`** (não deletar) — preserva histórico e respeita o protocolo de soft delete da CTO.
-- Gerar `auditorias/AUDITORIA_GIST_CLIENT_CLEANUP_YYYYMMDD.md` listando antes/depois.
-
-A migration **não** toca em clientes manuais (13 atuais) nem em clientes auto_created que já tenham demandas/agendas/RFIs (preserva trabalho real feito sobre eles).
-
-### 4. UI: `GistContactWizard.tsx`
-
-- Exibir `company_name` (quando disponível) como label principal de cada grupo, com o domínio em segundo plano.
-- Quando o grupo veio de `company_name` (não de domínio), o sufixo `· {company}` some e vira o título.
-- Botão "Quarentenar todos sem company" como ação em massa quando o usuário não quiser criar/mapear contatos sem empresa identificada.
-
-### 5. Documentação
-
-Atualizar `mem://constraints/gist-sync-generic-domains` e adicionar nova memória `mem://features/gist-company-name-priority` documentando a nova prioridade de resolução.
-
-## Não fazer
-
-- **Não deletar clientes** — apenas inativar (preserva integridade relacional e histórico).
-- **Não tocar** em clientes manuais ou em clientes com demandas/agendas/RFIs vinculados.
-- **Não alterar** `src/integrations/supabase/*`, `supabase/config.toml` ou auth flows.
-- **Não criar** clientes a partir de domínio nunca mais — domínio só serve para match com cliente já existente.
-
-## Detalhes técnicos
-
-```text
-Pipeline novo (process-jobs handleSyncContacts):
-
-contact
-  ├─ tem company_name? ──► CRIA/REUSA cliente por slug(company_name)
-  └─ não tem company_name?
-       ├─ tem email não-genérico? ──► tenta match com cliente existente por domínio
-       │     ├─ matchou? ──► vincula participante
-       │     └─ não matchou? ──► quarentena (participant.client_id = NULL)
-       └─ sem email útil? ──► quarentena
+-- Reativar quaisquer outros clientes inativados na limpeza anterior
+-- que tinham interações (segurança retroativa)
+UPDATE clients c
+SET active = true
+WHERE c.active = false
+  AND c.metadata->>'auto_created' = 'true'
+  AND EXISTS (SELECT 1 FROM interactions i WHERE i.client_id = c.id);
 ```
 
-Campos do Gist confirmados pela doc oficial (`docs.getgist.com/article/241`):
-- `company_name` — propriedade DEFAULT do contato (raiz do payload).
-- `custom_properties.company_name` — só existe se o workspace tiver custom property com mesmo nome (fallback).
+### 2. Atualizar `deactivate_stale_clients` para preservar interações
 
-Arquivos alterados:
-- `supabase/functions/gist-discover/index.ts`
-- `supabase/functions/process-jobs/index.ts` (apenas `handleSyncContacts`)
-- `src/components/GistContactWizard.tsx`
-- Nova migration `supabase/migrations/{ts}_inactivate_domain_only_auto_clients.sql`
-- `auditorias/AUDITORIA_GIST_CLIENT_CLEANUP_{YYYYMMDD}.md`
-- `mem://features/gist-company-name-priority` (novo)
-- `mem://constraints/gist-sync-generic-domains` (atualizado)
+Atualmente a função inativa por `last_seen_at` antigo sem checar interações. Vou adicionar uma cláusula que **nunca** inativa um cliente que tenha qualquer interação, demanda, agenda ou RFI vinculados.
 
-## Critérios de aceitação
+```sql
+CREATE OR REPLACE FUNCTION public.deactivate_stale_clients(_days integer)
+RETURNS integer
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
+AS $$
+DECLARE affected integer;
+BEGIN
+  UPDATE clients c
+  SET active = false
+  WHERE c.active = true
+    AND c.metadata->>'auto_created' = 'true'
+    AND (c.metadata->>'last_seen_at')::timestamptz < NOW() - make_interval(days => _days)
+    AND NOT EXISTS (SELECT 1 FROM interactions i  WHERE i.client_id = c.id)
+    AND NOT EXISTS (SELECT 1 FROM demands d       WHERE d.client_id = c.id)
+    AND NOT EXISTS (SELECT 1 FROM meeting_agendas m WHERE m.client_id = c.id);
+  GET DIAGNOSTICS affected = ROW_COUNT;
+  RETURN affected;
+END;
+$$;
+```
 
-1. Após próximo sync, novos contatos com `company_name` no Gist viram clientes com o nome da empresa (ex: "NK Store"), não com domínio.
-2. Contatos sem `company_name` e sem cliente existente que case por domínio ficam em quarentena (`participants.client_id = NULL`) e não criam cliente.
-3. Lista de Clientes deixa de mostrar entradas como `loftystyle.com.br`, `aluno.ufsj.edu.br`, `yahoo.com`, etc. (vão para inativo, ocultos pelo filtro default).
-4. Wizard de mapeamento mostra "NK Store" no lugar de "nkstore.com.br" quando o Gist tiver a empresa preenchida.
-5. Nenhum cliente manual ou cliente com demandas/agendas/RFIs é tocado.
+### 3. Renomear LOFTY manualmente
+
+```sql
+UPDATE clients
+SET name = 'Lofty Style'
+WHERE id = 'a33f0682-fbeb-41cd-88d4-a54aed4a883e';
+```
+
+> Slug fica `loftystyle-com-br` (não altero para não quebrar links existentes). O nome exibido na UI passa a ser "Lofty Style".
+
+### 4. Atualizar memória
+
+Atualizar `mem://tech/client-inactivation-safety-logic` com o novo critério: clientes auto-criados só são inativados se não tiverem **nenhuma** interação, demanda ou agenda.
+
+## Sobre PUKET no futuro
+
+Mantemos a decisão "Aceitar como está": quando o Gist enviar `company_name = "puket.com.br"`, o cliente continuará sendo criado com esse nome e você renomeia manualmente. Como agora há proteção por interações, ele não será mais inativado por engano.
+
+## Arquivos afetados
+
+- Migration nova (1 arquivo): reativação + redefinição de função + rename
+- `mem://tech/client-inactivation-safety-logic` (atualização de memória)
+
+## Validação pós-execução
+
+```sql
+SELECT id, name, active FROM clients
+WHERE id IN (
+  '12abfda9-f8a2-48e5-ac9c-a23350c4f2d2',  -- PUKET deve estar ativo
+  'a33f0682-fbeb-41cd-88d4-a54aed4a883e'   -- LOFTY deve aparecer como "Lofty Style"
+);
+```
+
+PUKET volta a aparecer na listagem de clientes na UI imediatamente após a migration.
