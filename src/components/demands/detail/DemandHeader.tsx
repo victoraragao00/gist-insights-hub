@@ -64,8 +64,16 @@ export function DemandHeader({ demand }: DemandHeaderProps) {
         <Badge variant="outline" className={`text-xs ${priorityBadgeClass(demand.priority)}`}>
           {priorityLabel(demand.priority)}
         </Badge>
+        {demand.demand_types?.name && (
+          <Badge
+            variant="outline"
+            className="text-xs bg-teal-50 text-teal-800 border-teal-200 dark:bg-teal-950 dark:text-teal-300 dark:border-teal-900"
+          >
+            {demand.demand_types.name}
+          </Badge>
+        )}
         {demand.clients?.name && (
-          <span className="text-sm text-muted-foreground">{demand.clients.name}</span>
+          <span className="text-sm text-muted-foreground">• {demand.clients.name}</span>
         )}
       </div>
     </header>
