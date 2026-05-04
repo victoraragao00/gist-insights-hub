@@ -88,14 +88,43 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaul
         notes: notes || undefined,
       },
       {
-        onSuccess: (data) => {
+        onSuccess: async (data) => {
           const newId = data?.id;
-          if (newId) {
-            setCreatedDemandId(newId);
-          } else {
+          if (!newId) {
             onOpenChange(false);
             resetForm();
+            return;
           }
+
+          // Side-effects: optional RFI + external link.
+          // Do not block the post-creation view if either fails — toasts will surface errors.
+          const trimmedRfi = rfiUrl.trim();
+          const trimmedLink = externalLink.trim();
+
+          if (trimmedRfi) {
+            try {
+              const rfi = await createRfiMutation.mutateAsync({ demand_id: newId });
+              if (rfi?.id) {
+                await updateRfiMutation.mutateAsync({
+                  id: rfi.id,
+                  demandId: newId,
+                  fields: { link: trimmedRfi },
+                });
+              }
+            } catch {
+              /* toast already shown by mutation */
+            }
+          }
+
+          if (trimmedLink) {
+            try {
+              await addLinkMutation.mutateAsync({ demandId: newId, url: trimmedLink });
+            } catch {
+              /* toast already shown by mutation */
+            }
+          }
+
+          setCreatedDemandId(newId);
         },
       }
     );
@@ -112,6 +141,8 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaul
     setDescription("");
     setExpectedResult("");
     setNotes("");
+    setRfiUrl("");
+    setExternalLink("");
     setCreatedDemandId(null);
   };
 
