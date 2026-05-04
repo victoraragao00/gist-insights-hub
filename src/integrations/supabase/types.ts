@@ -756,6 +756,54 @@ export type Database = {
           },
         ]
       }
+      demand_time_entries: {
+        Row: {
+          created_at: string
+          demand_id: string
+          description: string | null
+          ended_at: string | null
+          hours_manual: number | null
+          id: string
+          started_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          demand_id: string
+          description?: string | null
+          ended_at?: string | null
+          hours_manual?: number | null
+          id?: string
+          started_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          demand_id?: string
+          description?: string | null
+          ended_at?: string | null
+          hours_manual?: number | null
+          id?: string
+          started_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "demand_time_entries_demand_id_fkey"
+            columns: ["demand_id"]
+            isOneToOne: false
+            referencedRelation: "demands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "demand_time_entries_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       demand_types: {
         Row: {
           active: boolean | null
@@ -1685,6 +1733,7 @@ export type Database = {
         Args: { p_client_id?: string; p_days?: number }
         Returns: Json
       }
+      get_demand_total_hours: { Args: { p_demand_id: string }; Returns: number }
       get_demands_with_sla: {
         Args: { p_user_id: string }
         Returns: {
