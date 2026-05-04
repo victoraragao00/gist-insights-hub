@@ -112,6 +112,13 @@ export function DemandCard({ demand, onClick }: DemandCardProps) {
             <Lock className="h-3 w-3 mr-0.5" /> Bloqueado
           </Badge>
         )}
+
+        {/* Worked hours badge */}
+        {demand.total_hours != null && demand.total_hours > 0 && (
+          <Badge variant="outline" className="text-xs gap-1">
+            <Clock className="h-3 w-3" /> {formatHours(demand.total_hours)}
+          </Badge>
+        )}
       </div>
 
       <div className="mt-2 flex items-center justify-between">
