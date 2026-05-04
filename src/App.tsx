@@ -11,6 +11,7 @@ import Index from "./pages/Index";
 import ClientsPage from "./pages/ClientsPage";
 import ClientDetailPage from "./pages/ClientDetailPage";
 import DemandsPage from "./pages/DemandsPage";
+import DemandDetailPage from "./pages/DemandDetailPage";
 import DemandsDashboardPage from "./pages/DemandsDashboardPage";
 import SearchPage from "./pages/SearchPage";
 import Audits from "./pages/Audits";
@@ -43,6 +44,7 @@ const App = () => (
                 <Route path="/clients/:slug" element={<ErrorBoundary><ClientDetailPage /></ErrorBoundary>} />
                 <Route path="/demands" element={<ErrorBoundary><DemandsPage /></ErrorBoundary>} />
                 <Route path="/demands/dashboard" element={<ErrorBoundary><DemandsDashboardPage /></ErrorBoundary>} />
+                <Route path="/demands/:id" element={<ErrorBoundary><DemandDetailPage /></ErrorBoundary>} />
                 <Route path="/agendas" element={<ErrorBoundary><AgendasPage /></ErrorBoundary>} />
                 <Route path="/agendas/:id" element={<ErrorBoundary><AgendaDetailPage /></ErrorBoundary>} />
                 <Route path="/search" element={<ErrorBoundary><SearchPage /></ErrorBoundary>} />
