@@ -114,38 +114,61 @@ Deno.serve(async (req) => {
       ? teammatesRes
       : (teammatesRes as { teammates: GistTeammate[] }).teammates ?? [];
 
-    // 3. Group contacts by email domain
-    const domainMap = new Map<string, ContactGroup>();
+    // 3. Group contacts: prefer company_name; fallback to email domain
+    const groupMap = new Map<string, ContactGroup>();
+    const genericDomains = new Set([
+      'gmail.com', 'hotmail.com', 'outlook.com', 'yahoo.com', 'yahoo.com.br',
+      'icloud.com', 'live.com', 'aol.com', 'protonmail.com', 'mail.com',
+      'me.com', 'msn.com', 'ymail.com', 'zoho.com', 'uol.com.br', 'bol.com.br',
+      'terra.com.br', 'proton.me', 'gmx.com', 'gmx.net',
+    ]);
+    let contactsWithoutCompany = 0;
 
     for (const contact of allContacts) {
       const email = contact.email;
-      if (!email || !email.includes('@')) continue;
+      const rawCompany = (contact.company_name && contact.company_name.trim())
+        || (contact.custom_properties?.company_name && String(contact.custom_properties.company_name).trim())
+        || '';
+      const company = rawCompany ? rawCompany.toString().trim() : '';
 
-      const domain = email.split('@')[1].toLowerCase();
-      // Skip generic email providers
-      const genericDomains = ['gmail.com', 'hotmail.com', 'outlook.com', 'yahoo.com', 'icloud.com', 'live.com', 'aol.com', 'protonmail.com', 'mail.com'];
-      if (genericDomains.includes(domain)) continue;
+      let groupKey: string | null = null;
+      let groupedBy: 'company_name' | 'domain' = 'domain';
+      let domain = '';
 
-      if (!domainMap.has(domain)) {
-        domainMap.set(domain, {
-          domain,
-          company: contact.company_name ?? undefined,
+      if (company) {
+        groupKey = `company:${company.toLowerCase()}`;
+        groupedBy = 'company_name';
+      } else if (email && email.includes('@')) {
+        domain = email.split('@')[1].toLowerCase();
+        if (genericDomains.has(domain)) { contactsWithoutCompany++; continue; }
+        groupKey = `domain:${domain}`;
+        groupedBy = 'domain';
+      } else {
+        contactsWithoutCompany++;
+        continue;
+      }
+
+      if (!groupMap.has(groupKey)) {
+        groupMap.set(groupKey, {
+          domain: company || domain,
+          company: company || undefined,
+          grouped_by: groupedBy,
           contacts: [],
         });
       }
 
-      const group = domainMap.get(domain)!;
+      const group = groupMap.get(groupKey)!;
       group.contacts.push({
         id: contact.id,
         name: contact.name ?? contact.email ?? 'Sem nome',
         email: contact.email ?? '',
-        company: contact.company_name ?? undefined,
+        company: company || undefined,
       });
 
-      if (!group.company && contact.company_name) {
-        group.company = contact.company_name;
-      }
+      if (!group.company && company) group.company = company;
     }
+
+    const domainMap = groupMap;
 
     // 4. Query clients table for similarity matching
     const supaAdmin = createClient(supabaseUrl, serviceKey);
