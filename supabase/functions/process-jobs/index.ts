@@ -105,6 +105,7 @@ interface GistContact {
   name: string;
   email: string;
   last_seen_at: number | string | null;
+  company_name?: string | null;
   custom_properties?: { company_name?: string; [k: string]: unknown };
 }
 
