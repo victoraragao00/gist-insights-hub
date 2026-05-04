@@ -198,13 +198,14 @@ async function handleSyncContacts(
   const clientLastSeen = new Map<string, Date>();
   const newClientIds = new Set<string>();
 
-  async function findOrCreateClient(name: string, slug: string): Promise<ClientRecord> {
+  async function findOrCreateClient(name: string, slug: string, fromCompanyName = false): Promise<ClientRecord> {
     const existing = clientsBySlug.get(slug);
     if (existing) return existing;
 
+    const source = fromCompanyName ? 'gist_sync_company_name' : 'gist_sync';
     const { data: inserted, error: insertErr } = await supaAdmin
       .from('clients')
-      .upsert({ name, slug, active: true, metadata: { auto_created: true, source: 'gist_sync' } }, { onConflict: 'slug' })
+      .upsert({ name, slug, active: true, metadata: { auto_created: true, source } }, { onConflict: 'slug' })
       .select('id, name, slug, metadata')
       .single();
     if (insertErr) throw new Error(`Client upsert failed for ${slug}: ${insertErr.message}`);
