@@ -1,192 +1,104 @@
-# S0-B — Horas Trabalhadas em Demandas (revisado)
+## Problema
 
-Adicionar rastreamento de tempo por demanda: timer persistente em banco (start/stop), entradas manuais (horas + descrição), total agregado, badge no Kanban — com **garantia de timer único global por usuário**.
+Hoje **230 de 243 clientes** foram criados automaticamente, e quase todos usam o **domínio do email** como nome (ex: `loftystyle.com.br`, `aluno.ufsj.edu.br`, `yahoo.com`, `mclknit.com`). Isso polui a lista de Clientes e cria entidades sem valor de negócio.
 
-## 1. Migration — `demand_time_entries`
+O Gist já tem o campo **`Company name`** como propriedade default do contato (visível em "Qualification → Company name", ex: "NK Store"). Esse é o campo correto para ser usado como nome do cliente.
 
-Tabela conforme SQL do prompt, com 2 ajustes para alinhar aos padrões do projeto:
-- `user_accessible_client_ids` recebe `_user_id uuid` → passar `auth.uid()`.
-- Função retorna `SETOF uuid` → usar `IN (SELECT ...)` (não `= ANY`).
+Diagnóstico do código atual:
 
-```sql
-CREATE TABLE demand_time_entries (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  demand_id UUID NOT NULL REFERENCES demands(id) ON DELETE CASCADE,
-  user_id UUID NOT NULL REFERENCES user_profiles(id) ON DELETE CASCADE,
-  started_at TIMESTAMPTZ,
-  ended_at TIMESTAMPTZ,
-  hours_manual NUMERIC(6,2),
-  description TEXT,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  CONSTRAINT chk_hours CHECK (
-    (started_at IS NOT NULL AND ended_at IS NOT NULL AND hours_manual IS NULL)
-    OR (started_at IS NULL AND ended_at IS NULL AND hours_manual IS NOT NULL AND hours_manual > 0)
-    OR (started_at IS NOT NULL AND ended_at IS NULL AND hours_manual IS NULL)
-  )
-);
+1. `gist-discover` (wizard de mapeamento) lê `contact.company_name` como campo raiz — **errado**. Por isso o wizard nunca mostra a empresa real, só o domínio.
+2. `process-jobs → handleSyncContacts` lê `contact.custom_properties?.company_name` — também provavelmente errado (no Gist, `company_name` é uma **default property**, não custom). Mesmo quando estiver presente, o fallback sempre cai no domínio do email — e é esse fallback que está criando todos os 230 clientes-lixo.
+3. Domínios genéricos (yahoo.com, zoho.com) escapam do filtro porque ele só compara em minúsculas e sem trims robustos — mas mesmo assim foram criados antes (ex: `yahoo.com`, `zoho.com`).
 
-CREATE INDEX idx_time_entries_demand ON demand_time_entries(demand_id);
-CREATE INDEX idx_time_entries_user ON demand_time_entries(user_id);
-CREATE INDEX idx_time_entries_active ON demand_time_entries(user_id)
-  WHERE ended_at IS NULL AND started_at IS NOT NULL;
+## Objetivo
 
--- Garantia hard: no máximo 1 timer ativo por usuário (defesa em profundidade)
-CREATE UNIQUE INDEX uq_time_entries_one_active_per_user
-  ON demand_time_entries(user_id)
-  WHERE ended_at IS NULL AND started_at IS NOT NULL;
+Mudar a fonte de verdade para criação/agrupamento de clientes:
+**1º** `company_name` do contato no Gist · **2º** matching com cliente existente por domínio · **3º** quarentena (sem criar cliente) — nunca mais criar cliente a partir do domínio.
 
-ALTER TABLE demand_time_entries ENABLE ROW LEVEL SECURITY;
+## Mudanças
 
-CREATE POLICY "time_entries_select" ON demand_time_entries FOR SELECT USING (
-  demand_id IN (
-    SELECT d.id FROM demands d
-    WHERE d.client_id IN (SELECT user_accessible_client_ids(auth.uid()))
-  )
-);
-CREATE POLICY "time_entries_insert" ON demand_time_entries FOR INSERT WITH CHECK (user_id = auth.uid());
-CREATE POLICY "time_entries_update" ON demand_time_entries FOR UPDATE USING (user_id = auth.uid());
-CREATE POLICY "time_entries_delete" ON demand_time_entries FOR DELETE USING (user_id = auth.uid());
+### 1. Edge Function `gist-discover` (agrupamento do wizard)
 
-CREATE OR REPLACE FUNCTION get_demand_total_hours(p_demand_id UUID)
-RETURNS NUMERIC LANGUAGE SQL STABLE SECURITY DEFINER SET search_path = public AS $$
-  SELECT COALESCE(SUM(
-    CASE
-      WHEN hours_manual IS NOT NULL THEN hours_manual
-      WHEN started_at IS NOT NULL AND ended_at IS NOT NULL
-        THEN EXTRACT(EPOCH FROM (ended_at - started_at)) / 3600.0
-      ELSE 0
-    END
-  ), 0)::NUMERIC
-  FROM demand_time_entries WHERE demand_id = p_demand_id;
-$$;
-```
+- Corrigir leitura: `contact.company_name` (campo raiz é o correto pela doc oficial do Gist) **+** fallback para `contact.custom_properties?.company_name` por segurança.
+- **Mudar a chave de agrupamento de `domain` para `company_name`** quando disponível. Quando ausente, manter agrupamento por domínio (comportamento atual) para compatibilidade do wizard.
+- Adicionar contagem `contacts_without_company` no payload de retorno para o wizard exibir.
+- Manter o filtro de domínios genéricos.
 
-**Por que o índice único parcial:** mesmo que o frontend tenha bug ou race condition (dois cliques simultâneos, duas abas), o banco rejeita o segundo INSERT com erro `23505`. Defesa em camadas.
+### 2. Edge Function `process-jobs → handleSyncContacts`
 
-## 2. Hook — `src/hooks/useDemandTimeEntries.ts`
+Nova lógica de resolução de cliente para cada contato (em ordem):
 
-Padrão idêntico a `useDemandWatchers`: queryKey com `user?.id` + `demandId`, `staleTime: 30000`, `{ data, error }` em todas chamadas, `useMutation` para escrita, toasts via `sonner`.
+1. **`company_name` presente** (raiz do contato OU `custom_properties.company_name`):
+   - `name = company_name.trim()`, `slug = toSlug(company_name)`.
+   - `findOrCreateClient(name, slug)` — cria com `metadata.source = 'gist_sync_company_name'`.
+2. **Sem `company_name`, com email** (não-genérico):
+   - **Tentar matchar com cliente existente** (manual ou já mapeado) por similaridade de domínio.
+   - **Se matchar**: vincular participante ao cliente existente.
+   - **Se NÃO matchar**: **quarentenar** (`upsertParticipant(contact, null)` + `contactsUnresolved++`). **Não criar mais clientes a partir de domínio.**
+3. **Sem `company_name` e sem email útil**: quarentena.
 
-```ts
-useDemandTimeEntries(demandId)        // SELECT *, user_profiles(full_name,email) ORDER BY created_at DESC
-useActiveTimerEntry(demandId)         // timer ativo NESTA demanda (para UI do botão Iniciar/Finalizar)
-useUserActiveTimer()                  // timer ativo do usuário em QUALQUER demanda (global)
-useDemandTotalHours(demandId)         // RPC get_demand_total_hours
-useStartTimer()                       // INSERT — com guarda global (ver abaixo)
-usePauseTimer()                       // UPDATE { ended_at: now() } WHERE id = entryId
-useAddManualEntry()                   // INSERT { demand_id, user_id, hours_manual, description }
-useDeleteTimeEntry()                  // DELETE WHERE id = entryId
-```
+Ampliar `GENERIC_DOMAINS` para incluir provedores que já vazaram (`zoho.com`, `yahoo.com.br`, etc.) — lista revisada com base no banco atual.
 
-**`useStartTimer` — guarda global (correção do gap):**
+### 3. Migration de limpeza (clientes auto_created sem valor)
 
-```ts
-mutationFn: async ({ demandId }) => {
-  if (!user?.id) throw new Error("Não autenticado");
+Migration manual + idempotente:
 
-  // 1) Guarda em SW: bloqueia se já existe timer ativo em qualquer demanda
-  const { data: existing, error: checkErr } = await supabase
-    .from("demand_time_entries")
-    .select("id, demand_id, demands(title)")
-    .eq("user_id", user.id)
-    .is("ended_at", null)
-    .not("started_at", "is", null)
-    .maybeSingle();
-  if (checkErr) throw checkErr;
-  if (existing) {
-    throw new Error(
-      `Você já tem um timer ativo em "${existing.demands?.title ?? "outra demanda"}". Finalize antes de iniciar um novo.`
-    );
-  }
+- Identificar clientes com `metadata->>'auto_created' = 'true'` AND `metadata->>'source' = 'gist_sync'` AND **sem demandas, sem agendas, sem RFIs vinculados** AND `slug` parecendo domínio (regex `\.(com|net|org|br|io|co|app|dev|tech)$` ou contém ponto).
+- Para cada um:
+  - Se tiver participantes, **desvincular** (`participants.client_id = NULL`) — vão para quarentena.
+  - **Marcar como `inactive`** (não deletar) — preserva histórico e respeita o protocolo de soft delete da CTO.
+- Gerar `auditorias/AUDITORIA_GIST_CLIENT_CLEANUP_YYYYMMDD.md` listando antes/depois.
 
-  // 2) INSERT (índice único garante atomicidade contra race)
-  const { data, error } = await supabase
-    .from("demand_time_entries")
-    .insert({ demand_id: demandId, user_id: user.id, started_at: new Date().toISOString() })
-    .select()
-    .single();
-  if (error) {
-    if (error.code === "23505") {
-      throw new Error("Você já tem um timer ativo em outra demanda.");
-    }
-    throw error;
-  }
-  return data;
-},
-onSuccess: () => {
-  toast.success("Timer iniciado");
-  queryClient.invalidateQueries({ queryKey: ["demand-time-entries"] });
-  queryClient.invalidateQueries({ queryKey: ["user-active-timer"] });
-  queryClient.invalidateQueries({ queryKey: ["demand-total-hours"] });
-},
-onError: (err) => toast.error(err instanceof Error ? err.message : "Erro ao iniciar timer"),
-```
+A migration **não** toca em clientes manuais (13 atuais) nem em clientes auto_created que já tenham demandas/agendas/RFIs (preserva trabalho real feito sobre eles).
 
-`useUserActiveTimer()` retorna `{ id, demand_id, demand_title, started_at } | null` — usado na UI para mostrar aviso e link "Ir para demanda X".
+### 4. UI: `GistContactWizard.tsx`
 
-## 3. UI — Seção "Tempo trabalhado" na `DemandDetailPage`
+- Exibir `company_name` (quando disponível) como label principal de cada grupo, com o domínio em segundo plano.
+- Quando o grupo veio de `company_name` (não de domínio), o sufixo `· {company}` some e vira o título.
+- Botão "Quarentenar todos sem company" como ação em massa quando o usuário não quiser criar/mapear contatos sem empresa identificada.
 
-Novo componente `src/components/demands/DemandTimeTrackingSection.tsx` montado em `DemandDetailContent`.
+### 5. Documentação
 
-Layout:
-```text
-Tempo trabalhado
-┌──────────────────────────────────────────────┐
-│ Σ 3h 20min                  [▶ Iniciar timer]│
-│  ⚠ Timer ativo em "Outra demanda" → Ir       │  (só se useUserActiveTimer != null E != esta)
-├──────────────────────────────────────────────┤
-│ Manual: [horas] [descrição]      [Adicionar] │
-├──────────────────────────────────────────────┤
-│ ▼ 4 entradas                                 │
-│  • Você · há 2h · 1h 30min            [🗑]   │
-│  • Maria · ontem · 2h (manual)        [🗑]   │
-└──────────────────────────────────────────────┘
-```
+Atualizar `mem://constraints/gist-sync-generic-domains` e adicionar nova memória `mem://features/gist-company-name-priority` documentando a nova prioridade de resolução.
 
-- Botão "▶ Iniciar timer" fica **disabled** quando `useUserActiveTimer()` retorna timer em outra demanda; tooltip explica.
-- Quando o timer ativo é nesta demanda → botão vira "⏹ Finalizar" + cronômetro `HH:MM:SS` (`setInterval` lê `started_at`).
-- Refresh da página → timer continua de onde parou (lê do banco).
-- Lista colapsável com `AlertDialog` na exclusão; ícone só aparece para entradas do próprio usuário.
+## Não fazer
 
-## 4. Badge no Kanban — `DemandCard.tsx`
-
-`DemandRow` ganha `total_hours?: number | null`. Quando `> 0`:
-
-```tsx
-<Badge variant="outline" className="text-xs gap-1">
-  <Clock className="h-3 w-3" /> {formatHours(total_hours)}
-</Badge>
-```
-
-Helper `src/lib/formatHours.ts` → `"3h 20min"`, compartilhado.
-
-## 5. Popular `total_hours` em `useDemands` sem N+1
-
-Após o SELECT principal de demandas:
-- `supabase.from('demand_time_entries').select('demand_id, started_at, ended_at, hours_manual').in('demand_id', ids)`
-- Reduzir client-side em `Map<demandId, totalHours>` e fundir.
-- Mesmo pattern em `useDemand(id)` — uma chamada extra.
-
-Sem migration adicional, RLS continua valendo via `demands.client_id`.
+- **Não deletar clientes** — apenas inativar (preserva integridade relacional e histórico).
+- **Não tocar** em clientes manuais ou em clientes com demandas/agendas/RFIs vinculados.
+- **Não alterar** `src/integrations/supabase/*`, `supabase/config.toml` ou auth flows.
+- **Não criar** clientes a partir de domínio nunca mais — domínio só serve para match com cliente já existente.
 
 ## Detalhes técnicos
 
-- **Arquivos novos:**
-  - `supabase/migrations/<timestamp>_demand_time_entries.sql`
-  - `src/hooks/useDemandTimeEntries.ts`
-  - `src/components/demands/DemandTimeTrackingSection.tsx`
-  - `src/lib/formatHours.ts`
-- **Arquivos editados:**
-  - `src/hooks/useDemands.ts` — campo `total_hours` + agregação pós-fetch
-  - `src/components/demands/DemandCard.tsx` — badge ⏱
-  - `src/components/demands/DemandDetailSheet.tsx` — montar `<DemandTimeTrackingSection demandId={demand.id} />`
-- **Padrões aplicados:** m4 (`staleTime: 30_000`), m5 (queryKey com `user?.id`), m8 (`{ data, error }`), m9 (`useMutation`), m11, `sonner`, sem `localStorage`. Tipos via `Tables<"demand_time_entries">`.
+```text
+Pipeline novo (process-jobs handleSyncContacts):
 
-## Verificação pós-deploy
+contact
+  ├─ tem company_name? ──► CRIA/REUSA cliente por slug(company_name)
+  └─ não tem company_name?
+       ├─ tem email não-genérico? ──► tenta match com cliente existente por domínio
+       │     ├─ matchou? ──► vincula participante
+       │     └─ não matchou? ──► quarentena (participant.client_id = NULL)
+       └─ sem email útil? ──► quarentena
+```
 
-1. `SELECT rowsecurity FROM pg_tables WHERE tablename = 'demand_time_entries';` → `true`.
-2. `SELECT get_demand_total_hours('<uuid>');` → numérico.
-3. Iniciar timer em demanda A → abrir demanda B → botão "▶ Iniciar" disabled + aviso "Timer ativo em A".
-4. Tentar driblar via 2 abas simultâneas → segundo INSERT falha com `23505` (índice único).
-5. Refresh → timer da demanda A continua de onde parou.
-6. Finalizar → entrada listada com duração correta + badge ⏱ aparece no Kanban.
+Campos do Gist confirmados pela doc oficial (`docs.getgist.com/article/241`):
+- `company_name` — propriedade DEFAULT do contato (raiz do payload).
+- `custom_properties.company_name` — só existe se o workspace tiver custom property com mesmo nome (fallback).
+
+Arquivos alterados:
+- `supabase/functions/gist-discover/index.ts`
+- `supabase/functions/process-jobs/index.ts` (apenas `handleSyncContacts`)
+- `src/components/GistContactWizard.tsx`
+- Nova migration `supabase/migrations/{ts}_inactivate_domain_only_auto_clients.sql`
+- `auditorias/AUDITORIA_GIST_CLIENT_CLEANUP_{YYYYMMDD}.md`
+- `mem://features/gist-company-name-priority` (novo)
+- `mem://constraints/gist-sync-generic-domains` (atualizado)
+
+## Critérios de aceitação
+
+1. Após próximo sync, novos contatos com `company_name` no Gist viram clientes com o nome da empresa (ex: "NK Store"), não com domínio.
+2. Contatos sem `company_name` e sem cliente existente que case por domínio ficam em quarentena (`participants.client_id = NULL`) e não criam cliente.
+3. Lista de Clientes deixa de mostrar entradas como `loftystyle.com.br`, `aluno.ufsj.edu.br`, `yahoo.com`, etc. (vão para inativo, ocultos pelo filtro default).
+4. Wizard de mapeamento mostra "NK Store" no lugar de "nkstore.com.br" quando o Gist tiver a empresa preenchida.
+5. Nenhum cliente manual ou cliente com demandas/agendas/RFIs é tocado.
