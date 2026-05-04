@@ -1,13 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { Eye, EyeOff, Lock, Unlock, Trash2, X, Plus, FileText, Loader2, ChevronRight } from "lucide-react";
 import { useState } from "react";
-import { Link } from "react-router-dom";
+
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Separator } from "@/components/ui/separator";
+
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -186,18 +186,27 @@ export function DemandSidebar({ demand, onActivityTabSelect, onClose }: DemandSi
     }
   };
 
-  const recentActivities = activities.slice(0, 5);
+  const recentActivities = activities.slice(0, 3);
   const assigneeProfile = userProfiles.find((u) => u.id === demand.assignee_id);
 
-  return (
-    <aside className="w-full lg:w-[280px] lg:shrink-0 space-y-5">
-      {/* Details */}
-      <section className="space-y-3">
-        <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Detalhes
-        </Label>
+  const initialsOf = (name: string) =>
+    name
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((p) => p[0])
+      .slice(0, 2)
+      .join("")
+      .toUpperCase();
 
-        <div className="space-y-2">
+  return (
+    <aside className="w-full lg:w-[280px] lg:shrink-0 lg:bg-muted/20 lg:border-l lg:border-border lg:pl-4 space-y-4">
+      {/* Details */}
+      <section className="rounded-lg border border-border bg-card p-4 space-y-3">
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          Detalhes
+        </p>
+
+        <div className="space-y-0">
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground">Coluna</Label>
             <Select value={demand.column_id} onValueChange={handleColumnChange}>
@@ -265,11 +274,14 @@ export function DemandSidebar({ demand, onActivityTabSelect, onClose }: DemandSi
             >
               <SelectTrigger className="h-8">
                 {assigneeProfile ? (
-                  <AssigneeDisplay
-                    fullName={assigneeProfile.full_name}
-                    email={assigneeProfile.email}
-                    size="sm"
-                  />
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="w-5 h-5 rounded-full bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 text-[10px] font-medium flex items-center justify-center shrink-0">
+                      {initialsOf(assigneeProfile.full_name || assigneeProfile.email || "?")}
+                    </span>
+                    <span className="text-sm font-medium truncate">
+                      {assigneeProfile.full_name || assigneeProfile.email}
+                    </span>
+                  </div>
                 ) : (
                   <SelectValue placeholder="—" />
                 )}
@@ -282,13 +294,11 @@ export function DemandSidebar({ demand, onActivityTabSelect, onClose }: DemandSi
         </div>
       </section>
 
-      <Separator />
-
       {/* RFI */}
-      <section className="space-y-2">
-        <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+      <section className="rounded-lg border border-border bg-card p-4 space-y-3">
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
           RFI
-        </Label>
+        </p>
         {rfiData ? (
           <div className="flex items-center gap-1.5">
             <button
@@ -340,18 +350,16 @@ export function DemandSidebar({ demand, onActivityTabSelect, onClose }: DemandSi
         )}
       </section>
 
-      <Separator />
-
       {/* Time tracking */}
-      <DemandTimeTrackingSection demandId={demand.id} />
-
-      <Separator />
+      <section className="rounded-lg border border-border bg-card p-4">
+        <DemandTimeTrackingSection demandId={demand.id} />
+      </section>
 
       {/* Bloqueio */}
-      <section className="space-y-2">
-        <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+      <section className="rounded-lg border border-border bg-card p-4 space-y-3">
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
           Bloqueio
-        </Label>
+        </p>
         {demand.is_blocked ? (
           <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 space-y-2">
             <div className="flex items-center justify-between">
@@ -391,14 +399,12 @@ export function DemandSidebar({ demand, onActivityTabSelect, onClose }: DemandSi
         )}
       </section>
 
-      <Separator />
-
       {/* Watchers */}
-      <section className="space-y-2">
+      <section className="rounded-lg border border-border bg-card p-4 space-y-3">
         <div className="flex items-center justify-between">
-          <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Observadores ({watchers.length})
-          </Label>
+          </p>
           <Button
             variant="outline" size="sm" className="h-7 text-xs"
             onClick={() => toggleWatcherMutation.mutate(isWatching)}
@@ -421,15 +427,13 @@ export function DemandSidebar({ demand, onActivityTabSelect, onClose }: DemandSi
         )}
       </section>
 
-      <Separator />
-
       {/* Recent activity */}
-      <section className="space-y-2">
+      <section className="rounded-lg border border-border bg-card p-4 space-y-3">
         <div className="flex items-center justify-between">
-          <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Atividade recente
-          </Label>
-          {activities.length > 5 && (
+          </p>
+          {activities.length > 0 && (
             <Button
               variant="link" size="sm" className="h-auto p-0 text-xs"
               onClick={onActivityTabSelect}
@@ -456,10 +460,8 @@ export function DemandSidebar({ demand, onActivityTabSelect, onClose }: DemandSi
         )}
       </section>
 
-      <Separator />
-
       {/* Danger zone */}
-      <section className="space-y-2">
+      <section className="rounded-lg border border-border bg-card p-4 space-y-2">
         <Button variant="outline" size="sm" className="w-full h-8 text-xs" onClick={() => setCancelDialogOpen(true)}>
           <X className="h-3 w-3 mr-1" /> Cancelar demanda
         </Button>
