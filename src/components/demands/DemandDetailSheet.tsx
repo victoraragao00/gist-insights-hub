@@ -36,6 +36,7 @@ import { useDemandAreas } from "@/hooks/useDemandAreas";
 import { useQuery } from "@tanstack/react-query";
 import {
   useDemandAttachments, useUploadAttachments, useAddLink, useDeleteAttachment,
+  useSignedAttachmentUrls,
 } from "@/hooks/useDemandAttachments";
 import {
   useDemandInteractions, useUnlinkInteraction,
