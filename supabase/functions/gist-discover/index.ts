@@ -184,13 +184,18 @@ Deno.serve(async (req) => {
 
     const clientList = (clients ?? []) as Array<{ id: string; name: string; slug: string }>;
 
-    // 5. Match domains to clients
-    for (const [domain, group] of domainMap) {
-      const domainParts = domain.replace(/\.(com|net|org|io|co|com\.br|app|dev|tech)(\..+)?$/i, '').toLowerCase();
+    // 5. Match each group to an existing client (by name/slug similarity)
+    for (const [_key, group] of domainMap) {
+      const haystack = (group.company || group.domain)
+        .toLowerCase()
+        .replace(/\.(com|net|org|io|co|com\.br|app|dev|tech)(\..+)?$/i, '')
+        .replace(/\s+/g, '');
 
       for (const client of clientList) {
-        const nameMatch = client.name.toLowerCase().includes(domainParts) || domainParts.includes(client.name.toLowerCase().replace(/\s+/g, ''));
-        const slugMatch = client.slug.toLowerCase().includes(domainParts) || domainParts.includes(client.slug.toLowerCase());
+        const cName = client.name.toLowerCase().replace(/\s+/g, '');
+        const cSlug = client.slug.toLowerCase();
+        const nameMatch = cName.includes(haystack) || haystack.includes(cName);
+        const slugMatch = cSlug.includes(haystack) || haystack.includes(cSlug);
 
         if (nameMatch || slugMatch) {
           group.suggested_client_id = client.id;
@@ -207,6 +212,7 @@ Deno.serve(async (req) => {
       teammates: teammates.map((t) => ({ id: t.id, name: t.name, email: t.email })),
       total_contacts: allContacts.length,
       total_teammates: teammates.length,
+      contacts_without_company: contactsWithoutCompany,
     };
 
     return new Response(JSON.stringify(payload), {
