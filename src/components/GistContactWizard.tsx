@@ -558,7 +558,7 @@ export function GistContactWizard({ open, onClose, mode, clientId }: GistContact
                     <div className="flex items-center justify-between">
                       <h4 className="text-sm font-semibold flex items-center gap-2">
                         <Building2 className="h-4 w-4 text-muted-foreground" />
-                        {group.domain}
+                        {group.company || group.domain}
                         <Badge variant="outline" className="text-xs font-normal">
                           → {label}
                         </Badge>
