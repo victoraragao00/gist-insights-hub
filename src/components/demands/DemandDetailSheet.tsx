@@ -220,7 +220,7 @@ function CommentItem({
 
 // ── DemandDetailContent ──
 
-function DemandDetailContent({ demand, onClose }: { demand: DemandRow; onClose: () => void }) {
+export function DemandDetailContent({ demand, onClose }: { demand: DemandRow; onClose: () => void }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { data: columns = [] } = useTicketColumns();
