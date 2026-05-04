@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Sparkles, Loader2, Upload, Link2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,7 @@ import {
   useSignedAttachmentUrls,
 } from "@/hooks/useDemandAttachments";
 import { useDemandAnalysis, useAnalyzeDemand } from "@/hooks/useDemandAnalysis";
+import { useAutoResize } from "@/hooks/useAutoResize";
 import { AttachmentThumbnail } from "./AttachmentThumbnail";
 
 const ACCEPTED_FILE_TYPES = "image/*,application/pdf,.doc,.docx,.xls,.xlsx,.csv";
