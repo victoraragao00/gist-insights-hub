@@ -1086,10 +1086,7 @@ const ClientDetailPage = () => {
             return (
               <button
                 key={d.id}
-                onClick={() => {
-                  setSelectedDemandId(d.id);
-                  setDemandSheetOpen(true);
-                }}
+                onClick={() => navigate(`/demands/${d.id}`)}
                 className="w-full text-left rounded-lg border border-border p-3 hover:bg-accent transition-colors space-y-1.5"
               >
                 <div className="flex items-start justify-between gap-2">
@@ -1142,14 +1139,6 @@ const ClientDetailPage = () => {
             defaultClientId={clientId}
           />
 
-          <DemandDetailSheet
-            demand={selectedDemand}
-            open={demandSheetOpen}
-            onOpenChange={(open) => {
-              setDemandSheetOpen(open);
-              if (!open) setSelectedDemandId(null);
-            }}
-          />
         </TabsContent>
 
         {/* ── TAB: Pautas ── */}
