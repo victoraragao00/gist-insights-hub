@@ -17,6 +17,7 @@ export interface DemandRow extends Tables<"demands"> {
   ticket_columns?: { name: string; color: string | null } | null;
   demand_areas?: { name: string; color: string | null } | null;
   user_profiles?: { full_name: string | null; email: string | null } | null;
+  total_hours?: number;
 }
 
 export interface DemandFilters {
@@ -85,9 +86,36 @@ export function useDemands(filters?: DemandFilters) {
 
       const { data, error } = await query;
       if (error) throw error;
-      return data as DemandRow[];
+      const rows = (data ?? []) as DemandRow[];
+      await attachTotalHours(rows);
+      return rows;
     },
   });
+}
+
+async function attachTotalHours(rows: DemandRow[]): Promise<void> {
+  const ids = rows.map((r) => r.id);
+  if (ids.length === 0) return;
+  const { data, error } = await supabase
+    .from("demand_time_entries")
+    .select("demand_id, started_at, ended_at, hours_manual")
+    .in("demand_id", ids);
+  if (error) {
+    console.warn("[useDemands] total_hours aggregation failed:", error.message);
+    return;
+  }
+  const totals = new Map<string, number>();
+  for (const e of data ?? []) {
+    let h = 0;
+    if (e.hours_manual != null) h = Number(e.hours_manual);
+    else if (e.started_at && e.ended_at) {
+      h = (new Date(e.ended_at).getTime() - new Date(e.started_at).getTime()) / 3_600_000;
+    }
+    totals.set(e.demand_id, (totals.get(e.demand_id) ?? 0) + h);
+  }
+  for (const row of rows) {
+    row.total_hours = totals.get(row.id) ?? 0;
+  }
 }
 
 export function useDemand(demandId: string | undefined) {
@@ -102,7 +130,9 @@ export function useDemand(demandId: string | undefined) {
         .eq("id", demandId!)
         .maybeSingle();
       if (error) throw error;
-      return data as DemandRow | null;
+      const row = (data ?? null) as DemandRow | null;
+      if (row) await attachTotalHours([row]);
+      return row;
     },
   });
 }

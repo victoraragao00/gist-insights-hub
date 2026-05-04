@@ -1,7 +1,8 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Badge } from "@/components/ui/badge";
-import { Lock, Headphones, Bug, TrendingUp, Sparkles, Briefcase, Search } from "lucide-react";
+import { Lock, Headphones, Bug, TrendingUp, Sparkles, Briefcase, Search, Clock } from "lucide-react";
+import { formatHours } from "@/lib/formatHours";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import type { DemandRow, DemandPriority } from "@/hooks/useDemands";
@@ -109,6 +110,13 @@ export function DemandCard({ demand, onClick }: DemandCardProps) {
         {demand.is_blocked && (
           <Badge className="text-xs bg-red-100 text-red-700 border-0 dark:bg-red-950 dark:text-red-300">
             <Lock className="h-3 w-3 mr-0.5" /> Bloqueado
+          </Badge>
+        )}
+
+        {/* Worked hours badge */}
+        {demand.total_hours != null && demand.total_hours > 0 && (
+          <Badge variant="outline" className="text-xs gap-1">
+            <Clock className="h-3 w-3" /> {formatHours(demand.total_hours)}
           </Badge>
         )}
       </div>
