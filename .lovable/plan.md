@@ -1,57 +1,37 @@
-# Plano: Agendas com duração/projeto/resumo + bypass TECH
+## Plano: RPC `get_tech_dashboard_metrics`
 
-## Estado atual
+Criar a RPC conforme spec, com **3 ajustes obrigatórios** ao SQL devido a divergências reais entre o spec e o schema do banco. Sem isso, a função falha no `CREATE`.
 
-- `CreateAgendaDialog` não expõe `duration_minutes`, `project_id`, `executive_summary` nem `agenda_type` (banco tem default `'client'` e `60`).
-- `useCreateAgenda` payload não aceita esses campos — INSERT atual perde-os mesmo se preenchidos.
-- `ProjectStatsData` (`src/lib/projectStatus.ts`) e RPC já retornam `meeting_hours` (banco D), mas o tipo TS não inclui — sidebar do `ProjectDetailPage` não exibe.
-- Settings → Equipe (`UserManagementTab` / `UserPermissionsSheet`) não tem toggle de `bypass_client_access`. Coluna existe em `user_profiles` (banco D).
+### Divergências detectadas (verificadas no banco)
 
-## Mudanças
+1. **`demands.updated_at` não existe.** A coluna real é `last_updated`. Spec usa `d.updated_at` em alertas (blocked/forgotten).
+   - Ajuste: trocar `d.updated_at` → `d.last_updated` nos blocos de `blocked` e `forgotten`.
 
-### 1. `src/hooks/useMeetingAgendas.ts`
-- Estender `CreateAgendaPayload` com `duration_minutes?`, `agenda_type?`, `project_id?: string | null`, `executive_summary?`.
-- INSERT já é spread — basta incluir os campos.
-- Adicionar hook `useProjectAgendas(projectId)` (`select id, title, meeting_date, duration_minutes` + `agenda_type='internal'` + `project_id=eq`, `staleTime 60s`, `enabled !!projectId`).
+2. **`demand_activities` não tem `action_type`, `metadata` nem `moved_at`.** Colunas reais: `event_type` (enum `demand_event_type`), `from_value`, `to_value`, `description`, `created_by`, `created_at`. Enum não tem `column_changed` nem `reopened` — tem `moved`, `created`, `assigned`, `blocked`, `unblocked`, `edited`, `cancelled`, `linked_interaction`, `commented`.
+   - Ajuste **§4 Tempo médio por coluna**: usar `event_type = 'moved'` e calcular duração entre eventos consecutivos via `LEAD(created_at) OVER (PARTITION BY demand_id ORDER BY created_at)`. O `column_id` de destino vem de `to_value::uuid` (assumindo que o trigger grava UUID em `to_value`). Se `to_value` armazenar nome em vez de UUID, fazer JOIN por nome com `ticket_columns`.
+   - Ajuste **§7 reopen_count**: enum não tem `reopened`. Aproximar como demandas com `finished_at IS NULL` que possuem ao menos um evento `moved` posterior a um momento em que estiveram em coluna com `triggers_finished_at=true` — ou simplificar para `reopen_count: 0` com `TODO` comentado (preferida; menos risco). Confirmar abordagem com o time antes de inferir.
 
-### 2. `src/components/agendas/CreateAgendaDialog.tsx`
-- States novos: `agendaType` (`'client' | 'internal'`, default `'client'`), `durationMinutes` (default `60`), `projectId` (`string | null`), `executiveSummary`.
-- UI:
-  - Seletor "Tipo de pauta" (Cliente / Interna) — quando `internal`, **oculta** o seletor de Cliente (mas o campo `client_id` continua obrigatório no schema; nesse caso usa o cliente atual do `ClientContext` ou exige seleção). Manter Cliente sempre visível por simplicidade.
-  - Campo `Duração *` ao lado da Data (grid 2 colunas), `Input type=number min=15 step=15`, helper `Xh` abaixo.
-  - Quando `agendaType === 'internal'`, mostrar `Select` Projeto (busca `useProjects('tech')` + `useProjects('cx')` ou todos; usar hook existente). Opção "Nenhum projeto".
-  - Campo `Resumo executivo` (`Textarea rows=3`, opcional).
-- `canSubmit`: incluir `durationMinutes >= 15`.
-- `handleSubmit`: passar campos novos no payload (com `project_id: agendaType === 'internal' ? projectId : null`).
-- `resetForm`: resetar tudo.
+3. **Convenção CTO §SQL**: o spec viola "IN (SELECT …) — não `= ANY(…)`" só em texto; o SQL em si está OK. Manter.
 
-### 3. `src/lib/projectStatus.ts`
-- Adicionar `meeting_hours: number` em `ProjectStatsData` (opcional? — mantém obrigatório com default fallback `0` na leitura).
+### Mudanças aplicadas no SQL final
 
-### 4. `src/pages/ProjectDetailPage.tsx`
-- Após o card de "Tempo total", adicionar card "Reuniões":
-  - Mostra apenas se `meetingHours > 0`.
-  - Exibe `formatHours(meetingHours)` (ou `.toFixed(1) + 'h'`).
-  - Lista até N agendas via `useProjectAgendas(id)`, clique navega para `/agendas/:id`.
+- `d.updated_at` → `d.last_updated` (2 ocorrências em alertas).
+- Bloco §4 reescrito com `LEAD()` sobre `demand_activities` filtrado por `event_type='moved'`, JOIN em `ticket_columns` por `to_value::uuid`.
+- Bloco §7 `reopen_count` retorna `0` por enquanto (sem evento `reopened` no enum) com comentário `-- TODO: definir evento de reabertura`.
+- Resto do SQL permanece **idêntico ao spec**, incluindo: `SECURITY DEFINER`, `STABLE`, `search_path = public`, defaults dos parâmetros, regra admin/self em `overloaded` e `people`, `RAISE EXCEPTION` se não autenticado, `COMMENT ON FUNCTION`.
 
-### 5. Bypass TECH
-- Estender `UserWithPermissions` com `bypass_client_access?: boolean` (a RPC pode ou não retornar; o frontend lê via query suplementar caso ausente).
-- Para evitar mexer na RPC, adicionar `useUsersBypass()` simples: `select id, bypass_client_access from user_profiles` (admins têm RLS para ler) → Map id→bool. Mesclar no render.
-- Hook novo `useUpdateUserBypass` em `src/hooks/useUserManagement.ts` (`useMutation` + `toast` + invalidar `users_with_permissions` e `users_bypass`).
-- Em `UserManagementTab.tsx`, nova coluna **"Acesso TECH"** com `Switch` ao lado de Status (com tooltip), desabilitado para self.
-- `UserPermissionsSheet.tsx` ganha o mesmo toggle no topo, antes da lista de clientes, com label/descrição.
+### Verificação pós-deploy (do spec, sem mudanças)
 
-### 6. Higiene
-- Sem novos imports não usados (m11). Toast via `sonner` (já em uso).
-- Sem `any`. Toda escrita via `useMutation` (m9).
-- Sem migrations e sem editar `supabase/*`.
+1. `SELECT proname, prosecdef FROM pg_proc WHERE proname='get_tech_dashboard_metrics';` → `prosecdef=true`
+2. `SELECT get_tech_dashboard_metrics(30, NULL, NULL);` → JSON com todas as seções
+3. `SELECT get_tech_dashboard_metrics(7, NULL, NULL);`
+4. Como usuário não-admin: `SELECT (get_tech_dashboard_metrics())::json->>'is_admin';` → `'false'`
 
-## Arquivos tocados
-- `src/hooks/useMeetingAgendas.ts`
-- `src/components/agendas/CreateAgendaDialog.tsx`
-- `src/lib/projectStatus.ts`
-- `src/pages/ProjectDetailPage.tsx`
-- `src/hooks/useUsers.ts` (estende type)
-- `src/hooks/useUserManagement.ts` (novo `useUpdateUserBypass` + helper query bypass)
-- `src/components/settings/UserManagementTab.tsx`
-- `src/components/settings/UserPermissionsSheet.tsx`
+### Arquivos tocados
+
+- 1 migration nova (criada pela migration tool do Lovable).
+- Nenhum arquivo de frontend, nenhum dos protegidos (`src/integrations/supabase/*`, `supabase/config.toml`, `.env`).
+
+### Aprovação necessária
+
+Confirmar tratamento do **§7 `reopen_count`** (manter `0` com TODO) e do **§4 `to_value`** (assumir UUID). Se preferir o `reopen_count` real, precisamos definir antes qual evento marca reabertura (provável: trigger novo gravando `event_type='moved'` com `from_value` = coluna `triggers_finished_at`).
