@@ -84,7 +84,14 @@ export function AppSidebar() {
         </SidebarHeader>
 
         {!collapsed && (
-          <WorkspaceSwitcher active={activeWorkspace} onChange={setWorkspace} />
+          <WorkspaceSwitcher
+            active={activeWorkspace}
+            onChange={(ws) => {
+              setWorkspace(ws);
+              if (ws === "tech") navigate("/tech/dashboard");
+              else navigate("/");
+            }}
+          />
         )}
 
         <SidebarContent>
