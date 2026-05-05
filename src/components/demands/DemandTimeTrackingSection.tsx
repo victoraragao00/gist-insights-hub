@@ -201,7 +201,7 @@ export function DemandTimeTrackingSection({ demandId, taskId = null, compact = f
         </div>
 
         {/* Entries list */}
-        {entries.length > 0 && (
+        {!compact && entries.length > 0 && (
           <div className="rounded-lg border bg-card">
             <button
               type="button"
