@@ -156,18 +156,40 @@ const DemandsPage = () => {
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
   );
 
+  // Alert filter from query params (?filter=blocked|forgotten|delivered|overloaded)
+  const [searchParams] = useSearchParams();
+  const alertFilter = searchParams.get("filter");
+
+  const filteredDemands = useMemo(() => {
+    if (!alertFilter) return demands;
+    const now = Date.now();
+    if (alertFilter === "blocked") {
+      return demands.filter((d) => d.is_blocked === true);
+    }
+    if (alertFilter === "forgotten") {
+      return demands.filter((d) => {
+        const ts = d.last_updated ? new Date(d.last_updated).getTime() : 0;
+        return ts > 0 && (now - ts) / 86_400_000 > 7;
+      });
+    }
+    if (alertFilter === "delivered") {
+      return demands.filter((d) => !!d.finished_at);
+    }
+    return demands;
+  }, [demands, alertFilter]);
+
   const demandsByColumn = useMemo(() => {
     const map = new Map<string, DemandRow[]>();
     for (const col of columns) {
       map.set(col.id, []);
     }
-    for (const d of demands) {
+    for (const d of filteredDemands) {
       const arr = map.get(d.column_id);
       if (arr) arr.push(d);
       else map.set(d.column_id, [d]);
     }
     return map;
-  }, [columns, demands]);
+  }, [columns, filteredDemands]);
 
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event;
