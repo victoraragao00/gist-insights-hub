@@ -103,6 +103,8 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaul
         description: description || undefined,
         expected_result: expectedResult || undefined,
         notes: notes || undefined,
+        workspace,
+        squad_id: workspace === "tech" && squadId !== "none" ? squadId : null,
       },
       {
         onSuccess: async (data) => {
