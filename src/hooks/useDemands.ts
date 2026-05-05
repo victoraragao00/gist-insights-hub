@@ -265,6 +265,13 @@ export function useMoveDemand() {
         created_by: user?.id ?? null,
       });
       if (actError) console.error("Activity log error:", actError.message);
+
+      await createDemandNotification({
+        demandId: input.demandId,
+        type: "status_changed",
+        message: `Status alterado para "${input.targetColumnName}"`,
+        actorId: user?.id ?? null,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["demands"] });
