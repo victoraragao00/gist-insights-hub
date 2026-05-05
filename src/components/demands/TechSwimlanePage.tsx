@@ -80,7 +80,7 @@ export function TechSwimlanePage({ columns, demands, taskCounts }: Props) {
   const gridTemplate = useMemo(
     () =>
       `180px ${columns
-        .map((c) => (isCollapsed(c.id) ? "48px" : "minmax(280px, 1fr)"))
+        .map((c) => (isCollapsed(c.id) ? "48px" : "300px"))
         .join(" ")}`,
     [columns, isCollapsed]
   );
@@ -229,12 +229,13 @@ function SwimlaneCell({ areaId, columnId, demands, onCardClick, collapsed, taskC
       )}
     >
       {demands.map((d) => (
-        <DraggableDemandCard
-          key={d.id}
-          demand={d}
-          onClick={() => onCardClick(d)}
-          taskCounts={taskCounts}
-        />
+        <div key={d.id} className="max-w-[280px]">
+          <DraggableDemandCard
+            demand={d}
+            onClick={() => onCardClick(d)}
+            taskCounts={taskCounts}
+          />
+        </div>
       ))}
       {demands.length === 0 && <div className="h-12" aria-hidden />}
     </div>
