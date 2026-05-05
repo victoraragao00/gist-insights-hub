@@ -897,6 +897,7 @@ export type Database = {
           priority: Database["public"]["Enums"]["demand_priority"]
           resolution: string | null
           sla_first_response_at: string | null
+          source_demand_id: string | null
           started_at: string | null
           title: string
         }
@@ -926,6 +927,7 @@ export type Database = {
           priority?: Database["public"]["Enums"]["demand_priority"]
           resolution?: string | null
           sla_first_response_at?: string | null
+          source_demand_id?: string | null
           started_at?: string | null
           title: string
         }
@@ -955,6 +957,7 @@ export type Database = {
           priority?: Database["public"]["Enums"]["demand_priority"]
           resolution?: string | null
           sla_first_response_at?: string | null
+          source_demand_id?: string | null
           started_at?: string | null
           title?: string
         }
@@ -992,6 +995,13 @@ export type Database = {
             columns: ["demand_type_id"]
             isOneToOne: false
             referencedRelation: "demand_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "demands_source_demand_id_fkey"
+            columns: ["source_demand_id"]
+            isOneToOne: false
+            referencedRelation: "demands"
             referencedColumns: ["id"]
           },
         ]
@@ -1110,6 +1120,7 @@ export type Database = {
       }
       meeting_agendas: {
         Row: {
+          agenda_type: string
           ai_processed: boolean | null
           ai_processed_at: string | null
           client_id: string
@@ -1129,6 +1140,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          agenda_type?: string
           ai_processed?: boolean | null
           ai_processed_at?: string | null
           client_id: string
@@ -1148,6 +1160,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          agenda_type?: string
           ai_processed?: boolean | null
           ai_processed_at?: string | null
           client_id?: string
@@ -1609,6 +1622,7 @@ export type Database = {
         Row: {
           active: boolean | null
           created_at: string | null
+          default_workspace: string
           email: string | null
           full_name: string | null
           global_role: string
@@ -1618,6 +1632,7 @@ export type Database = {
         Insert: {
           active?: boolean | null
           created_at?: string | null
+          default_workspace?: string
           email?: string | null
           full_name?: string | null
           global_role?: string
@@ -1627,6 +1642,7 @@ export type Database = {
         Update: {
           active?: boolean | null
           created_at?: string | null
+          default_workspace?: string
           email?: string | null
           full_name?: string | null
           global_role?: string
