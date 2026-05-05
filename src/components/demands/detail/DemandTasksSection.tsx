@@ -213,6 +213,7 @@ export function DemandTasksSection({ demandId }: DemandTasksSectionProps) {
 
 interface DemandTaskItemProps {
   task: DemandTaskRow;
+  demandId: string;
   userProfiles: UserProfileMini[];
   onUpdate: (fields: Partial<{
     title: string;
@@ -225,7 +226,7 @@ interface DemandTaskItemProps {
   onDelete: () => void;
 }
 
-function DemandTaskItem({ task, userProfiles, onUpdate, onDelete }: DemandTaskItemProps) {
+function DemandTaskItem({ task, demandId, userProfiles, onUpdate, onDelete }: DemandTaskItemProps) {
   const [expanded, setExpanded] = useState(!!task.description);
   const status = (task.status ?? "open") as DemandTaskStatus;
   const cfg = STATUS_CONFIG[status];
@@ -233,6 +234,31 @@ function DemandTaskItem({ task, userProfiles, onUpdate, onDelete }: DemandTaskIt
   const assignee = userProfiles.find((u) => u.id === task.assignee_id);
   const assigneeLabel =
     assignee?.full_name ?? assignee?.email ?? null;
+
+  const { data: activeTimer } = useActiveTimerEntry({ demandId, taskId: task.id });
+  const { data: userActiveTimer } = useUserActiveTimer();
+  const { data: taskHours = 0 } = useTaskTotalHours(task.id);
+  const startTimer = useStartTimer();
+  const stopTimer = useStopTimer();
+  const addManual = useAddManualEntry();
+  const [manualValue, setManualValue] = useState("");
+
+  const isRunning = !!activeTimer;
+  const isBlockedByOther = !isRunning && !!userActiveTimer;
+  const blockedReason = userActiveTimer?.task_title
+    ? `Timer ativo na subdemanda "${userActiveTimer.task_title}"`
+    : userActiveTimer?.demand_title
+      ? `Timer ativo na demanda "${userActiveTimer.demand_title}"`
+      : "Timer ativo em outra demanda";
+
+  const submitManual = () => {
+    const v = parseFloat(manualValue.replace(",", "."));
+    if (!Number.isFinite(v) || v <= 0) return;
+    addManual.mutate(
+      { demandId, taskId: task.id, hours: v },
+      { onSuccess: () => setManualValue("") },
+    );
+  };
 
   return (
     <div
