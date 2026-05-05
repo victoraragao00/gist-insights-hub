@@ -165,3 +165,29 @@ export function useDeleteAgenda() {
     onError: (err) => toast.error(`Erro ao excluir: ${err.message}`),
   });
 }
+
+export interface ProjectAgendaRow {
+  id: string;
+  title: string;
+  meeting_date: string;
+  duration_minutes: number | null;
+}
+
+export function useProjectAgendas(projectId: string | undefined) {
+  const { user } = useAuth();
+  return useQuery<ProjectAgendaRow[]>({
+    queryKey: ["project-agendas", user?.id, projectId],
+    enabled: !!user?.id && !!projectId,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("meeting_agendas")
+        .select("id, title, meeting_date, duration_minutes")
+        .eq("project_id", projectId!)
+        .eq("agenda_type", "internal")
+        .order("meeting_date", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as ProjectAgendaRow[];
+    },
+  });
+}
