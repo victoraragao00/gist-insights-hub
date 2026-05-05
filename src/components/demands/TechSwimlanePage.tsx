@@ -217,7 +217,7 @@ function SwimlaneCell({ areaId, columnId, demands, onCardClick, collapsed, taskC
   const { setNodeRef, isOver } = useDroppable({ id, disabled: collapsed });
 
   if (collapsed) {
-    return <div className="min-h-20 rounded-md bg-muted/10" aria-hidden />;
+    return <div className="bg-muted/10" aria-hidden />;
   }
 
   return (
