@@ -1,71 +1,63 @@
+# Plano: Notificações in-app + Menções @usuário
 
-## Plano: Frontend A — Tasks, Collaborators, Blockers
+## Estado atual
 
-### Hooks novos
+- `NotificationBell` já existe em `src/components/NotificationBell.tsx` (montado no `DashboardLayout`).
+- `useDemandNotifications` já existe (com Realtime e mark-as-read), mas:
+  - `staleTime: 10_000` (precisa virar `0`)
+  - `limit(20)` → subir para `50`
+  - SELECT não traz `demands(id, title)` (o sino não consegue navegar pra demanda certa nem mostrar título)
+  - Helper `createDemandNotification` não cobre colaboradores/watchers nem tipos `status_changed`/`blocked`/`unblocked`/`mentioned`.
+- Comentários: `DemandConversationsTab.tsx` usa `Textarea` simples + `useCreateComment`. Sem menções, sem renderizador.
+- Mutations existentes em `useDemands.ts` (`useUpdateDemand`, `useMoveDemand`) e em `DemandSidebar.tsx` (`handleBlock`/`handleUnblock`) não disparam notificações.
 
-**`src/hooks/useDemandCollaborators.ts`**
-- `useDemandCollaborators(demandId)` — lista colaboradores de uma demanda (join `user_profiles!demand_collaborators_user_id_fkey`), `staleTime: 30s`
-- `useDemandCollaboratorsBatch(demandIds[])` — batch para o Kanban evitar N+1, retorna `Record<demand_id, Collaborator[]>`
-- `useMyCollaboratorDemandIds(enabled)` — IDs onde o usuário logado é colaborador (filtro "Minhas tasks")
-- `useAddCollaborator()` — INSERT, ignora erro `23505` (unique) → idempotente
-- `useRemoveCollaborator()` — DELETE composto por `demand_id + user_id`
-- Todos invalidam `demand_collaborators`, `demand_collaborators_batch`, `my_collaborator_demand_ids`
+## Mudanças
 
-**`src/hooks/useBlockerTypes.ts`**
-- `useBlockerTypes()` — apenas ativos, ordem por `position`, `staleTime: 5min`
-- `useAllBlockerTypes()` — incluindo inativos (Settings)
-- `useCreateBlockerType()`, `useUpdateBlockerType()`, `useToggleBlockerTypeActive()` (sem delete — preserva histórico)
+### 1. `src/hooks/useDemandNotifications.ts`
+- `staleTime: 0`, `limit(50)`, SELECT `*, demands:demand_id(id, title)` (FK existe via PostgREST).
+- Tipar `demands` opcional no `DemandNotification`.
+- Reescrever `createDemandNotification` para aceitar tipos `status_changed | blocked | unblocked | commented | mentioned | moved | assigned | created` e buscar destinatários via helper:
+  - `getNotificationRecipients(demandId, excludeUserId)` lê `demands.assignee_id` + `demand_collaborators` + `demand_watchers`, dedup com `Set`, remove `null` e o ator.
+- Exportar `createMentionNotifications(demandId, userIds, actorId)` para o caso de menção (não usa watchers).
 
-### Filtro "Minhas tasks"
+### 2. `src/components/NotificationBell.tsx`
+- Navegar para `/demands/${n.demand_id}` (não `/demands`).
+- Mostrar título (`n.demands?.title`) abaixo da mensagem quando disponível.
+- Dot de não-lida visual (bolinha primária) à esquerda.
 
-`DemandsPage.tsx`: adiciona toggle button no header com ícone `User` e estado `myTasksOnly`. Adiciona ao `filters: DemandFilters` o campo opcional `mine_user_id` (só preenchido quando ligado).
+### 3. Disparos de notificação
+- **`src/hooks/useDemands.ts`** → `useMoveDemand` (mudança de coluna) e `useUpdateDemand` (quando `column_id`, `is_blocked`, `assignee_id` mudam): chamar `createDemandNotification` com `type: 'status_changed' | 'assigned'`. Já temos `targetColumnName`/`sourceColumnName` no payload do move.
+- **`src/components/demands/detail/DemandSidebar.tsx`** → em `handleBlock` (`blocked`, msg com nome do tipo) e `handleUnblock` (`unblocked`).
+- **`src/hooks/useDemandComments.ts`** → em `useCreateComment.onSuccess`, disparar `commented` (mensagem `Novo comentário de <full_name>`). Menções tratadas separadamente no input.
 
-`useDemands.ts`:
-- Estende `DemandFilters` com `mine_user_id?: string` e `mine_collab_ids?: string[]`
-- Quando `mine_user_id` presente, aplica `.or("assignee_id.eq.<id>,id.in.(<collab_ids>)")` (PostgREST). Se `mine_collab_ids` vazio, usa apenas `eq("assignee_id", id)`.
+### 4. Menções @usuário em comentários
+Refatorar o bloco de input do `DemandConversationsTab.tsx` para um componente local `CommentInput`:
 
-`DemandsPage`: chama `useMyCollaboratorDemandIds(myTasksOnly)` antes de montar `filters`, repassa IDs.
+- Detectar `@` antes do cursor com regex `/@([\w]*)$/`.
+- Popover/dropdown abaixo do textarea com até 5 usuários (busca `useUsers()` ou query inline em `user_profiles` ativos por nome/email).
+- Setas ↑↓ + Enter para selecionar; Esc fecha; clique também funciona.
+- Inserir como token `@[Nome do Usuário](uuid)` no texto bruto (formato estável para parsing posterior, evitando ambiguidade de nomes com espaços).
+- No submit:
+  - Extrair `[...text.matchAll(/@\[([^\]]+)\]\(([0-9a-f-]{36})\)/g)]` → array de `userId`.
+  - Salvar `content` com tokens (renderizador formata).
+  - Após `useCreateComment`, chamar `createMentionNotifications` para mencionados (excluindo autor e quem já receberá `commented`).
 
-### Avatares no DemandCard (owner + colabs)
+Renderização: novo `CommentText` que faz split pelo regex e renderiza menções como `<span class="text-primary font-medium">@Nome</span>`. Substitui `whitespace-pre-wrap` simples na lista de comentários.
 
-`DemandCard.tsx` recebe novas props opcionais `collaborators?: DemandCollaborator[]` e `blockerType?: BlockerType | null`.
-- Avatar do owner ganha `ring-2 ring-primary` para destaque
-- Empilha até 2 avatares de colaboradores com `-ml-1.5`, fundo escuro neutro
-- Excedente vira chip `+N`
-- Badge de bloqueio passa a usar `blockerType.icon + name` quando disponível, fallback `🔒 Bloqueado`
+### 5. Limpezas
+- Remover imports não usados resultantes (m11).
+- Sem novas dependências.
 
-`KanbanColumn` e `TechSwimlanePage` passam `collaboratorsByDemand` e `blockerTypesById` (Maps) para cada `DemandCard`.
+## Arquivos tocados
+- `src/hooks/useDemandNotifications.ts` (refatorar)
+- `src/hooks/useDemands.ts` (disparos em move/update)
+- `src/hooks/useDemandComments.ts` (disparo `commented`)
+- `src/components/NotificationBell.tsx` (navegação + título)
+- `src/components/demands/detail/DemandSidebar.tsx` (disparos block/unblock)
+- `src/components/demands/detail/DemandConversationsTab.tsx` (CommentInput + CommentText)
+- Novo: `src/components/demands/detail/CommentInput.tsx` e `CommentText.tsx`
 
-`DemandsPage` e `TechSwimlanePage`:
-- Chamam `useDemandCollaboratorsBatch(demandIds)` e `useBlockerTypes()`
-- Constroem map por demanda e passam adiante
-
-### DemandSidebar — bloqueio com tipo + colaboradores
-
-Substitui o `Dialog` atual de bloqueio:
-- Grid 2 cols com botões dos `blocker_types` (ícone + nome), seleção visual
-- Textarea opcional `blocker_reason` (livre)
-- `handleBlock` agora salva `is_blocked, blocker_type_id, blocker_reason, blocked_at, blocked_by` (texto livre opcional). Trigger SQL gravará histórico.
-- Estado bloqueado mostra badge com `icon + name` do tipo + razão + botão Desbloquear
-
-Nova seção "Colaboradores" entre Responsável e RFI:
-- Lista colaboradores como chips com avatar 4x4 + primeiro nome + X (visível em hover)
-- Chip "+ Adicionar" abre `Popover` com `Command` (search) listando `userProfiles` excluindo `assignee_id` e já presentes
-- Usa `useAddCollaborator` / `useRemoveCollaborator`
-
-### Settings → aba "Bloqueios" (admin)
-
-**Novo:** `src/components/settings/BlockerTypesSettingsTab.tsx` — segue padrão de `AreaSettingsTab`:
-- Form de adicionar (nome, seletor de ícone simples — input texto pequeno aceitando emoji, paleta de cores preset)
-- Tabela com inline edit de nome, paleta de cores, contador (opcional pular para v1), toggle ativo/inativo (sem botão Excluir)
-- Hook: `useAllBlockerTypes`, `useCreateBlockerType`, `useUpdateBlockerType`, `useToggleBlockerTypeActive`
-
-`SettingsPage.tsx`:
-- Adiciona `<TabsTrigger value="blockers">Bloqueios</TabsTrigger>` (admin only) entre "Áreas" e "Pautas"
-- Adiciona `<TabsContent value="blockers"><BlockerTypesSettingsTab /></TabsContent>`
-
-### Qualidade
-- Todos os `useQuery` com `staleTime ≥ 30s` e `queryKey` incluindo `user?.id` quando aplicável (m4, m5)
-- Toda escrita via `useMutation` com `toast` `sonner` (m9)
-- `{ data, error }` destructurado em todas as queries (m8)
-- Sem `any`, sem imports órfãos (m1, m11)
+## Não-objetivos
+- Sem migrations (tabela `demand_notifications` já existe).
+- Sem alteração em `supabase/*` ou docs.
+- Mantém `sonner` como único toast.
