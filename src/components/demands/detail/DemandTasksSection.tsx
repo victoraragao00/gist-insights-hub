@@ -1,20 +1,16 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { AlignLeft, Clock, Plus, Trash2, Check, Play, Square, Loader2 } from "lucide-react";
+import { Clock, Plus, Trash2, Check } from "lucide-react";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
-  Popover, PopoverContent, PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
-} from "@/components/ui/command";
-import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { supabase } from "@/integrations/supabase/client";
 import { formatHours } from "@/lib/formatHours";
 import {
@@ -26,14 +22,7 @@ import {
   type DemandTaskRow,
   type DemandTaskStatus,
 } from "@/hooks/useDemandTasks";
-import {
-  useActiveTimerEntry,
-  useUserActiveTimer,
-  useStartTimer,
-  useStopTimer,
-  useAddManualEntry,
-  useTaskTotalHours,
-} from "@/hooks/useDemandTimeEntries";
+import { useTaskTotalHours } from "@/hooks/useDemandTimeEntries";
 
 interface UserProfileMini {
   id: string;
@@ -226,54 +215,44 @@ interface DemandTaskItemProps {
   onDelete: () => void;
 }
 
-function DemandTaskItem({ task, demandId, userProfiles, onUpdate, onDelete }: DemandTaskItemProps) {
-  const [expanded, setExpanded] = useState(!!task.description);
+const STATUS_CHIP: Record<DemandTaskStatus, string> = {
+  open: "bg-muted/60 text-muted-foreground border-border/60",
+  in_progress: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-900",
+  done: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-900",
+};
+
+function getInitials(label?: string | null) {
+  if (!label) return "?";
+  return label.split(/\s+/).filter(Boolean).map((p) => p[0]).slice(0, 2).join("").toUpperCase();
+}
+
+function DemandTaskItem({ task, userProfiles, onUpdate, onDelete }: DemandTaskItemProps) {
+  const navigate = useNavigate();
   const status = (task.status ?? "open") as DemandTaskStatus;
   const cfg = STATUS_CONFIG[status];
+  const { data: taskHours = 0 } = useTaskTotalHours(task.id);
 
   const assignee = userProfiles.find((u) => u.id === task.assignee_id);
-  const assigneeLabel =
-    assignee?.full_name ?? assignee?.email ?? null;
-
-  const { data: activeTimer } = useActiveTimerEntry({ demandId, taskId: task.id });
-  const { data: userActiveTimer } = useUserActiveTimer();
-  const { data: taskHours = 0 } = useTaskTotalHours(task.id);
-  const startTimer = useStartTimer();
-  const stopTimer = useStopTimer();
-  const addManual = useAddManualEntry();
-  const [manualValue, setManualValue] = useState("");
-
-  const isRunning = !!activeTimer;
-  const isBlockedByOther = !isRunning && !!userActiveTimer;
-  const blockedReason = userActiveTimer?.task_title
-    ? `Timer ativo na subdemanda "${userActiveTimer.task_title}"`
-    : userActiveTimer?.demand_title
-      ? `Timer ativo na demanda "${userActiveTimer.demand_title}"`
-      : "Timer ativo em outra demanda";
-
-  const submitManual = () => {
-    const v = parseFloat(manualValue.replace(",", "."));
-    if (!Number.isFinite(v) || v <= 0) return;
-    addManual.mutate(
-      { demandId, taskId: task.id, hours: v },
-      { onSuccess: () => setManualValue("") },
-    );
-  };
+  const assigneeLabel = assignee?.full_name ?? assignee?.email ?? null;
 
   return (
     <div
       className={cn(
-        "group border border-border rounded-md p-3 transition-colors",
-        status === "done" && "bg-muted/30 border-border/50",
+        "group border border-border rounded-lg transition-all bg-card cursor-pointer",
+        "hover:border-primary/30 hover:shadow-sm",
+        status === "done" && "opacity-60 bg-muted/20",
       )}
+      onClick={() => navigate(`/tasks/${task.id}`)}
     >
-      <div className="flex items-start gap-3">
-        {/* Status toggle */}
+      <div className="flex items-center gap-3 px-3 py-2.5">
         <button
           type="button"
-          onClick={() => onUpdate({ status: NEXT_STATUS[status] })}
+          onClick={(e) => {
+            e.stopPropagation();
+            onUpdate({ status: NEXT_STATUS[status] });
+          }}
           className={cn(
-            "h-4 w-4 rounded-full mt-1 shrink-0 transition-transform hover:scale-110 flex items-center justify-center",
+            "h-4 w-4 rounded-full shrink-0 transition-transform hover:scale-110 flex items-center justify-center",
             cfg.dot,
           )}
           title={cfg.label}
@@ -282,273 +261,72 @@ function DemandTaskItem({ task, demandId, userProfiles, onUpdate, onDelete }: De
           {status === "done" && <Check className="h-2.5 w-2.5 text-white" />}
         </button>
 
-        <div className="flex-1 min-w-0">
-          <input
-            type="text"
-            defaultValue={task.title}
-            key={`title-${task.id}-${task.title}`}
-            onBlur={(e) => {
-              const v = e.target.value.trim();
-              if (v && v !== task.title) onUpdate({ title: v });
-            }}
-            className={cn(
-              "w-full bg-transparent text-sm font-medium border-0 p-0 focus:outline-none focus:ring-0",
-              status === "done" && "line-through text-muted-foreground",
-            )}
-          />
+        <span
+          className={cn(
+            "flex-1 text-sm font-medium truncate",
+            status === "done" && "line-through text-muted-foreground",
+          )}
+        >
+          {task.title}
+        </span>
 
-          <div className="flex items-center gap-3 mt-1 flex-wrap">
-            {/* Assignee */}
-            <AssigneePicker
-              value={task.assignee_id}
-              users={userProfiles}
-              label={assigneeLabel}
-              onChange={(v) => onUpdate({ assignee_id: v })}
-            />
-
-            {/* Hours estimated */}
-            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-              <Clock className="h-3 w-3" />
-              <input
-                type="number"
-                step="0.5"
-                min="0"
-                defaultValue={task.hours_estimated ?? ""}
-                key={`he-${task.id}-${task.hours_estimated ?? ""}`}
-                onBlur={(e) => {
-                  const v = e.target.value === "" ? null : parseFloat(e.target.value);
-                  const next = Number.isFinite(v as number) ? (v as number) : null;
-                  if (next !== task.hours_estimated)
-                    onUpdate({ hours_estimated: next });
-                }}
-                placeholder="0h est"
-                className="w-14 bg-transparent border-0 p-0 text-xs focus:outline-none focus:ring-0"
-              />
+        <div className="flex items-center gap-2 shrink-0">
+          {assigneeLabel && (
+            <div
+              className="w-5 h-5 rounded-full bg-purple-50 dark:bg-purple-950 text-purple-700 dark:text-purple-300 text-[9px] font-semibold flex items-center justify-center"
+              title={assigneeLabel}
+            >
+              {getInitials(assigneeLabel)}
             </div>
+          )}
 
-            {/* Hours actual */}
-            {status !== "open" && (
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <span className="text-muted-foreground/60">/</span>
-                <input
-                  type="number"
-                  step="0.5"
-                  min="0"
-                  defaultValue={task.hours_actual ?? ""}
-                  key={`ha-${task.id}-${task.hours_actual ?? ""}`}
-                  onBlur={(e) => {
-                    const v = e.target.value === "" ? null : parseFloat(e.target.value);
-                    const next = Number.isFinite(v as number) ? (v as number) : null;
-                    if (next !== task.hours_actual)
-                      onUpdate({ hours_actual: next });
-                  }}
-                  placeholder="0h real"
-                  className="w-16 bg-transparent border-0 p-0 text-xs focus:outline-none focus:ring-0"
-                />
-              </div>
+          <div className="text-xs text-muted-foreground flex items-center gap-1">
+            <Clock className="h-3 w-3" />
+            {task.hours_estimated ? (
+              <span>{formatHours(Number(task.hours_estimated))} est</span>
+            ) : (
+              <span className="text-muted-foreground/40">—</span>
             )}
-
-            <span className={cn("text-xs", cfg.className)}>{cfg.label}</span>
+            {taskHours > 0 && (
+              <>
+                <span className="text-muted-foreground/30">/</span>
+                <span className="font-medium text-foreground">{formatHours(taskHours)}</span>
+              </>
+            )}
           </div>
 
-          {(task.description || expanded) && (
-            <div className="mt-2">
-              <textarea
-                defaultValue={task.description ?? ""}
-                key={`desc-${task.id}-${task.description ?? ""}`}
-                onBlur={(e) => {
-                  const v = e.target.value.trim() || null;
-                  if (v !== (task.description ?? null))
-                    onUpdate({ description: v });
-                }}
-                placeholder="Adicionar descrição..."
-                rows={2}
-                className="w-full bg-transparent text-xs text-muted-foreground border-0 p-0 resize-none focus:outline-none focus:ring-0"
-              />
-            </div>
+          <span className={cn("text-[11px] px-1.5 py-0.5 rounded border font-medium", STATUS_CHIP[status])}>
+            {cfg.label}
+          </span>
+
+          {task.started_at && !task.finished_at && (
+            <span className="text-[11px] text-blue-600 dark:text-blue-400 hidden sm:inline">
+              desde {format(new Date(task.started_at), "dd/MM", { locale: ptBR })}
+            </span>
+          )}
+          {task.finished_at && (
+            <span className="text-[11px] text-emerald-600 dark:text-emerald-400 hidden sm:inline">
+              ✓ {format(new Date(task.finished_at), "dd/MM", { locale: ptBR })}
+            </span>
           )}
         </div>
 
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-          <button
-            type="button"
-            onClick={() => setExpanded((v) => !v)}
-            className="p-1 rounded hover:bg-muted text-muted-foreground"
-            aria-label="Alternar descrição"
-          >
-            <AlignLeft className="h-3.5 w-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={onDelete}
-            className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
-            aria-label="Excluir subdemanda"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      </div>
-
-      {/* Timer block */}
-      <div
-        className={cn(
-          "mt-2 pt-2 border-t border-border/40 transition-opacity",
-          isRunning ? "opacity-100" : "opacity-60 group-hover:opacity-100",
-        )}
-      >
-        {isRunning ? (
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-destructive animate-pulse" />
-              <TaskTimer startedAt={activeTimer.started_at!} />
-            </div>
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-6 text-xs gap-1"
-              onClick={() => stopTimer.mutate({ entryId: activeTimer.id })}
-              disabled={stopTimer.isPending}
-            >
-              {stopTimer.isPending ? (
-                <Loader2 className="h-2.5 w-2.5 animate-spin" />
-              ) : (
-                <Square className="h-2.5 w-2.5 fill-current" />
-              )}
-              Pausar
-            </Button>
-          </div>
-        ) : (
-          <div className="flex items-center justify-between gap-2 flex-wrap">
-            <span className="text-xs text-muted-foreground">
-              {taskHours > 0 ? `⏱ ${formatHours(taskHours)} registradas` : "Sem horas registradas"}
-            </span>
-            <div className="flex items-center gap-1.5">
-              <input
-                type="number"
-                step="0.25"
-                min="0"
-                placeholder="0h"
-                value={manualValue}
-                onChange={(e) => setManualValue(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    submitManual();
-                  }
-                }}
-                className="w-14 h-6 text-xs border border-border rounded px-1.5 bg-background"
-              />
-              <span className="text-xs text-muted-foreground">manual</span>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-6 text-xs gap-1"
-                        disabled={isBlockedByOther || startTimer.isPending}
-                        onClick={() =>
-                          startTimer.mutate({ demandId, taskId: task.id })
-                        }
-                      >
-                        {startTimer.isPending ? (
-                          <Loader2 className="h-2.5 w-2.5 animate-spin" />
-                        ) : (
-                          <Play className="h-2.5 w-2.5 fill-current" />
-                        )}
-                        Timer
-                      </Button>
-                    </span>
-                  </TooltipTrigger>
-                  {isBlockedByOther && (
-                    <TooltipContent>{blockedReason}</TooltipContent>
-                  )}
-                </Tooltip>
-              </TooltipProvider>
-            </div>
-          </div>
-        )}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+          className="opacity-0 group-hover:opacity-100 p-1 rounded shrink-0 hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-opacity"
+          aria-label="Excluir subdemanda"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
       </div>
     </div>
   );
 }
 
-function TaskTimer({ startedAt }: { startedAt: string }) {
-  const [elapsed, setElapsed] = useState(0);
-  useEffect(() => {
-    const start = new Date(startedAt).getTime();
-    const tick = () => setElapsed(Math.floor((Date.now() - start) / 1000));
-    tick();
-    const interval = setInterval(tick, 1000);
-    return () => clearInterval(interval);
-  }, [startedAt]);
-  const h = Math.floor(elapsed / 3600);
-  const m = Math.floor((elapsed % 3600) / 60);
-  const s = elapsed % 60;
-  return (
-    <span className="font-mono text-xs text-destructive font-medium tabular-nums">
-      {String(h).padStart(2, "0")}:{String(m).padStart(2, "0")}:{String(s).padStart(2, "0")}
-    </span>
-  );
-}
-
-// ── Assignee picker (compact) ──
-
-interface AssigneePickerProps {
-  value: string | null;
-  users: UserProfileMini[];
-  label: string | null;
-  onChange: (id: string | null) => void;
-}
-
-function AssigneePicker({ value, users, label, onChange }: AssigneePickerProps) {
-  const [open, setOpen] = useState(false);
-
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          className="text-xs text-muted-foreground hover:text-foreground transition-colors truncate max-w-[140px]"
-        >
-          {label ?? "Sem responsável"}
-        </button>
-      </PopoverTrigger>
-      <PopoverContent className="p-0 w-56" align="start">
-        <Command>
-          <CommandInput placeholder="Buscar..." />
-          <CommandList>
-            <CommandEmpty>Nenhum usuário</CommandEmpty>
-            <CommandGroup>
-              <CommandItem
-                value="__none__"
-                onSelect={() => {
-                  onChange(null);
-                  setOpen(false);
-                }}
-              >
-                Sem responsável
-              </CommandItem>
-              {users.map((u) => (
-                <CommandItem
-                  key={u.id}
-                  value={u.full_name ?? u.email ?? u.id}
-                  onSelect={() => {
-                    onChange(u.id === value ? null : u.id);
-                    setOpen(false);
-                  }}
-                >
-                  {u.full_name ?? u.email}
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
-  );
-}
 
 // ── Add inline ──
 

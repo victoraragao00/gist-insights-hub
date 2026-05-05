@@ -29,6 +29,104 @@ export interface DemandTaskCount {
 const TASK_SELECT =
   "*, user_profiles!demand_tasks_assignee_id_fkey(id, full_name, email)";
 
+export interface UserMini {
+  id: string;
+  full_name: string | null;
+  email: string | null;
+}
+
+export interface TaskDetail extends Tables<"demand_tasks"> {
+  assignee: UserMini | null;
+  creator: UserMini | null;
+  demands: {
+    id: string;
+    title: string;
+    workspace: string;
+    clients: { id: string; name: string } | null;
+    ticket_columns: { name: string } | null;
+  } | null;
+}
+
+export interface TimeEntryWithUser {
+  id: string;
+  started_at: string | null;
+  ended_at: string | null;
+  hours_manual: number | null;
+  description: string | null;
+  created_at: string;
+  user_id: string;
+  task_id?: string | null;
+  demand_tasks?: { id: string; title: string } | null;
+  user_profiles: UserMini | null;
+}
+
+export function useTask(taskId: string | undefined) {
+  return useQuery({
+    queryKey: ["task", taskId],
+    enabled: !!taskId,
+    staleTime: 30_000,
+    queryFn: async (): Promise<TaskDetail> => {
+      const { data, error } = await supabase
+        .from("demand_tasks")
+        .select(`
+          *,
+          assignee:user_profiles!demand_tasks_assignee_id_fkey(id, full_name, email),
+          creator:user_profiles!demand_tasks_created_by_fkey(id, full_name, email),
+          demands!demand_tasks_demand_id_fkey(
+            id, title, workspace,
+            clients(id, name),
+            ticket_columns!demands_column_id_fkey(name)
+          )
+        `)
+        .eq("id", taskId!)
+        .single();
+      if (error) throw error;
+      return data as unknown as TaskDetail;
+    },
+  });
+}
+
+export function useTaskTimeEntries(taskId: string | undefined) {
+  return useQuery({
+    queryKey: ["task-time-entries", taskId],
+    enabled: !!taskId,
+    staleTime: 30_000,
+    queryFn: async (): Promise<TimeEntryWithUser[]> => {
+      const { data, error } = await supabase
+        .from("demand_time_entries")
+        .select(`
+          id, started_at, ended_at, hours_manual, description, created_at, user_id, task_id,
+          user_profiles!demand_time_entries_user_id_fkey(id, full_name, email)
+        `)
+        .eq("task_id", taskId!)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as unknown as TimeEntryWithUser[];
+    },
+  });
+}
+
+export function useDemandTimeEntriesAll(demandId: string | undefined) {
+  return useQuery({
+    queryKey: ["demand-time-entries-all", demandId],
+    enabled: !!demandId,
+    staleTime: 30_000,
+    queryFn: async (): Promise<TimeEntryWithUser[]> => {
+      const { data, error } = await supabase
+        .from("demand_time_entries")
+        .select(`
+          id, started_at, ended_at, hours_manual, description, created_at, user_id, task_id,
+          demand_tasks!demand_time_entries_task_id_fkey(id, title),
+          user_profiles!demand_time_entries_user_id_fkey(id, full_name, email)
+        `)
+        .eq("demand_id", demandId!)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as unknown as TimeEntryWithUser[];
+    },
+  });
+}
+
 export function useDemandTasks(demandId: string | undefined) {
   return useQuery({
     queryKey: ["demand-tasks", demandId],
@@ -168,6 +266,7 @@ export function useUpdateDemandTask() {
       queryClient.invalidateQueries({ queryKey: ["demand-task-counts"] });
       queryClient.invalidateQueries({ queryKey: ["demand", vars.demand_id] });
       queryClient.invalidateQueries({ queryKey: ["demands"] });
+      queryClient.invalidateQueries({ queryKey: ["task", vars.id] });
     },
     onError: (err) =>
       toast.error(err instanceof Error ? err.message : "Erro ao atualizar subdemanda"),

@@ -134,6 +134,8 @@ export function useTaskTotalHours(taskId: string | undefined) {
 
 function invalidateAll(qc: ReturnType<typeof useQueryClient>) {
   qc.invalidateQueries({ queryKey: ["demand-time-entries"] });
+  qc.invalidateQueries({ queryKey: ["demand-time-entries-all"] });
+  qc.invalidateQueries({ queryKey: ["task-time-entries"] });
   qc.invalidateQueries({ queryKey: ["demand-active-timer"] });
   qc.invalidateQueries({ queryKey: ["user-active-timer"] });
   qc.invalidateQueries({ queryKey: ["demand-total-hours"] });

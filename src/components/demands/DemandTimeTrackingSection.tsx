@@ -24,9 +24,10 @@ import { formatHours, formatStopwatch } from "@/lib/formatHours";
 interface Props {
   demandId: string;
   taskId?: string | null;
+  compact?: boolean;
 }
 
-export function DemandTimeTrackingSection({ demandId, taskId = null }: Props) {
+export function DemandTimeTrackingSection({ demandId, taskId = null, compact = false }: Props) {
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -200,7 +201,7 @@ export function DemandTimeTrackingSection({ demandId, taskId = null }: Props) {
         </div>
 
         {/* Entries list */}
-        {entries.length > 0 && (
+        {!compact && entries.length > 0 && (
           <div className="rounded-lg border bg-card">
             <button
               type="button"
