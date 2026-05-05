@@ -310,6 +310,19 @@ const DemandsPage = () => {
               ]}
               className="w-36"
             />
+            <button
+              type="button"
+              onClick={() => setMyTasksOnly((v) => !v)}
+              className={cn(
+                "flex items-center gap-1.5 h-9 px-3 rounded-lg border text-sm font-medium transition-all",
+                myTasksOnly
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "border-border text-muted-foreground hover:text-foreground hover:border-primary/40"
+              )}
+            >
+              <User className="h-4 w-4" />
+              Minhas tasks
+            </button>
           </div>
         )}
       </div>
@@ -335,7 +348,13 @@ const DemandsPage = () => {
             Nenhuma demanda encontrada com os filtros selecionados
           </div>
         ) : activeWorkspace === "tech" ? (
-          <TechSwimlanePage columns={columns} demands={demands} taskCounts={taskCounts} />
+          <TechSwimlanePage
+            columns={columns}
+            demands={demands}
+            taskCounts={taskCounts}
+            collaboratorsByDemand={collaboratorsByDemand}
+            blockerTypesById={blockerTypesById}
+          />
         ) : (
           <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
             <div className="h-full overflow-x-auto">
@@ -350,6 +369,8 @@ const DemandsPage = () => {
                     isCollapsed={isCollapsed(col.id)}
                     onToggleCollapse={toggleCollapse}
                     taskCounts={taskCounts}
+                    collaboratorsByDemand={collaboratorsByDemand}
+                    blockerTypesById={blockerTypesById}
                   />
                 ))}
               </div>
