@@ -358,6 +358,26 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaul
             </div>
           </div>
 
+          {/* Squad — TECH workspace only */}
+          {workspace === "tech" && (
+            <div className="space-y-1.5">
+              <Label>Squad</Label>
+              <Select value={squadId} onValueChange={setSquadId}>
+                <SelectTrigger><SelectValue placeholder="Sem squad" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sem squad</SelectItem>
+                  {squads.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      <span className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: s.color }} />
+                        {s.name}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {/* Description */}
           <div className="space-y-1.5">
