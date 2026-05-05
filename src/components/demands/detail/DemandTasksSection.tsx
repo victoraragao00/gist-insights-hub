@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { AlignLeft, Clock, Plus, Trash2, Check } from "lucide-react";
+import { AlignLeft, Clock, Plus, Trash2, Check, Play, Square, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -14,6 +14,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { supabase } from "@/integrations/supabase/client";
 import { formatHours } from "@/lib/formatHours";
 import {
@@ -25,6 +26,14 @@ import {
   type DemandTaskRow,
   type DemandTaskStatus,
 } from "@/hooks/useDemandTasks";
+import {
+  useActiveTimerEntry,
+  useUserActiveTimer,
+  useStartTimer,
+  useStopTimer,
+  useAddManualEntry,
+  useTaskTotalHours,
+} from "@/hooks/useDemandTimeEntries";
 
 interface UserProfileMini {
   id: string;
