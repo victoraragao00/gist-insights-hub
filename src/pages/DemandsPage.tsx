@@ -197,51 +197,46 @@ const DemandsPage = () => {
   const isLoading = colsLoading || demandsLoading;
 
   return (
-    <div className="p-6 space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <h1 className="text-2xl font-bold text-foreground">Demandas</h1>
-        <div className="flex items-center gap-2">
-          <Button
-            variant={view === "kanban" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setView("kanban")}
-          >
-            <LayoutGrid className="h-4 w-4 mr-1" /> Kanban
-          </Button>
-          <Button
-            variant={view === "sla" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setView("sla")}
-          >
-            <Clock className="h-4 w-4 mr-1" /> SLA
-            {slaVencidos > 0 && (
-              <span className="ml-1.5 bg-destructive text-destructive-foreground text-xs rounded-full px-1.5">
-                {slaVencidos}
-              </span>
-            )}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => exportCSVMutation.mutate(filters)}
-            disabled={exportCSVMutation.isPending}
-          >
-            <Download className="h-4 w-4 mr-1" /> Exportar CSV
-          </Button>
-          <Button onClick={() => { setCreateColumnId(undefined); setCreateOpen(true); }}>
-            <Plus className="h-4 w-4 mr-1" /> Nova demanda
-          </Button>
+    <div className="flex flex-col h-full overflow-hidden">
+      {/* Header fixo */}
+      <div className="shrink-0 px-6 pt-6 pb-4 border-b border-border bg-background space-y-4">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <h1 className="text-2xl font-bold text-foreground">Demandas</h1>
+          <div className="flex items-center gap-2">
+            <Button
+              variant={view === "kanban" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setView("kanban")}
+            >
+              <LayoutGrid className="h-4 w-4 mr-1" /> Kanban
+            </Button>
+            <Button
+              variant={view === "sla" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setView("sla")}
+            >
+              <Clock className="h-4 w-4 mr-1" /> SLA
+              {slaVencidos > 0 && (
+                <span className="ml-1.5 bg-destructive text-destructive-foreground text-xs rounded-full px-1.5">
+                  {slaVencidos}
+                </span>
+              )}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => exportCSVMutation.mutate(filters)}
+              disabled={exportCSVMutation.isPending}
+            >
+              <Download className="h-4 w-4 mr-1" /> Exportar CSV
+            </Button>
+            <Button onClick={() => { setCreateColumnId(undefined); setCreateOpen(true); }}>
+              <Plus className="h-4 w-4 mr-1" /> Nova demanda
+            </Button>
+          </div>
         </div>
-      </div>
 
-      {/* SLA View */}
-      {view === "sla" && <SlaView />}
-
-      {/* Kanban View */}
-      {view === "kanban" && (
-        <>
-          {/* Filters */}
+        {view === "kanban" && (
           <div className="flex flex-wrap gap-3">
             <Input
               placeholder="Buscar por título..."
@@ -297,27 +292,35 @@ const DemandsPage = () => {
               className="w-36"
             />
           </div>
+        )}
+      </div>
 
-          {/* Kanban Board */}
-          {isLoading ? (
-            <div className="flex gap-4 overflow-x-auto pb-4">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className="min-w-64 space-y-3">
-                  <Skeleton className="h-6 w-32 animate-shimmer" />
-                  <Skeleton className="h-24 w-full animate-shimmer" />
-                  <Skeleton className="h-24 w-full animate-shimmer" />
-                </div>
-              ))}
-            </div>
-          ) : demands.length === 0 && columns.length > 0 && (filters.search || filters.client_id || filters.demand_type_id || filters.priority) ? (
-            <div className="text-center py-16 text-muted-foreground">
-              Nenhuma demanda encontrada com os filtros selecionados
-            </div>
-          ) : activeWorkspace === "tech" ? (
-            <TechSwimlanePage columns={columns} demands={demands} taskCounts={taskCounts} />
-          ) : (
-            <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
-              <div className="flex gap-4 overflow-x-auto pb-4">
+      {/* Conteúdo scrollável */}
+      <div className="flex-1 min-h-0 overflow-hidden">
+        {view === "sla" ? (
+          <div className="h-full overflow-auto p-6">
+            <SlaView />
+          </div>
+        ) : isLoading ? (
+          <div className="flex gap-4 overflow-x-auto p-6">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="min-w-64 space-y-3">
+                <Skeleton className="h-6 w-32 animate-shimmer" />
+                <Skeleton className="h-24 w-full animate-shimmer" />
+                <Skeleton className="h-24 w-full animate-shimmer" />
+              </div>
+            ))}
+          </div>
+        ) : demands.length === 0 && columns.length > 0 && (filters.search || filters.client_id || filters.demand_type_id || filters.priority) ? (
+          <div className="text-center py-16 text-muted-foreground">
+            Nenhuma demanda encontrada com os filtros selecionados
+          </div>
+        ) : activeWorkspace === "tech" ? (
+          <TechSwimlanePage columns={columns} demands={demands} taskCounts={taskCounts} />
+        ) : (
+          <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
+            <div className="h-full overflow-x-auto overflow-y-hidden">
+              <div className="flex gap-4 h-full px-6 py-4 min-w-max">
                 {columns.map((col) => (
                   <KanbanColumn
                     key={col.id}
@@ -331,12 +334,11 @@ const DemandsPage = () => {
                   />
                 ))}
               </div>
-            </DndContext>
-          )}
-        </>
-      )}
+            </div>
+          </DndContext>
+        )}
+      </div>
 
-      {/* Create Dialog */}
       <CreateDemandDialog
         open={createOpen}
         onOpenChange={setCreateOpen}

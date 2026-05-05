@@ -93,7 +93,7 @@ export function TechSwimlanePage({ columns, demands, taskCounts }: Props) {
 
   return (
     <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
-      <div className="overflow-x-auto pb-4">
+      <div className="h-full overflow-auto px-6 py-4">
         <div className="min-w-max space-y-2">
           {/* Header */}
           <div
