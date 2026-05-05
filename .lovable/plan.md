@@ -1,93 +1,39 @@
-## Contexto
+## Estado atual
 
-Esta sprint **revisa a arquitetura** do Sprint 3-A anterior. Em vez de manter tabelas dedicadas `squads` / `squad_members` + coluna `demands.squad_id`, vamos usar a tabela existente `demand_areas` (já vinculada via `demands.area_id`) como definição das raias do swimlane TECH, controlada por uma nova coluna `workspace`.
+A implementação do Sprint 3-A revisado já cobriu ~95% do escopo do 3-B revisado. Verifiquei os arquivos e o que está pronto:
 
-Estado atual no banco (verificado):
-- `demands.workspace` **já existe** (criado no 3-A) — backfill já feito
-- `demands.squad_id` existe — precisa ser removido
-- Tabelas `squads` e `squad_members` existem — precisam ser removidas
-- `demand_areas.workspace` **não existe** — precisa ser criado
-- Frontend tem `useSquads.ts`, `SquadsSettingsTab.tsx`, lógica de squad em `TechSwimlanePage`, `CreateDemandDialog`, `DemandSidebar` — precisa ser refatorado
+| Item OBRIGATÓRIO | Status |
+|---|---|
+| 1. Filtro `workspace='cx'` no Kanban CX | OK — `useDemands` aplica `.eq("workspace", filters.workspace)` (linha 84) |
+| 2. Filtro `workspace='tech'` + swimlane | OK — branch em `DemandsPage.tsx:304` |
+| 3. Raias = `demand_areas` com `workspace IN ('tech','both')` + `active=true` | OK — `useAreasByWorkspace("tech")` |
+| 4. DnD horizontal muda `column_id`, vertical muda `area_id` | OK — `TechSwimlanePage.handleDragEnd` |
+| 5. `CreateDemandDialog` define workspace pelo workspace ativo | OK — recebe prop `workspace`, insere com ele (linha 102) |
+| 6. Settings → Áreas com seletor cx/tech/both por área | OK — `AreaSettingsTab.tsx` linhas 212-226 |
+| 7. Layout flat CX preservado | OK — branch só ativa swimlane se `activeWorkspace === "tech"` |
+| 8. `staleTime > 0` em todas queries | OK |
+| 9. `useMutation` para escrita | OK |
+| 10. `{ data, error }` destructurado | OK |
 
----
+## Gaps identificados (pequenos)
 
-## Plano
+1. **`useDemands` queryKey (m5):** o key é `["demands", user?.id, filters]` — `filters` é objeto recriado, mas funcional. Aceitável.
+2. **Filtro Área no Kanban CX:** o `<FilterCombobox>` de Área lista todas as áreas (`useDemandAreas()`), incluindo as `tech`. No workspace CX deveria filtrar áreas com `workspace IN ('cx','both')`, e no TECH com `('tech','both')`.
+3. **Empty state vazio no swimlane TECH:** mensagem "Nenhuma demanda encontrada com filtros" precede o branch `tech` em `DemandsPage.tsx:300-305` — ordem está correta, mas vale confirmar que swimlane também aparece quando `demands.length === 0` sem filtros (atualmente cai no branch tech, OK).
 
-### 1. Migration de banco (única, executa tudo na ordem)
+## Mudanças propostas
 
-```sql
--- A. Garantir demands.workspace (idempotente, já existe)
-ALTER TABLE demands
-  ADD COLUMN IF NOT EXISTS workspace TEXT NOT NULL DEFAULT 'cx'
-  CHECK (workspace IN ('cx','tech'));
-UPDATE demands SET workspace = 'cx' WHERE workspace IS NULL;
-CREATE INDEX IF NOT EXISTS idx_demands_workspace ON demands(workspace);
-COMMENT ON COLUMN demands.workspace IS '...';
+### 1. `src/pages/DemandsPage.tsx`
+- Filtrar `areas` exibidas no Combobox de filtro pela mesma regra do swimlane: `useAreasByWorkspace(activeWorkspace)` em vez de `useDemandAreas()` para o select de filtro.
+- Resetar `filterArea` quando `activeWorkspace` mudar (área selecionada pode não existir no novo workspace).
 
--- B. demand_areas.workspace (NOVO)
-ALTER TABLE demand_areas
-  ADD COLUMN IF NOT EXISTS workspace TEXT NOT NULL DEFAULT 'both'
-  CHECK (workspace IN ('cx','tech','both'));
+### 2. Verificação manual pós-deploy
+Rodar a checklist 1–12 do prompt no preview.
 
-UPDATE demand_areas
-SET workspace = CASE
-  WHEN LOWER(name) LIKE '%opera%' THEN 'cx'
-  ELSE 'tech'
-END;
+## Não vou alterar
 
-CREATE INDEX IF NOT EXISTS idx_demand_areas_workspace
-  ON demand_areas(workspace) WHERE active = true;
-COMMENT ON COLUMN demand_areas.workspace IS '...';
-
--- C. Cleanup do 3-A (squads)
-DROP INDEX IF EXISTS idx_demands_squad;
-ALTER TABLE demands DROP COLUMN IF EXISTS squad_id;
-DROP TABLE IF EXISTS squad_members CASCADE;
-DROP TABLE IF EXISTS squads CASCADE;
-```
-
-### 2. Refatoração frontend (raias = áreas com `workspace IN ('tech','both')`)
-
-**Remover:**
-- `src/hooks/useSquads.ts`
-- `src/components/settings/SquadsSettingsTab.tsx`
-- Aba "Squads" em `src/pages/SettingsPage.tsx`
-
-**Atualizar `src/hooks/useDemandAreas.ts`:**
-- Adicionar campo `workspace` no tipo
-- Adicionar `useAreasByWorkspace(ws)` retornando áreas ativas filtradas por workspace (`tech`/`cx`/`both`)
-- `useManageAreas` aceitar `workspace` em add/update
-
-**Atualizar `src/components/demands/AreaSettingsTab.tsx`:**
-- Coluna/seletor de workspace por área (cx | tech | both) com badge
-- Filtro/agrupamento por workspace
-
-**Atualizar `src/components/demands/TechSwimlanePage.tsx`:**
-- Trocar todas as referências de `squad`/`squad_id` por `area`/`area_id`
-- Raias = áreas com workspace tech/both + raia "Sem área" no fim
-- DnD vertical chama `useUpdateDemand({ area_id })` em vez de `useUpdateDemandSquad`
-- DroppableId continua `${areaId}::${columnId}`
-
-**Atualizar `src/hooks/useDemands.ts`:**
-- Remover filtro `squad_id` do `DemandFilters` e da query
-- Remover `squad_id` do payload de `useCreateDemand`
-
-**Atualizar `src/components/demands/CreateDemandDialog.tsx`:**
-- Remover seleção de Squad
-- Quando `workspace === 'tech'`, pré-selecionar Área filtrando por `useAreasByWorkspace('tech')` (auto-default na primeira área tech disponível, opcional)
-- Sempre enviar `workspace` ativo
-
-**Atualizar `src/components/demands/detail/DemandSidebar.tsx`:**
-- Remover linha "Squad"
-- Linha "Área" já existente passa a ser o controle único (já filtrar opções por workspace da demanda)
-
-### 3. Verificação pós-deploy
-Queries do prompt + smoke test: `/demands` em workspace TECH deve renderizar swimlane com áreas como raias; criação de demanda em TECH grava `workspace='tech'` + `area_id` da área tech.
-
----
-
-## Observações
-
-- A migration é idempotente — segura mesmo se 3-A já estava parcialmente aplicado.
-- Toda a lógica de "membros do squad" (avatares na raia) deixa de existir nesta arquitetura. Se a UI atual da swimlane mostra avatares por squad, eles serão removidos — raias passam a ter apenas nome + cor da área.
-- Aprovado o plano, executo migration + refactor de uma vez.
+- `TechSwimlanePage.tsx` — completo e funcional
+- `AreaSettingsTab.tsx` — seletor já presente
+- `CreateDemandDialog.tsx` — já filtra áreas por workspace
+- `useDemandAreas.ts` / `useDemands.ts` — sem mudanças necessárias
+- Migrations — proibido
