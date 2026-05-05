@@ -895,6 +895,7 @@ export type Database = {
           notes: string | null
           position: number
           priority: Database["public"]["Enums"]["demand_priority"]
+          project_id: string | null
           resolution: string | null
           sla_first_response_at: string | null
           source_demand_id: string | null
@@ -925,6 +926,7 @@ export type Database = {
           notes?: string | null
           position?: number
           priority?: Database["public"]["Enums"]["demand_priority"]
+          project_id?: string | null
           resolution?: string | null
           sla_first_response_at?: string | null
           source_demand_id?: string | null
@@ -955,6 +957,7 @@ export type Database = {
           notes?: string | null
           position?: number
           priority?: Database["public"]["Enums"]["demand_priority"]
+          project_id?: string | null
           resolution?: string | null
           sla_first_response_at?: string | null
           source_demand_id?: string | null
@@ -995,6 +998,13 @@ export type Database = {
             columns: ["demand_type_id"]
             isOneToOne: false
             referencedRelation: "demand_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "demands_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
           {
@@ -1362,6 +1372,109 @@ export type Database = {
           },
         ]
       }
+      project_members: {
+        Row: {
+          added_at: string
+          id: string
+          project_id: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          added_at?: string
+          id?: string
+          project_id: string
+          role?: string
+          user_id: string
+        }
+        Update: {
+          added_at?: string
+          id?: string
+          project_id?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_members_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      projects: {
+        Row: {
+          cancelled_at: string | null
+          cancelled_by: string | null
+          client_id: string | null
+          created_at: string
+          description: string | null
+          due_date: string | null
+          id: string
+          owner_id: string
+          title: string
+          updated_at: string
+          workspace: string
+        }
+        Insert: {
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          client_id?: string | null
+          created_at?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          owner_id: string
+          title: string
+          updated_at?: string
+          workspace?: string
+        }
+        Update: {
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          client_id?: string | null
+          created_at?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          owner_id?: string
+          title?: string
+          updated_at?: string
+          workspace?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "projects_cancelled_by_fkey"
+            columns: ["cancelled_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "projects_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "projects_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       rfi_statuses: {
         Row: {
           active: boolean | null
@@ -1664,6 +1777,10 @@ export type Database = {
           unread_count: number
         }[]
       }
+      cancel_project: {
+        Args: { p_project_id: string; p_reason?: string }
+        Returns: undefined
+      }
       claim_next_job: {
         Args: never
         Returns: {
@@ -1772,6 +1889,7 @@ export type Database = {
           title: string
         }[]
       }
+      get_project_stats: { Args: { p_project_id: string }; Returns: Json }
       get_users_with_permissions: {
         Args: never
         Returns: {
