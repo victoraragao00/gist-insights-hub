@@ -1,77 +1,35 @@
-## Hotfix: RPC `create_project` SECURITY DEFINER + frontend usa RPC
+## Diagnóstico
 
-Sim, isso resolve. O erro 42501 acontece porque `auth.uid()` não está sendo lido corretamente no contexto da policy de INSERT. A solução definitiva é uma RPC SECURITY DEFINER.
+O código já foi corrigido: `useCreateProject` chama `supabase.rpc("create_project", ...)` e a função `SECURITY DEFINER` está válida no banco com permissão de execução para `authenticated`. O erro 42501 visto no screenshot é da tentativa **antes** do deploy (13:39:20). Após o deploy, **nenhuma chamada nova de criação foi disparada** no log de rede — provavelmente o preview está com bundle antigo em cache.
 
-### 1) Migration
+## Passo 1 — Validar (sem código)
 
-```sql
-DROP TRIGGER IF EXISTS trg_set_project_owner ON public.projects;
-DROP FUNCTION IF EXISTS public.set_project_owner();
+1. **Hard refresh no preview** (Ctrl+Shift+R / Cmd+Shift+R) para invalidar o cache do Vite.
+2. Tentar criar um projeto novo.
+3. Confirmar no Network que a chamada vai para `POST /rest/v1/rpc/create_project` (e **não** mais para `POST /rest/v1/projects`).
 
-CREATE OR REPLACE FUNCTION public.create_project(
-  p_title       TEXT,
-  p_description TEXT    DEFAULT NULL,
-  p_due_date    DATE    DEFAULT NULL,
-  p_client_id   UUID    DEFAULT NULL,
-  p_workspace   TEXT    DEFAULT 'tech'
-)
-RETURNS public.projects
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  v_result public.projects;
-  v_user_id UUID;
-BEGIN
-  v_user_id := auth.uid();
-  IF v_user_id IS NULL THEN
-    RAISE EXCEPTION 'Not authenticated';
-  END IF;
+Se isso resolver, encerramos sem alterar código.
 
-  IF p_workspace NOT IN ('cx', 'tech', 'both') THEN
-    RAISE EXCEPTION 'Invalid workspace: %', p_workspace;
-  END IF;
+## Passo 2 — Se persistir, adicionar guarda-redundante
 
-  INSERT INTO public.projects (title, description, due_date, client_id, workspace, owner_id)
-  VALUES (p_title, p_description, p_due_date, p_client_id, p_workspace, v_user_id)
-  RETURNING * INTO v_result;
+Caso o erro continue mesmo após o reload (indicando bug residual em algum outro caminho), aplicar:
 
-  INSERT INTO public.project_members (project_id, user_id, role)
-  VALUES (v_result.id, v_user_id, 'owner')
-  ON CONFLICT (project_id, user_id) DO NOTHING;
+1. **Frontend — `CreateProjectDialog.tsx`**: adicionar log de `console.info("[create_project] calling RPC", input)` antes do `mutateAsync` para confirmar pelo console qual hook está sendo executado.
+2. **Banco — migração**: tornar a policy `projects_insert` ainda mais explícita, exigindo `auth.uid() = owner_id` (em vez de `true`), para que qualquer rota legada exploda com erro mais claro e não passe inserts sem owner.
+   ```sql
+   DROP POLICY IF EXISTS "projects_insert" ON public.projects;
+   CREATE POLICY "projects_insert" ON public.projects
+     FOR INSERT TO authenticated
+     WITH CHECK (auth.uid() = owner_id);
+   ```
+   A criação via RPC continua funcionando (ela roda como `postgres` por `SECURITY DEFINER`, bypass de RLS).
 
-  RETURN v_result;
-END;
-$$;
+## Passo 3 — Limpeza
 
-DROP POLICY IF EXISTS "projects_insert" ON public.projects;
-CREATE POLICY "projects_insert" ON public.projects
-  FOR INSERT WITH CHECK (true);
-```
+Remover o `console.info` do passo 2 após confirmação.
 
-Nota: `project_members` precisa de constraint UNIQUE em `(project_id, user_id)` para o ON CONFLICT funcionar — adicionar caso ainda não exista:
+## Validação final
 
-```sql
-ALTER TABLE public.project_members
-  ADD CONSTRAINT project_members_project_user_unique UNIQUE (project_id, user_id);
-```
-(usar DO $$ ... EXCEPTION WHEN duplicate_object THEN NULL; END $$ se necessário, mas tentamos direto.)
-
-### 2) Frontend
-
-Em `src/hooks/useProjects.ts`, substituir o `useCreateProject` para usar RPC:
-
-```ts
-const { data, error } = await supabase.rpc('create_project', {
-  p_title:       input.title,
-  p_description: input.description ?? null,
-  p_due_date:    input.due_date ?? null,
-  p_client_id:   input.client_id ?? null,
-  p_workspace:   input.workspace ?? 'tech',
-});
-if (error) throw error;
-return data;
-```
-
-Manter toasts e invalidação de cache existentes.
+- Criar projeto pelo modal → toast "Projeto criado" e item aparece na lista.
+- `select id, owner_id from projects order by created_at desc limit 1;` retorna o `owner_id` correto.
+- `select count(*) from project_members where project_id = '<novo_id>' and role = 'owner';` retorna 1.
