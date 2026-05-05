@@ -85,7 +85,15 @@ export function TechSwimlanePage({ columns, demands }: Props) {
     }
   }, [demands, columns, moveMutation, updateMutation]);
 
-  const gridTemplate = `160px repeat(${columns.length}, minmax(220px, 1fr))`;
+  const { isCollapsed, toggle: toggleCollapse } = useCollapsedColumns(columns);
+
+  const gridTemplate = useMemo(
+    () =>
+      `160px ${columns
+        .map((c) => (isCollapsed(c.id) ? "48px" : "minmax(220px, 1fr)"))
+        .join(" ")}`,
+    [columns, isCollapsed]
+  );
 
   const columnCounts = useMemo(() => {
     const map = new Map<string, number>();
@@ -100,19 +108,60 @@ export function TechSwimlanePage({ columns, demands }: Props) {
           {/* Header */}
           <div className="grid gap-2" style={{ gridTemplateColumns: gridTemplate }}>
             <div />
-            {columns.map((col) => (
-              <div key={col.id} className="flex items-center gap-2 px-2 py-1">
+            {columns.map((col) => {
+              const collapsed = isCollapsed(col.id);
+              const count = columnCounts.get(col.id) ?? 0;
+              return (
                 <div
-                  className="h-2.5 w-2.5 rounded-full shrink-0"
-                  style={{ backgroundColor: col.color ?? "hsl(var(--muted-foreground))" }}
-                />
-                <span className="text-sm font-semibold text-foreground truncate">{col.name}</span>
-                <span className="text-xs text-muted-foreground">
-                  ({columnCounts.get(col.id) ?? 0})
-                </span>
-              </div>
-            ))}
+                  key={col.id}
+                  onClick={() => toggleCollapse(col.id)}
+                  className={cn(
+                    "flex items-center gap-2 px-2 py-1 rounded cursor-pointer select-none",
+                    "hover:bg-muted/60 transition-colors",
+                    collapsed && "justify-center"
+                  )}
+                  title={collapsed ? `${col.name} — expandir` : "Colapsar coluna"}
+                >
+                  <div
+                    className="h-2.5 w-2.5 rounded-full shrink-0"
+                    style={{ backgroundColor: col.color ?? "hsl(var(--muted-foreground))" }}
+                  />
+                  {collapsed ? (
+                    <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
+                      {count}
+                    </span>
+                  ) : (
+                    <>
+                      <span className="text-sm font-semibold text-foreground truncate">{col.name}</span>
+                      <span className="text-xs text-muted-foreground">({count})</span>
+                    </>
+                  )}
+                  <ChevronDown
+                    className={cn(
+                      "h-3 w-3 text-muted-foreground/60 ml-auto transition-transform duration-200",
+                      collapsed && "-rotate-90 ml-0"
+                    )}
+                  />
+                </div>
+              );
+            })}
           </div>
+
+          {/* Lanes */}
+          {lanes.map((area) => (
+            <SwimlaneLane
+              key={area?.id ?? NO_AREA}
+              area={area}
+              columns={columns}
+              gridTemplate={gridTemplate}
+              demands={demands.filter((d) =>
+                area ? d.area_id === area.id : !d.area_id
+              )}
+              onCardClick={(d) => navigate(`/demands/${d.id}`)}
+              isCollapsed={isCollapsed}
+            />
+          ))}
+        </div>
 
           {/* Lanes */}
           {lanes.map((area) => (
