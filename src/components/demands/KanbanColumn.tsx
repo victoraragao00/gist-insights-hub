@@ -70,7 +70,7 @@ export function KanbanColumn({
   }
 
   return (
-    <div className="flex flex-col min-w-64 max-w-72 shrink-0 transition-all duration-200">
+    <div className="flex flex-col w-[280px] shrink-0 h-full transition-all duration-200">
       <KanbanColumnHeader
         column={column}
         count={demands.length}
@@ -82,7 +82,7 @@ export function KanbanColumn({
       <div
         ref={setNodeRef}
         className={cn(
-          "flex-1 space-y-2 rounded-lg p-2 min-h-24 mt-2 transition-colors",
+          "flex-1 min-h-0 overflow-y-auto space-y-2 rounded-lg p-2 mt-2 transition-colors",
           isOver ? "bg-primary/5 ring-2 ring-primary/20" : "bg-muted/30",
         )}
       >
