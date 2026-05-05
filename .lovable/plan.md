@@ -1,21 +1,35 @@
-## Hotfix: Recursão infinita em RLS de `projects` / `project_members`
+## Hotfix: Recriar policies de `projects` (INSERT bloqueando criação)
 
-### Problema
-As policies `projects_select` e `project_members_select` se referenciam mutuamente, causando `infinite recursion detected in policy` ao abrir qualquer projeto.
+### Diagnóstico
+- Frontend (`src/hooks/useProjects.ts` linha 212) já passa `owner_id: user.id` corretamente — **nenhuma mudança de código necessária**.
+- O problema está nas RLS policies de `projects`. Recriar todas do zero garante consistência após o hotfix anterior.
 
-### Solução
-Migration única que:
-1. Cria função `is_project_accessible(p_project_id uuid)` como `SECURITY DEFINER` (bypassa RLS, quebra o ciclo).
-2. Recria `projects_select` usando a função.
-3. Recria `project_members_select` usando a função.
-4. Recria `project_members_insert` e `project_members_delete` com check direto em `projects.owner_id` (sem recursão).
+### Migration única
 
-SQL exato fornecido no prompt será aplicado na íntegra, na ordem.
+```sql
+DROP POLICY IF EXISTS "projects_select" ON public.projects;
+DROP POLICY IF EXISTS "projects_insert" ON public.projects;
+DROP POLICY IF EXISTS "projects_update" ON public.projects;
+DROP POLICY IF EXISTS "projects_delete" ON public.projects;
 
-### Verificação pós-deploy
-- `pg_proc` confirma `prosecdef = true` para `is_project_accessible`.
-- `pg_policies` lista as policies recriadas.
-- `SELECT * FROM projects LIMIT 5` e `SELECT * FROM project_members LIMIT 5` executam sem erro de recursão.
+CREATE POLICY "projects_select" ON public.projects FOR SELECT USING (
+  public.is_project_accessible(id)
+);
+
+CREATE POLICY "projects_insert" ON public.projects FOR INSERT
+  WITH CHECK (auth.uid() IS NOT NULL);
+
+CREATE POLICY "projects_update" ON public.projects FOR UPDATE
+  USING (owner_id = auth.uid())
+  WITH CHECK (owner_id = auth.uid());
+
+CREATE POLICY "projects_delete" ON public.projects FOR DELETE
+  USING (owner_id = auth.uid());
+```
 
 ### Escopo
-- Apenas migration. Sem mudanças de frontend, docs ou config.
+- Apenas migration de RLS. Sem mudanças de frontend, docs ou config.
+
+### Verificação pós-deploy
+- `pg_policies` lista 4 policies (SELECT, INSERT, UPDATE, DELETE) em `projects`.
+- Criação de projeto pelo app passa a funcionar.
