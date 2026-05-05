@@ -6,6 +6,8 @@ import { getDemandCardData } from "@/lib/demandCardData";
 import { cn } from "@/lib/utils";
 import { priorityBadgeClass, priorityLabel } from "./detail/priorityBadgeStyles";
 import type { DemandRow } from "@/hooks/useDemands";
+import type { DemandCollaborator } from "@/hooks/useDemandCollaborators";
+import type { BlockerType } from "@/hooks/useBlockerTypes";
 import type { CSSProperties } from "react";
 
 export interface DemandCardDraggable {
@@ -20,19 +22,35 @@ export interface DemandCardProps {
   demand: DemandRow;
   taskCounts?: Record<string, { total: number; done: number }>;
   hoursTotals?: Record<string, number>;
+  collaborators?: DemandCollaborator[];
+  blockerType?: BlockerType | null;
   onClick?: () => void;
   draggable?: DemandCardDraggable;
+}
+
+function getCollabInitials(c: DemandCollaborator): string {
+  const source = c.full_name || c.email || "?";
+  const clean = source.includes("@") ? source.split("@")[0] : source;
+  const parts = clean.trim().split(/\s+/).filter(Boolean);
+  const first = parts[0]?.[0] ?? "";
+  const last = parts.length > 1 ? parts[parts.length - 1]?.[0] ?? "" : "";
+  return (first + last).toUpperCase() || "?";
 }
 
 export function DemandCard({
   demand,
   taskCounts,
   hoursTotals,
+  collaborators,
+  blockerType,
   onClick,
   draggable,
 }: DemandCardProps) {
   const navigate = useNavigate();
   const d = getDemandCardData(demand, taskCounts, hoursTotals);
+  const collabs = collaborators ?? [];
+  const visibleCollabs = collabs.slice(0, 2);
+  const remaining = collabs.length - visibleCollabs.length;
 
   const handleClick = () => {
     if (onClick) onClick();
@@ -94,7 +112,14 @@ export function DemandCard({
               variant="outline"
               className="text-[11px] px-1.5 py-0 h-5 bg-destructive/10 text-destructive border-destructive/30 gap-1"
             >
-              <Lock className="h-2.5 w-2.5" /> Bloqueado
+              {blockerType?.icon ? (
+                <span aria-hidden>{blockerType.icon}</span>
+              ) : (
+                <Lock className="h-2.5 w-2.5" />
+              )}
+              <span className="truncate max-w-[140px]">
+                {blockerType?.name ?? "Bloqueado"}
+              </span>
             </Badge>
           )}
           {d.aging && (
@@ -111,18 +136,43 @@ export function DemandCard({
         {d.createdAgo && <span className="shrink-0 ml-2">há {d.createdAgo}</span>}
       </div>
 
-      {/* Responsável + chips */}
+      {/* Responsável + colaboradores + chips */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground min-w-0">
-          <div
-            className={cn(
-              "w-5 h-5 rounded-full text-[9px] font-semibold flex items-center justify-center shrink-0",
-              d.assigneeInitials
-                ? "bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300"
-                : "bg-muted text-muted-foreground",
+          {/* Stack de avatares */}
+          <div className="flex items-center shrink-0">
+            <div
+              className={cn(
+                "w-5 h-5 rounded-full text-[9px] font-semibold flex items-center justify-center shrink-0 ring-2 ring-background relative z-30",
+                d.assigneeInitials
+                  ? "bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300"
+                  : "bg-muted text-muted-foreground",
+              )}
+              title={d.assigneeName ? `Responsável: ${d.assigneeName}` : "Sem responsável"}
+            >
+              {d.assigneeInitials ?? <User className="h-2.5 w-2.5" />}
+            </div>
+            {visibleCollabs.map((c, i) => (
+              <div
+                key={c.id}
+                className={cn(
+                  "w-5 h-5 rounded-full text-[9px] font-semibold flex items-center justify-center shrink-0 ring-2 ring-background -ml-1.5",
+                  "bg-muted text-foreground/70",
+                )}
+                style={{ zIndex: 20 - i }}
+                title={c.full_name || c.email || "Colaborador"}
+              >
+                {getCollabInitials(c)}
+              </div>
+            ))}
+            {remaining > 0 && (
+              <div
+                className="w-5 h-5 rounded-full text-[9px] font-semibold flex items-center justify-center shrink-0 ring-2 ring-background -ml-1.5 bg-muted/80 text-muted-foreground"
+                title={`+${remaining} colaboradores`}
+              >
+                +{remaining}
+              </div>
             )}
-          >
-            {d.assigneeInitials ?? <User className="h-2.5 w-2.5" />}
           </div>
           <span className="truncate">{d.assigneeName ?? "—"}</span>
         </div>
