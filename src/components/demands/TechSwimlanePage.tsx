@@ -32,9 +32,10 @@ const NO_AREA = "no-area";
 interface Props {
   columns: Tables<"ticket_columns">[];
   demands: DemandRow[];
+  taskCounts?: Record<string, { total: number; done: number }>;
 }
 
-export function TechSwimlanePage({ columns, demands }: Props) {
+export function TechSwimlanePage({ columns, demands, taskCounts }: Props) {
   const { data: areas = [] } = useAreasByWorkspace("tech");
   const moveMutation = useMoveDemand();
   const updateMutation = useUpdateDemand();
