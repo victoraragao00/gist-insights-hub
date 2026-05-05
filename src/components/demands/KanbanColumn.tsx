@@ -24,6 +24,7 @@ export function KanbanColumn({
   onAddClick,
   isCollapsed,
   onToggleCollapse,
+  taskCounts,
 }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: column.id });
 
