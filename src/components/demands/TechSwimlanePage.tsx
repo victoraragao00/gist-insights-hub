@@ -6,7 +6,7 @@ import {
   type DragEndEvent,
 } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, CheckSquare } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { getAgingDays, getAgingStyle } from "@/lib/getAgingStyle";
