@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/collapsible";
 import { useDemandActivities } from "@/hooks/useDemands";
 import { useDemandTimeEntriesAll } from "@/hooks/useDemandTasks";
-import { useDeleteTimeEntry, entryHours } from "@/hooks/useDemandTimeEntries";
+import { useDeleteTimeEntry } from "@/hooks/useDemandTimeEntries";
 import { useAuth } from "@/context/AuthContext";
 import { formatHours } from "@/lib/formatHours";
 import { TimeEntryRow, getInitials } from "./TimeEntryRow";
@@ -41,7 +41,12 @@ export function DemandActivityTab({ demandId }: DemandActivityTabProps) {
     const map: Record<string, { name: string; total: number }> = {};
     let total = 0;
     for (const e of allEntries) {
-      const hours = entryHours(e);
+      const hours =
+        e.hours_manual != null
+          ? Number(e.hours_manual)
+          : e.started_at && e.ended_at
+            ? Math.max(0, (new Date(e.ended_at).getTime() - new Date(e.started_at).getTime()) / 3_600_000)
+            : 0;
       total += hours;
       const userId = e.user_id;
       const name = e.user_profiles?.full_name ?? e.user_profiles?.email ?? "Usuário";
