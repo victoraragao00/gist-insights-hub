@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useUsers } from "@/hooks/useUsers";
-import { useUpdateUserRole, useToggleUserActive } from "@/hooks/useUserManagement";
+import { useUpdateUserRole, useToggleUserActive, useUsersBypass, useUpdateUserBypass } from "@/hooks/useUserManagement";
 import { useDebounce } from "@/hooks/useDebounce";
 import { UserPermissionsSheet } from "./UserPermissionsSheet";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
