@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -14,6 +14,8 @@ import { Loader2, Sparkles, MessageSquarePlus } from "lucide-react";
 import { useCreateDemand, useTicketColumns, useDemandTypes, type DemandPriority } from "@/hooks/useDemands";
 import { useDemandAreas } from "@/hooks/useDemandAreas";
 import { useClient } from "@/context/ClientContext";
+import { useAuth } from "@/context/AuthContext";
+import { useSquads } from "@/hooks/useSquads";
 import { useDemandAnalysis, useAnalyzeDemand } from "@/hooks/useDemandAnalysis";
 import { useCreateRfi, useUpdateRfi } from "@/hooks/useRfis";
 import { useAddLink } from "@/hooks/useDemandAttachments";
@@ -27,13 +29,16 @@ interface CreateDemandDialogProps {
   onOpenChange: (open: boolean) => void;
   defaultColumnId?: string;
   defaultClientId?: string;
+  workspace?: "cx" | "tech";
 }
 
-export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaultClientId }: CreateDemandDialogProps) {
+export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaultClientId, workspace = "cx" }: CreateDemandDialogProps) {
   const { clients } = useClient();
+  const { user } = useAuth();
   const { data: columns = [] } = useTicketColumns();
   const { data: types = [] } = useDemandTypes();
   const { data: areas = [] } = useDemandAreas();
+  const { data: squads = [] } = useSquads();
   const { data: userProfiles = [] } = useQuery({
     queryKey: ["user_profiles_active"],
     staleTime: 300_000,
@@ -66,6 +71,16 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaul
   const [externalLink, setExternalLink] = useState("");
   const [createdDemandId, setCreatedDemandId] = useState<string | null>(null);
   const [showLinkDialog, setShowLinkDialog] = useState(false);
+  const [squadId, setSquadId] = useState<string>("none");
+
+  // Pre-fill squad if user belongs to exactly 1 squad (TECH workspace)
+  useEffect(() => {
+    if (workspace !== "tech" || !user?.id || squads.length === 0 || squadId !== "none") return;
+    const userSquads = squads.filter((s) =>
+      s.squad_members?.some((m) => m.user_id === user.id),
+    );
+    if (userSquads.length === 1) setSquadId(userSquads[0].id);
+  }, [workspace, user?.id, squads, squadId]);
 
   const { data: analysis } = useDemandAnalysis(createdDemandId ?? undefined);
   const analyzeMutation = useAnalyzeDemand();
@@ -88,6 +103,8 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaul
         description: description || undefined,
         expected_result: expectedResult || undefined,
         notes: notes || undefined,
+        workspace,
+        squad_id: workspace === "tech" && squadId !== "none" ? squadId : null,
       },
       {
         onSuccess: async (data) => {
@@ -147,6 +164,7 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaul
     setExternalLink("");
     setCreatedDemandId(null);
     setShowLinkDialog(false);
+    setSquadId("none");
   };
 
   const handleFinish = () => {
@@ -340,6 +358,26 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaul
             </div>
           </div>
 
+          {/* Squad — TECH workspace only */}
+          {workspace === "tech" && (
+            <div className="space-y-1.5">
+              <Label>Squad</Label>
+              <Select value={squadId} onValueChange={setSquadId}>
+                <SelectTrigger><SelectValue placeholder="Sem squad" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sem squad</SelectItem>
+                  {squads.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      <span className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: s.color }} />
+                        {s.name}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {/* Description */}
           <div className="space-y-1.5">

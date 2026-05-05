@@ -13,12 +13,14 @@ import { Plus, ChevronsUpDown, Check, Download, Clock, LayoutGrid } from "lucide
 import { cn } from "@/lib/utils";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useClient } from "@/context/ClientContext";
+import { useWorkspace } from "@/hooks/useWorkspace";
 import {
   useTicketColumns, useDemandTypes, useDemands, useMoveDemand,
   type DemandRow, type DemandPriority, type DemandFilters,
 } from "@/hooks/useDemands";
 import { useDemandAreas } from "@/hooks/useDemandAreas";
 import { KanbanColumn } from "@/components/demands/KanbanColumn";
+import { TechSwimlanePage } from "@/components/demands/TechSwimlanePage";
 // DemandDetailSheet still used elsewhere; navigation now opens dedicated page
 import { CreateDemandDialog } from "@/components/demands/CreateDemandDialog";
 import { useExportDemandsCSV } from "@/hooks/useExportDemandsCSV";
@@ -82,6 +84,7 @@ function FilterCombobox({ value, onValueChange, placeholder, searchPlaceholder, 
 
 const DemandsPage = () => {
   const { clients } = useClient();
+  const { activeWorkspace } = useWorkspace();
   const { data: columns = [], isLoading: colsLoading } = useTicketColumns();
   const { data: types = [] } = useDemandTypes();
   const { data: areas = [] } = useDemandAreas();
@@ -106,7 +109,8 @@ const DemandsPage = () => {
     demand_type_id: filterType || undefined,
     priority: (filterPriority as DemandPriority) || undefined,
     area_id: filterArea || undefined,
-  }), [debouncedSearch, filterClient, filterType, filterPriority, filterArea]);
+    workspace: activeWorkspace,
+  }), [debouncedSearch, filterClient, filterType, filterPriority, filterArea, activeWorkspace]);
 
   const { data: demands = [], isLoading: demandsLoading } = useDemands(filters);
   const moveMutation = useMoveDemand();
@@ -297,6 +301,8 @@ const DemandsPage = () => {
             <div className="text-center py-16 text-muted-foreground">
               Nenhuma demanda encontrada com os filtros selecionados
             </div>
+          ) : activeWorkspace === "tech" ? (
+            <TechSwimlanePage columns={columns} demands={demands} />
           ) : (
             <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
               <div className="flex gap-4 overflow-x-auto pb-4">
@@ -320,6 +326,7 @@ const DemandsPage = () => {
         open={createOpen}
         onOpenChange={setCreateOpen}
         defaultColumnId={createColumnId}
+        workspace={activeWorkspace}
       />
     </div>
   );

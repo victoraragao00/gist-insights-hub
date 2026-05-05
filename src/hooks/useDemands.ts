@@ -27,6 +27,8 @@ export interface DemandFilters {
   demand_type_id?: string;
   area_id?: string;
   search?: string;
+  workspace?: "cx" | "tech";
+  squad_id?: string;
 }
 
 // ── Queries ──
@@ -80,6 +82,8 @@ export function useDemands(filters?: DemandFilters) {
       if (filters?.priority) query = query.eq("priority", filters.priority);
       if (filters?.demand_type_id) query = query.eq("demand_type_id", filters.demand_type_id);
       if (filters?.area_id) query = query.eq("area_id", filters.area_id);
+      if (filters?.workspace) query = query.eq("workspace", filters.workspace);
+      if (filters?.squad_id) query = query.eq("squad_id", filters.squad_id);
       if (filters?.search && filters.search.length >= 3) {
         query = query.ilike("title", `%${filters.search}%`);
       }
@@ -175,6 +179,8 @@ export function useCreateDemand() {
       expected_result?: string;
       assignee?: string;
       notes?: string;
+      workspace?: "cx" | "tech";
+      squad_id?: string | null;
     }) => {
       const { data, error } = await supabase
         .from("demands")
