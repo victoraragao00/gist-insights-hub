@@ -86,6 +86,10 @@ export function DemandSidebar({ demand, onActivityTabSelect, onClose }: DemandSi
   });
   const { data: watchers = [] } = useDemandWatchers(demand.id);
   const toggleWatcherMutation = useToggleWatcher(demand.id);
+  const { data: collaborators = [] } = useDemandCollaborators(demand.id);
+  const addCollaborator = useAddCollaborator();
+  const removeCollaborator = useRemoveCollaborator();
+  const { data: blockerTypes = [] } = useBlockerTypes();
   const { data: rfiData } = useRfiByDemand(demand.id);
   const createRfiMutation = useCreateRfi();
   const deleteRfiMutation = useDeleteRfi();
@@ -102,9 +106,10 @@ export function DemandSidebar({ demand, onActivityTabSelect, onClose }: DemandSi
 
   const [rfiSheetOpen, setRfiSheetOpen] = useState(false);
   const [blockDialogOpen, setBlockDialogOpen] = useState(false);
+  const [selectedBlockerType, setSelectedBlockerType] = useState<string>("");
   const [blockerReason, setBlockerReason] = useState("");
-  const [blockedBy, setBlockedBy] = useState("");
   const [blockLoading, setBlockLoading] = useState(false);
+  const [collabPopoverOpen, setCollabPopoverOpen] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [cancelOther, setCancelOther] = useState("");
@@ -128,7 +133,7 @@ export function DemandSidebar({ demand, onActivityTabSelect, onClose }: DemandSi
   };
 
   const handleBlock = async () => {
-    if (!blockerReason.trim()) return;
+    if (!selectedBlockerType) return;
     setBlockLoading(true);
     try {
       const { error } = await supabase
@@ -136,24 +141,26 @@ export function DemandSidebar({ demand, onActivityTabSelect, onClose }: DemandSi
         .update({
           is_blocked: true,
           blocked_at: new Date().toISOString(),
-          blocker_reason: blockerReason.trim(),
-          blocked_by: blockedBy.trim() || null,
+          blocker_type_id: selectedBlockerType,
+          blocker_reason: blockerReason.trim() || null,
         })
         .eq("id", demand.id);
       if (error) throw error;
+      const btName = blockerTypes.find((b) => b.id === selectedBlockerType)?.name ?? "Bloqueado";
       const { error: actErr } = await supabase.from("demand_activities").insert({
         demand_id: demand.id,
         event_type: "blocked",
-        description: `Bloqueado: ${blockerReason.trim()}`,
+        description: `Bloqueado: ${btName}${blockerReason.trim() ? ` — ${blockerReason.trim()}` : ""}`,
         created_by: user?.id,
       });
       if (actErr) throw actErr;
       toast.success("Demanda marcada como bloqueada");
       queryClient.invalidateQueries({ queryKey: ["demands"] });
+      queryClient.invalidateQueries({ queryKey: ["demand"] });
       queryClient.invalidateQueries({ queryKey: ["client_demands"] });
       setBlockDialogOpen(false);
+      setSelectedBlockerType("");
       setBlockerReason("");
-      setBlockedBy("");
     } catch (err) {
       toast.error("Erro ao bloquear: " + (err instanceof Error ? err.message : "Erro"));
     } finally {
@@ -165,7 +172,7 @@ export function DemandSidebar({ demand, onActivityTabSelect, onClose }: DemandSi
     try {
       const { error } = await supabase
         .from("demands")
-        .update({ is_blocked: false, blocked_at: null, blocker_reason: null, blocked_by: null })
+        .update({ is_blocked: false, blocked_at: null, blocker_reason: null, blocker_type_id: null, blocked_by: null })
         .eq("id", demand.id);
       if (error) throw error;
       const { error: actErr } = await supabase.from("demand_activities").insert({
@@ -177,6 +184,7 @@ export function DemandSidebar({ demand, onActivityTabSelect, onClose }: DemandSi
       if (actErr) throw actErr;
       toast.success("Demanda desbloqueada");
       queryClient.invalidateQueries({ queryKey: ["demands"] });
+      queryClient.invalidateQueries({ queryKey: ["demand"] });
       queryClient.invalidateQueries({ queryKey: ["client_demands"] });
     } catch (err) {
       toast.error("Erro ao desbloquear: " + (err instanceof Error ? err.message : "Erro"));
