@@ -1,20 +1,16 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { AlignLeft, Clock, Plus, Trash2, Check, Play, Square, Loader2 } from "lucide-react";
+import { Clock, Plus, Trash2, Check } from "lucide-react";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
-  Popover, PopoverContent, PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
-} from "@/components/ui/command";
-import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { supabase } from "@/integrations/supabase/client";
 import { formatHours } from "@/lib/formatHours";
 import {
@@ -26,14 +22,7 @@ import {
   type DemandTaskRow,
   type DemandTaskStatus,
 } from "@/hooks/useDemandTasks";
-import {
-  useActiveTimerEntry,
-  useUserActiveTimer,
-  useStartTimer,
-  useStopTimer,
-  useAddManualEntry,
-  useTaskTotalHours,
-} from "@/hooks/useDemandTimeEntries";
+import { useTaskTotalHours } from "@/hooks/useDemandTimeEntries";
 
 interface UserProfileMini {
   id: string;
