@@ -1,34 +1,43 @@
-## Problema
+## Diagnóstico
 
-Ao abrir um projeto, a página crasha com **React error #310** ("Rendered more hooks than during the previous render").
+A função `get_tech_dashboard_metrics` está retornando erro 42803 (`aggregate function calls cannot be nested`), por isso `/tech/dashboard` mostra "Não foi possível carregar o Dashboard TECH". O SQL v2 sugerido pelo usuário corrige a estrutura usando CTEs isolados, mas precisa de **3 ajustes obrigatórios** para compilar contra o schema real:
 
-A causa é uma violação das Rules of Hooks em `src/pages/ProjectDetailPage.tsx`:
+| Problema no SQL fornecido | Realidade no banco | Correção |
+|---|---|---|
+| `d.updated_at` (várias vezes) | Coluna não existe em `demands` | Usar `d.last_updated` |
+| `da.action_type = 'column_changed'` | Coluna se chama `event_type`; valor correto é `'moved'` | Usar `event_type = 'moved'` com `LEAD()` (como na v1) |
+| `da.action_type = 'reopened'` | Enum `demand_event_type` não tem `'reopened'` (`created, moved, assigned, blocked, unblocked, edited, cancelled, linked_interaction, commented`) | Manter `reopen_count = 0` com TODO |
 
-- Linhas 57-70: dois early returns (`if (isLoading)` e `if (!project || !id)`).
-- Linha 79: `const { data: projectAgendas = [] } = useProjectAgendas(id);` — um hook chamado **depois** dos early returns.
+Há também uma mudança de **shape** no JSON: a v2 transforma `throughput` de array em objeto (`{ weekly, total_done, total_created, delivery_rate }`). O frontend (`useTechDashboard.ts` e `ThroughputChart.tsx`) precisa ser atualizado para o novo shape.
 
-Na primeira render (enquanto carrega) o React registra N hooks; quando `project` chega, passa a registrar N+1 hooks → crash.
+## O que vou fazer
 
-## Correção
+### 1. Migration: substituir `get_tech_dashboard_metrics` (DROP + CREATE)
 
-Mover a chamada do hook `useProjectAgendas(id)` para **antes** dos early returns, junto com os outros hooks (`useProject`, `useProjectStats`, `useUpdateProject`, `useCancelProject`).
+Aplica a v2 do usuário com as 3 correções acima:
+- `last_updated` no lugar de `updated_at`
+- Tempo por coluna usando `event_type = 'moved'` + `LEAD()` (mantém comportamento útil; a fórmula original `COALESCE(da.created_at, now()) - da.created_at` retornaria sempre 0)
+- `reopen_count = 0` com TODO no comentário
 
-```text
-useProject(id)          ← já está no topo
-useProjectStats(id)     ← já está no topo
-useUpdateProject()      ← já está no topo
-useCancelProject()      ← já está no topo
-useProjectAgendas(id)   ← MOVER PARA AQUI (antes dos if isLoading / !project)
-useState(...)           ← mantém
-useEffect(...)          ← mantém
+Mantém: CTEs isolados, percentis com `GREATEST(..., 1)` para evitar divisão por zero, bypass admin, filtros `p_area_id` / `p_project_id`, `SECURITY DEFINER`, `search_path = public`.
+
+### 2. Frontend: alinhar tipos ao novo JSON
+
+- `src/hooks/useTechDashboard.ts`: trocar `throughput: Array<...>` por `throughput: { weekly: Array<...>; total_done; total_created; delivery_rate }`. Ajustar `DeliveredByArea` (sem `area_id`, agora só `area_name`).
+- `src/components/tech-dashboard/ThroughputChart.tsx`: ler `data.weekly` (em vez de iterar `data` direto). Usar `data.delivery_rate` direto, removendo o cálculo manual.
+- `src/components/tech-dashboard/AlertCards.tsx`: já usa `area_name` — sem mudança funcional.
+
+### 3. Validação pós-deploy
+
+```sql
+SELECT (get_tech_dashboard_metrics())::json->>'is_admin';
+SELECT ((get_tech_dashboard_metrics())::json->'alerts'->'blocked'->>'count')::int;
+SELECT ((get_tech_dashboard_metrics())::json->'forecast'->>'backlog_count')::int;
 ```
 
-O hook `useProjectAgendas` já tem `enabled: !!id && !!user?.id` internamente (padrão do projeto), então chamá-lo cedo com `id` possivelmente undefined é seguro.
+E recarregar `/tech/dashboard` no preview para confirmar render sem erro.
 
-## Arquivo afetado
+## Fora de escopo
 
-- `src/pages/ProjectDetailPage.tsx` — reordenar a linha 79 para antes do bloco `if (isLoading)` (linha 57).
-
-## Fora de escopo (para tratar depois, se quiser)
-
-- O erro "Não foi possível carregar o Dashboard TECH" em `/tech/dashboard` é um problema separado (RPC `get_tech_dashboard_metrics` falhando). Posso investigar em seguida se quiser — me avise.
+- Repensar a métrica de `column_time` com `from_value`/`to_value` adequados — fica para depois; mantemos o comportamento funcional da v1.
+- Definir evento de reabertura (precisa adicionar `'reopened'` ao enum `demand_event_type` em outra sprint).
