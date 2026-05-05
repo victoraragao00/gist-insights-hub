@@ -18,6 +18,8 @@ import Audits from "./pages/Audits";
 import AgendasPage from "./pages/AgendasPage";
 import AgendaDetailPage from "./pages/AgendaDetailPage";
 import SettingsPage from "./pages/SettingsPage";
+import ProjectsPage from "./pages/ProjectsPage";
+import ProjectDetailPage from "./pages/ProjectDetailPage";
 import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
 import PublicDemandsPage from "./pages/PublicDemandsPage";
@@ -50,6 +52,8 @@ const App = () => (
                 <Route path="/search" element={<ErrorBoundary><SearchPage /></ErrorBoundary>} />
                 <Route path="/audits" element={<ErrorBoundary><Audits /></ErrorBoundary>} />
                 <Route path="/settings" element={<ErrorBoundary><SettingsPage /></ErrorBoundary>} />
+                <Route path="/projects" element={<ErrorBoundary><ProjectsPage /></ErrorBoundary>} />
+                <Route path="/projects/:id" element={<ErrorBoundary><ProjectDetailPage /></ErrorBoundary>} />
               </Route>
             </Route>
             <Route path="*" element={<NotFound />} />

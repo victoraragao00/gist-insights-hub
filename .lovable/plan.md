@@ -1,36 +1,51 @@
-## Workspace Switcher (CX | TECH)
+## Projects Module — Frontend (Sprint 2-B)
 
-Adds a top-of-sidebar workspace toggle that swaps the entire navigation, plus aging badges on Kanban cards and TECH defaults for the demands page.
+Builds the full Projects UI on top of the schema from 1-B and the workspace switcher from 2-A. No DB changes.
 
-### Files
+### New files
 
-**New**
-- `src/hooks/useUserProfile.ts` — reads `user_profiles` (id, default_workspace, global_role, active) for current user. Separate from `useUserRole` (which only selects `global_role, active`) to expose `default_workspace` cleanly. `staleTime: 5min`, `queryKey: ["user-profile", user?.id]`.
-- `src/hooks/useWorkspace.ts` — returns `{ activeWorkspace, setWorkspace, defaultWorkspace }`. Persists in `sessionStorage` under `cx_hub_active_workspace`. Initializes from session; on profile load, applies `default_workspace` if no session entry. `'both'` falls back to `'cx'`.
-- `src/components/layout/WorkspaceSwitcher.tsx` — segmented toggle (Users icon / Code2 icon) using design system tokens (`bg-muted/60`, `bg-background`). Hidden when sidebar is collapsed (icon-only mode).
-- `src/lib/getAgingStyle.ts` — `getAgingDays(demand)` and `getAgingStyle(days)` per spec. Returns `null` for `<3d`; yellow `3–6d`; orange `7–13d`; red `≥14d`.
+**Hooks**
+- `src/hooks/useProjects.ts` — all queries + mutations:
+  - `useProjects({ workspace = "tech" })` — list with `user_profiles!owner_id(id, full_name, email)` + `clients(id, name)`. `staleTime: 5min`. Key: `["projects", user?.id, workspace]`.
+  - `useProject(id)` — single project + nested members. `staleTime: 30s`.
+  - `useProjectStats(id)` — `supabase.rpc("get_project_stats", { p_project_id })`. `staleTime: 30s`.
+  - `useProjectMembers(projectId)` — `project_members` joined with `user_profiles`. `staleTime: 5min`.
+  - `useProjectDemands(projectId)` — demands joined with `demand_types`, `ticket_columns`, `user_profiles!assignee_id`. `staleTime: 30s`.
+  - `useUnassignedDemands(query)` — demands with `project_id IS NULL` for the link dialog. `staleTime: 30s`.
+  - Mutations: `useCreateProject`, `useUpdateProject`, `useCancelProject` (RPC), `useAddProjectMember`, `useRemoveProjectMember`, `useLinkDemandToProject`, `useUnlinkDemandFromProject`. All destructure `{ data, error }`, `sonner` toasts, programmatic invalidations.
 
-**Modified**
-- `src/components/AppSidebar.tsx`
-  - Import `useWorkspace`, `WorkspaceSwitcher`, plus `Code2`, `FolderKanban`, `Calendar` from lucide.
-  - Render `<WorkspaceSwitcher>` between `SidebarHeader` and `SidebarContent` (only when `!collapsed`).
-  - Replace static `modules` with `cxItems` / `techItems` arrays and pick by `activeWorkspace`.
-  - TECH items: Kanban (`/demands`), Projetos (`/projects`), Dashboard TECH (`/tech/dashboard`), Pautas Internas (`/agendas?type=internal`).
-  - Group label switches to "TECH" / "Módulos" accordingly.
-- `src/pages/DemandsPage.tsx`
-  - Import `useWorkspace`. When `activeWorkspace === 'tech'`, default `filterClient` stays empty (already shows all) — confirmed current behavior matches; no functional change beyond reading the workspace for future label tweaks. Will leave the existing client filter visible (still useful), but not pre-select. (No-op verified — keep change minimal: just consume hook to ensure remount key on workspace change via `key={activeWorkspace}` on the page root, so filters reset between workspaces.)
-- `src/components/demands/DemandCard.tsx`
-  - Import `getAgingDays`, `getAgingStyle`. Render aging Badge in the badges row next to hours badge.
+**Helpers / shared UI**
+- `src/lib/projectStatus.ts` — `statusConfig` map (planning/active/completed/cancelled) and `StatusBadge` styling helpers.
+- `src/components/projects/StatusBadge.tsx`
+- `src/components/projects/MemberAvatar.tsx` — initials avatar (sm/md sizes), uses `bg-primary/10 text-primary`.
+- `src/components/projects/ProjectCard.tsx` — list card with progress bar, squad avatars, deadline, overdue alert; consumes `useProjectStats(project.id)` + `useProjectMembers(project.id)`.
+- `src/components/projects/CreateProjectDialog.tsx` — title, description, client (Combobox of clients), due_date (date input), workspace defaults to `'tech'`. Uses `useCreateProject`.
+- `src/components/projects/LinkDemandDialog.tsx` — search + list of unassigned demands; click links via `useLinkDemandToProject`.
+- `src/components/projects/ProjectSelect.tsx` — compact combobox of `useProjects()` + "Nenhum" option for the demand sidebar.
+- `src/components/projects/UserSelect.tsx` — local user picker that excludes already-listed user_ids.
+- `src/components/projects/tabs/ProjectDemandsTab.tsx`
+- `src/components/projects/tabs/ProjectSquadTab.tsx`
+- `src/components/projects/tabs/ProjectActivityTab.tsx` — minimal: list of derived events (created, members added, demands linked, cancelled). For v1, derive from project + members `added_at` + demands `created_at`. Keep simple.
 
-### Notes / decisions
+**Pages**
+- `src/pages/ProjectsPage.tsx` — header (title, count, "Novo projeto"), client-side filter chips (Todos/Planejamento/Ativo/Concluído — filters using each card's stats), responsive grid. Workspace-scoped to `'tech'`.
+- `src/pages/ProjectDetailPage.tsx` — header with breadcrumb, inline-editable title (uses `useUpdateProject`), `StatusBadge`, owner pill, full-width progress bar, Tabs (Demandas/Squad/Atividade), right sidebar (280px) with details, total hours, and Cancel action (AlertDialog → `useCancelProject`). Owner-only actions guarded via `project.owner_id === user?.id`.
 
-- `useWorkspace` is intentionally split from `useUserRole` so `useUserRole`'s shape stays untouched (avoids invalidating its cached consumers).
-- Sidebar switcher hidden in collapsed state (icon mode) — keeps the icon strip clean; user can expand to switch.
-- `sessionStorage` only (per spec); cleared automatically on browser/tab close.
-- TECH "Pautas Internas" link uses query string `?type=internal` — assumes `AgendasPage` will read it later (out of scope here; link works regardless).
-- No DB or migration changes.
-- No `localStorage`, no `use-toast`, no unused imports. `staleTime` set on the new profile query.
+### Modified files
+
+- `src/App.tsx` — add `<Route path="/projects" element={<ErrorBoundary><ProjectsPage/></ErrorBoundary>} />` and `/projects/:id` inside the protected `DashboardLayout` block. Lazy import not required.
+- `src/components/demands/detail/DemandSidebar.tsx` — add a "Projeto" row (above or near Coluna) with `<ProjectSelect>` driven by `useLinkDemandToProject` / `useUnlinkDemandFromProject`. Shows current `demand.project_id`.
+
+### Notes
+
+- Status is always read from `get_project_stats` — never inferred client-side except for filter chips, which still read from each card's `useProjectStats`.
+- `useCancelProject` calls `supabase.rpc("cancel_project", { p_project_id, p_reason })`. Never DELETE.
+- `useAddProjectMember` uses `.upsert(..., { onConflict: "project_id,user_id", ignoreDuplicates: true })` to honour ON CONFLICT DO NOTHING.
+- All queries include `user?.id` in the key per project memory rule.
+- All writes go through `useMutation`; `{ data, error }` destructured; `sonner` for feedback.
+- TECH workspace already routes `/projects` from sidebar (Sprint 2-A) — this implements the destination.
+- No edits to `CONTEXT.md`, `AGENTS.md`, `CLAUDE.md`, or any Supabase-generated file.
 
 ### Verification
 
-Matches the 11-point checklist in the prompt: switcher visible, sidebar swaps, session persistence, aging badge thresholds, TECH Kanban defaults to all clients.
+Maps 1:1 to the 13-point checklist in the prompt: route loads, create flows, link/unlink, member management, status badge transitions, owner-only cancel, demand sidebar field.
