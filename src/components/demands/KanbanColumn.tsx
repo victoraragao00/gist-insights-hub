@@ -1,9 +1,36 @@
 import { useDroppable } from "@dnd-kit/core";
-import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { SortableContext, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { ChevronDown, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DemandCard } from "./DemandCard";
 import type { DemandRow } from "@/hooks/useDemands";
+
+function SortableDemandCard({
+  demand,
+  onClick,
+  taskCounts,
+}: {
+  demand: DemandRow;
+  onClick: () => void;
+  taskCounts?: Record<string, { total: number; done: number }>;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: demand.id,
+  });
+  return (
+    <DemandCard
+      demand={demand}
+      taskCounts={taskCounts}
+      onClick={onClick}
+      dragRef={setNodeRef}
+      dragAttributes={attributes as unknown as Record<string, unknown>}
+      dragListeners={listeners as unknown as Record<string, unknown>}
+      dragStyle={{ transform: CSS.Transform.toString(transform), transition }}
+      isDragging={isDragging}
+    />
+  );
+}
 import type { Tables } from "@/integrations/supabase/types";
 import { cn } from "@/lib/utils";
 
