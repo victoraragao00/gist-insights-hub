@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
+import { createDemandNotification, createMentionNotifications } from "@/hooks/useDemandNotifications";
 
 export interface DemandComment {
   id: string;
