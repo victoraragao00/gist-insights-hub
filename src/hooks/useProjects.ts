@@ -204,18 +204,13 @@ export function useCreateProject() {
   return useMutation({
     mutationFn: async (input: CreateProjectInput) => {
       if (!user?.id) throw new Error("Não autenticado");
-      const { data, error } = await supabase
-        .from("projects")
-        .insert({
-          title: input.title,
-          description: input.description ?? null,
-          owner_id: user.id,
-          due_date: input.due_date ?? null,
-          client_id: input.client_id ?? null,
-          workspace: input.workspace ?? "tech",
-        })
-        .select("id")
-        .single();
+      const { data, error } = await supabase.rpc("create_project", {
+        p_title: input.title,
+        p_description: input.description ?? null,
+        p_due_date: input.due_date ?? null,
+        p_client_id: input.client_id ?? null,
+        p_workspace: input.workspace ?? "tech",
+      });
       if (error) throw error;
       return data;
     },

@@ -1909,6 +1909,34 @@ export type Database = {
           job_id: string
         }[]
       }
+      create_project: {
+        Args: {
+          p_client_id?: string
+          p_description?: string
+          p_due_date?: string
+          p_title: string
+          p_workspace?: string
+        }
+        Returns: {
+          cancelled_at: string | null
+          cancelled_by: string | null
+          client_id: string | null
+          created_at: string
+          description: string | null
+          due_date: string | null
+          id: string
+          owner_id: string
+          title: string
+          updated_at: string
+          workspace: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "projects"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       deactivate_stale_clients: { Args: { _days: number }; Returns: number }
       get_client_conversations: {
         Args: { p_client_id: string }
