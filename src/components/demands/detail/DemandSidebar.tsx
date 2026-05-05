@@ -19,18 +19,29 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Popover, PopoverContent, PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
+} from "@/components/ui/command";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import {
   useTicketColumns, useDemandTypes, useUpdateDemand, useMoveDemand, useDeleteDemand,
   useDemandActivities, type DemandRow,
 } from "@/hooks/useDemands";
 import { useDemandAreas } from "@/hooks/useDemandAreas";
 import { useDemandWatchers, useToggleWatcher } from "@/hooks/useDemandWatchers";
+import {
+  useDemandCollaborators, useAddCollaborator, useRemoveCollaborator,
+} from "@/hooks/useDemandCollaborators";
+import { useBlockerTypes } from "@/hooks/useBlockerTypes";
 import { useRfiByDemand, useCreateRfi, useRfiStatuses, useDeleteRfi } from "@/hooks/useRfis";
 import { RfiDetailSheet } from "@/components/rfis/RfiDetailSheet";
 import { DemandTimeTrackingSection } from "../DemandTimeTrackingSection";
