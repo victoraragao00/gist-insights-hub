@@ -28,6 +28,8 @@ export interface DemandFilters {
   area_id?: string;
   search?: string;
   workspace?: "cx" | "tech";
+  mine_user_id?: string;
+  mine_collab_ids?: string[];
 }
 
 // ── Queries ──
@@ -84,6 +86,16 @@ export function useDemands(filters?: DemandFilters) {
       if (filters?.workspace) query = query.eq("workspace", filters.workspace);
       if (filters?.search && filters.search.length >= 3) {
         query = query.ilike("title", `%${filters.search}%`);
+      }
+      if (filters?.mine_user_id) {
+        const collabIds = filters.mine_collab_ids ?? [];
+        if (collabIds.length > 0) {
+          query = query.or(
+            `assignee_id.eq.${filters.mine_user_id},id.in.(${collabIds.join(",")})`
+          );
+        } else {
+          query = query.eq("assignee_id", filters.mine_user_id);
+        }
       }
 
       const { data, error } = await query;

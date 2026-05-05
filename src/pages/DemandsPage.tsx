@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, ChevronsUpDown, Check, Download, Clock, LayoutGrid } from "lucide-react";
+import { Plus, ChevronsUpDown, Check, Download, Clock, LayoutGrid, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useClient } from "@/context/ClientContext";
@@ -28,6 +28,12 @@ import { CreateDemandDialog } from "@/components/demands/CreateDemandDialog";
 import { useExportDemandsCSV } from "@/hooks/useExportDemandsCSV";
 import { SlaView } from "@/components/demands/SlaView";
 import { useSlaDemandsBoard } from "@/hooks/useSla";
+import { useAuth } from "@/context/AuthContext";
+import {
+  useDemandCollaboratorsBatch,
+  useMyCollaboratorDemandIds,
+} from "@/hooks/useDemandCollaborators";
+import { useBlockerTypes, type BlockerType } from "@/hooks/useBlockerTypes";
 
 // ── Filter Combobox ──
 
@@ -93,6 +99,7 @@ const DemandsPage = () => {
   const exportCSVMutation = useExportDemandsCSV();
   const { data: slaDemands = [] } = useSlaDemandsBoard();
   const slaVencidos = slaDemands.filter((d) => d.sla_status === "vencido").length;
+  const { user } = useAuth();
 
   // View toggle
   const [view, setView] = useState<"kanban" | "sla">("kanban");
@@ -104,6 +111,9 @@ const DemandsPage = () => {
   const [filterType, setFilterType] = useState<string>("");
   const [filterPriority, setFilterPriority] = useState<string>("");
   const [filterArea, setFilterArea] = useState<string>("");
+  const [myTasksOnly, setMyTasksOnly] = useState(false);
+
+  const { data: myCollabIds = [] } = useMyCollaboratorDemandIds(myTasksOnly);
 
   // Reset area filter when workspace changes (selected area may not exist in new workspace)
   useEffect(() => {
@@ -117,13 +127,22 @@ const DemandsPage = () => {
     priority: (filterPriority as DemandPriority) || undefined,
     area_id: filterArea || undefined,
     workspace: activeWorkspace,
-  }), [debouncedSearch, filterClient, filterType, filterPriority, filterArea, activeWorkspace]);
+    mine_user_id: myTasksOnly && user?.id ? user.id : undefined,
+    mine_collab_ids: myTasksOnly ? myCollabIds : undefined,
+  }), [debouncedSearch, filterClient, filterType, filterPriority, filterArea, activeWorkspace, myTasksOnly, user?.id, myCollabIds]);
 
   const { data: demands = [], isLoading: demandsLoading } = useDemands(filters);
   const moveMutation = useMoveDemand();
 
   const demandIds = useMemo(() => demands.map((d) => d.id), [demands]);
   const { data: taskCounts = {} } = useDemandTaskCounts(demandIds);
+  const { data: collaboratorsByDemand = {} } = useDemandCollaboratorsBatch(demandIds);
+  const { data: blockerTypes = [] } = useBlockerTypes();
+  const blockerTypesById = useMemo(() => {
+    const map: Record<string, BlockerType> = {};
+    for (const bt of blockerTypes) map[bt.id] = bt;
+    return map;
+  }, [blockerTypes]);
 
   const navigate = useNavigate();
 
@@ -291,6 +310,19 @@ const DemandsPage = () => {
               ]}
               className="w-36"
             />
+            <button
+              type="button"
+              onClick={() => setMyTasksOnly((v) => !v)}
+              className={cn(
+                "flex items-center gap-1.5 h-9 px-3 rounded-lg border text-sm font-medium transition-all",
+                myTasksOnly
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "border-border text-muted-foreground hover:text-foreground hover:border-primary/40"
+              )}
+            >
+              <User className="h-4 w-4" />
+              Minhas tasks
+            </button>
           </div>
         )}
       </div>
@@ -316,7 +348,13 @@ const DemandsPage = () => {
             Nenhuma demanda encontrada com os filtros selecionados
           </div>
         ) : activeWorkspace === "tech" ? (
-          <TechSwimlanePage columns={columns} demands={demands} taskCounts={taskCounts} />
+          <TechSwimlanePage
+            columns={columns}
+            demands={demands}
+            taskCounts={taskCounts}
+            collaboratorsByDemand={collaboratorsByDemand}
+            blockerTypesById={blockerTypesById}
+          />
         ) : (
           <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
             <div className="h-full overflow-x-auto">
@@ -331,6 +369,8 @@ const DemandsPage = () => {
                     isCollapsed={isCollapsed(col.id)}
                     onToggleCollapse={toggleCollapse}
                     taskCounts={taskCounts}
+                    collaboratorsByDemand={collaboratorsByDemand}
+                    blockerTypesById={blockerTypesById}
                   />
                 ))}
               </div>

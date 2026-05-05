@@ -5,6 +5,8 @@ import { DemandCard } from "./DemandCard";
 import { KanbanColumnHeader } from "./KanbanColumnHeader";
 import { CollapsedColumnStub } from "./CollapsedColumnStub";
 import type { DemandRow } from "@/hooks/useDemands";
+import type { DemandCollaborator } from "@/hooks/useDemandCollaborators";
+import type { BlockerType } from "@/hooks/useBlockerTypes";
 import type { Tables } from "@/integrations/supabase/types";
 import { cn } from "@/lib/utils";
 
@@ -12,10 +14,14 @@ function SortableDemandCard({
   demand,
   onClick,
   taskCounts,
+  collaborators,
+  blockerType,
 }: {
   demand: DemandRow;
   onClick: () => void;
   taskCounts?: Record<string, { total: number; done: number }>;
+  collaborators?: DemandCollaborator[];
+  blockerType?: BlockerType | null;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: demand.id,
@@ -24,6 +30,8 @@ function SortableDemandCard({
     <DemandCard
       demand={demand}
       taskCounts={taskCounts}
+      collaborators={collaborators}
+      blockerType={blockerType}
       onClick={onClick}
       draggable={{
         ref: setNodeRef,
@@ -44,6 +52,8 @@ interface KanbanColumnProps {
   isCollapsed: boolean;
   onToggleCollapse: (columnId: string) => void;
   taskCounts?: Record<string, { total: number; done: number }>;
+  collaboratorsByDemand?: Record<string, DemandCollaborator[]>;
+  blockerTypesById?: Record<string, BlockerType>;
 }
 
 export function KanbanColumn({
@@ -54,6 +64,8 @@ export function KanbanColumn({
   isCollapsed,
   onToggleCollapse,
   taskCounts,
+  collaboratorsByDemand,
+  blockerTypesById,
 }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: column.id });
 
@@ -93,6 +105,12 @@ export function KanbanColumn({
               demand={demand}
               onClick={() => onCardClick(demand)}
               taskCounts={taskCounts}
+              collaborators={collaboratorsByDemand?.[demand.id]}
+              blockerType={
+                demand.blocker_type_id
+                  ? blockerTypesById?.[demand.blocker_type_id] ?? null
+                  : null
+              }
             />
           ))}
         </SortableContext>
