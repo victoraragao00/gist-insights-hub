@@ -189,6 +189,12 @@ export function DemandSidebar({ demand, onActivityTabSelect, onClose }: DemandSi
         created_by: user?.id,
       });
       if (actErr) throw actErr;
+      await createDemandNotification({
+        demandId: demand.id,
+        type: "unblocked",
+        message: "Demanda desbloqueada",
+        actorId: user?.id ?? null,
+      });
       toast.success("Demanda desbloqueada");
       queryClient.invalidateQueries({ queryKey: ["demands"] });
       queryClient.invalidateQueries({ queryKey: ["demand"] });
