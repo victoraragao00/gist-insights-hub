@@ -544,17 +544,24 @@ export function DemandSidebar({ demand, onActivityTabSelect, onClose }: DemandSi
           <DialogHeader><DialogTitle>Marcar como bloqueado</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1">
-              <Label className="text-xs">Motivo do bloqueio *</Label>
-              <Textarea value={blockerReason} onChange={(e) => setBlockerReason(e.target.value)} rows={3} placeholder="Descreva o bloqueio..." />
+              <Label className="text-xs">Tipo de bloqueio *</Label>
+              <Select value={selectedBlockerType} onValueChange={setSelectedBlockerType}>
+                <SelectTrigger><SelectValue placeholder="Selecione o tipo" /></SelectTrigger>
+                <SelectContent>
+                  {blockerTypes.map((bt) => (
+                    <SelectItem key={bt.id} value={bt.id}>{bt.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">Bloqueado por</Label>
-              <Input value={blockedBy} onChange={(e) => setBlockedBy(e.target.value)} placeholder="Nome ou área" />
+              <Label className="text-xs">Motivo (opcional)</Label>
+              <Textarea value={blockerReason} onChange={(e) => setBlockerReason(e.target.value)} rows={3} placeholder="Detalhes do bloqueio..." />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setBlockDialogOpen(false)}>Cancelar</Button>
-            <Button onClick={handleBlock} disabled={!blockerReason.trim() || blockLoading}>
+            <Button onClick={handleBlock} disabled={!selectedBlockerType || blockLoading}>
               {blockLoading && <Loader2 className="h-4 w-4 animate-spin mr-1" />} Confirmar
             </Button>
           </DialogFooter>
