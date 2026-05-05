@@ -15,11 +15,8 @@ interface Props {
 }
 
 export function ThroughputChart({ data }: Props) {
-  const rows = data ?? [];
-  const totalDone = rows.reduce((s, r) => s + (r.done ?? 0), 0);
-  const totalCreated = rows.reduce((s, r) => s + (r.created ?? 0), 0);
-  const rate =
-    totalCreated > 0 ? Math.round((totalDone / totalCreated) * 100) : 0;
+  const rows = data?.weekly ?? [];
+  const rate = Math.round(data?.delivery_rate ?? 0);
 
   return (
     <div className="rounded-xl border border-border bg-card p-4">
