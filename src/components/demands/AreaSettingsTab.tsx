@@ -33,6 +33,7 @@ export function AreaSettingsTab() {
 
   const [newName, setNewName] = useState("");
   const [newColor, setNewColor] = useState(PRESET_COLORS[0]);
+  const [newWorkspace, setNewWorkspace] = useState<AreaWorkspace>("both");
 
   const activeAreas = useMemo(() => allAreas.filter((a) => a.active), [allAreas]);
   const inactiveAreas = useMemo(() => allAreas.filter((a) => !a.active), [allAreas]);
@@ -59,7 +60,7 @@ export function AreaSettingsTab() {
   const handleAdd = () => {
     if (!newName.trim()) return;
     const maxPos = activeAreas.reduce((max, a) => Math.max(max, a.position), 0);
-    addArea.mutate({ name: newName.trim(), color: newColor, position: maxPos + 1 });
+    addArea.mutate({ name: newName.trim(), color: newColor, position: maxPos + 1, workspace: newWorkspace });
     setNewName("");
   };
 
@@ -91,6 +92,14 @@ export function AreaSettingsTab() {
                 />
               ))}
             </div>
+            <Select value={newWorkspace} onValueChange={(v) => setNewWorkspace(v as AreaWorkspace)}>
+              <SelectTrigger className="w-28 h-9"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="cx">CX</SelectItem>
+                <SelectItem value="tech">TECH</SelectItem>
+                <SelectItem value="both">Ambos</SelectItem>
+              </SelectContent>
+            </Select>
             <Button size="sm" onClick={handleAdd} disabled={!newName.trim() || addArea.isPending}>
               <Plus className="h-4 w-4 mr-1" /> Adicionar
             </Button>
@@ -102,6 +111,7 @@ export function AreaSettingsTab() {
               <TableRow>
                 <TableHead>Cor</TableHead>
                 <TableHead>Nome</TableHead>
+                <TableHead>Workspace</TableHead>
                 <TableHead className="text-right">Tickets</TableHead>
                 <TableHead className="w-24" />
               </TableRow>
@@ -114,7 +124,7 @@ export function AreaSettingsTab() {
                     key={area.id}
                     area={area}
                     count={count}
-                    onUpdate={(name, color) => updateArea.mutate({ id: area.id, fields: { name, color } })}
+                    onUpdate={(fields) => updateArea.mutate({ id: area.id, fields })}
                     onDeactivate={() => deactivateArea.mutate(area.id)}
                     onDelete={() => deleteArea.mutate(area.id)}
                     isUpdating={updateArea.isPending}
@@ -123,7 +133,7 @@ export function AreaSettingsTab() {
               })}
               {activeAreas.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center py-6 text-muted-foreground">
+                  <TableCell colSpan={5} className="text-center py-6 text-muted-foreground">
                     Nenhuma área ativa
                   </TableCell>
                 </TableRow>
@@ -161,15 +171,15 @@ export function AreaSettingsTab() {
 }
 
 interface AreaRowProps {
-  area: { id: string; name: string; color: string | null; position: number };
+  area: { id: string; name: string; color: string | null; position: number; workspace: AreaWorkspace };
   count: number;
-  onUpdate: (name: string, color: string) => void;
+  onUpdate: (fields: Record<string, unknown>) => void;
   onDeactivate: () => void;
   onDelete: () => void;
   isUpdating: boolean;
 }
 
-function AreaRow({ area, count, onUpdate, onDeactivate, onDelete, isUpdating }: AreaRowProps) {
+function AreaRow({ area, count, onUpdate, onDeactivate, onDelete }: AreaRowProps) {
   const [name, setName] = useState(area.name);
   const [color, setColor] = useState(area.color ?? "#6B7280");
 
@@ -183,7 +193,7 @@ function AreaRow({ area, count, onUpdate, onDeactivate, onDelete, isUpdating }: 
               type="button"
               onClick={() => {
                 setColor(c);
-                onUpdate(name, c);
+                onUpdate({ color: c });
               }}
               className="w-5 h-5 rounded-full border-2 transition-all"
               style={{ backgroundColor: c, borderColor: color === c ? "hsl(var(--foreground))" : "transparent" }}
@@ -195,9 +205,24 @@ function AreaRow({ area, count, onUpdate, onDeactivate, onDelete, isUpdating }: 
         <Input
           value={name}
           onChange={(e) => setName(e.target.value)}
-          onBlur={() => { if (name.trim() && name !== area.name) onUpdate(name.trim(), color); }}
+          onBlur={() => { if (name.trim() && name !== area.name) onUpdate({ name: name.trim() }); }}
           className="h-7 text-sm border-0 p-0 shadow-none focus-visible:ring-0"
         />
+      </TableCell>
+      <TableCell>
+        <Select
+          value={area.workspace}
+          onValueChange={(v) => onUpdate({ workspace: v as AreaWorkspace })}
+        >
+          <SelectTrigger className="w-28 h-7 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="cx">CX</SelectItem>
+            <SelectItem value="tech">TECH</SelectItem>
+            <SelectItem value="both">Ambos</SelectItem>
+          </SelectContent>
+        </Select>
       </TableCell>
       <TableCell className="text-right tabular-nums text-xs text-muted-foreground">
         {count}
