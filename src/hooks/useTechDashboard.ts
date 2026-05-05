@@ -13,7 +13,6 @@ export interface AlertItemSimple {
 }
 
 export interface DeliveredByArea {
-  area_id: string | null;
   area_name: string | null;
   count: number;
 }
