@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   DndContext, closestCorners, PointerSensor, useSensor, useSensors,
@@ -18,7 +18,7 @@ import {
   useTicketColumns, useDemandTypes, useDemands, useMoveDemand,
   type DemandRow, type DemandPriority, type DemandFilters,
 } from "@/hooks/useDemands";
-import { useDemandAreas } from "@/hooks/useDemandAreas";
+import { useAreasByWorkspace } from "@/hooks/useDemandAreas";
 import { KanbanColumn } from "@/components/demands/KanbanColumn";
 import { TechSwimlanePage } from "@/components/demands/TechSwimlanePage";
 // DemandDetailSheet still used elsewhere; navigation now opens dedicated page
@@ -87,7 +87,7 @@ const DemandsPage = () => {
   const { activeWorkspace } = useWorkspace();
   const { data: columns = [], isLoading: colsLoading } = useTicketColumns();
   const { data: types = [] } = useDemandTypes();
-  const { data: areas = [] } = useDemandAreas();
+  const { data: areas = [] } = useAreasByWorkspace(activeWorkspace);
   const exportCSVMutation = useExportDemandsCSV();
   const { data: slaDemands = [] } = useSlaDemandsBoard();
   const slaVencidos = slaDemands.filter((d) => d.sla_status === "vencido").length;
@@ -102,6 +102,11 @@ const DemandsPage = () => {
   const [filterType, setFilterType] = useState<string>("");
   const [filterPriority, setFilterPriority] = useState<string>("");
   const [filterArea, setFilterArea] = useState<string>("");
+
+  // Reset area filter when workspace changes (selected area may not exist in new workspace)
+  useEffect(() => {
+    setFilterArea("");
+  }, [activeWorkspace]);
 
   const filters: DemandFilters = useMemo(() => ({
     search: debouncedSearch.length >= 3 ? debouncedSearch : undefined,
