@@ -12,10 +12,9 @@ import {
 } from "@/components/ui/select";
 import { Loader2, Sparkles, MessageSquarePlus } from "lucide-react";
 import { useCreateDemand, useTicketColumns, useDemandTypes, type DemandPriority } from "@/hooks/useDemands";
-import { useDemandAreas } from "@/hooks/useDemandAreas";
+import { useDemandAreas, useAreasByWorkspace } from "@/hooks/useDemandAreas";
 import { useClient } from "@/context/ClientContext";
 import { useAuth } from "@/context/AuthContext";
-import { useSquads } from "@/hooks/useSquads";
 import { useDemandAnalysis, useAnalyzeDemand } from "@/hooks/useDemandAnalysis";
 import { useCreateRfi, useUpdateRfi } from "@/hooks/useRfis";
 import { useAddLink } from "@/hooks/useDemandAttachments";
@@ -37,8 +36,9 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaul
   const { user } = useAuth();
   const { data: columns = [] } = useTicketColumns();
   const { data: types = [] } = useDemandTypes();
-  const { data: areas = [] } = useDemandAreas();
-  const { data: squads = [] } = useSquads();
+  const { data: allAreas = [] } = useDemandAreas();
+  const { data: workspaceAreas = [] } = useAreasByWorkspace(workspace);
+  const areas = workspace === "tech" ? workspaceAreas : allAreas;
   const { data: userProfiles = [] } = useQuery({
     queryKey: ["user_profiles_active"],
     staleTime: 300_000,
@@ -71,16 +71,12 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaul
   const [externalLink, setExternalLink] = useState("");
   const [createdDemandId, setCreatedDemandId] = useState<string | null>(null);
   const [showLinkDialog, setShowLinkDialog] = useState(false);
-  const [squadId, setSquadId] = useState<string>("none");
 
-  // Pre-fill squad if user belongs to exactly 1 squad (TECH workspace)
+  // Pre-fill area if there's exactly 1 area available for this workspace
   useEffect(() => {
-    if (workspace !== "tech" || !user?.id || squads.length === 0 || squadId !== "none") return;
-    const userSquads = squads.filter((s) =>
-      s.squad_members?.some((m) => m.user_id === user.id),
-    );
-    if (userSquads.length === 1) setSquadId(userSquads[0].id);
-  }, [workspace, user?.id, squads, squadId]);
+    if (areaId || areas.length === 0) return;
+    if (workspace === "tech" && areas.length === 1) setAreaId(areas[0].id);
+  }, [workspace, areas, areaId]);
 
   const { data: analysis } = useDemandAnalysis(createdDemandId ?? undefined);
   const analyzeMutation = useAnalyzeDemand();
