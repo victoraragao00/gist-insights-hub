@@ -40,9 +40,9 @@ const cxItems = [
 ];
 
 const techItems = [
+  { title: "Dashboard", url: "/tech/dashboard", icon: BarChart2 },
   { title: "Kanban", url: "/demands", icon: Kanban },
   { title: "Projetos", url: "/projects", icon: FolderKanban },
-  { title: "Dashboard TECH", url: "/tech/dashboard", icon: BarChart2 },
   { title: "Pautas Internas", url: "/agendas?type=internal", icon: Calendar },
 ];
 
