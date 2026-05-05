@@ -6,12 +6,14 @@ import {
   type DragEndEvent,
 } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
+import { ChevronDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { getAgingDays, getAgingStyle } from "@/lib/getAgingStyle";
 import type { DemandRow, DemandPriority } from "@/hooks/useDemands";
 import { useMoveDemand, useUpdateDemand } from "@/hooks/useDemands";
 import { useAreasByWorkspace, type DemandArea } from "@/hooks/useDemandAreas";
+import { useCollapsedColumns } from "@/hooks/useCollapsedColumns";
 import type { Tables } from "@/integrations/supabase/types";
 
 const PRIORITY_CLASSES: Record<DemandPriority, string> = {
