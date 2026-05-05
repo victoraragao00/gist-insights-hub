@@ -219,22 +219,10 @@ export function DemandConversationsTab({ demand }: DemandConversationsTabProps) 
           ))}
         </div>
 
-        <div className="space-y-1.5">
-          <Textarea
-            value={newComment}
-            onChange={(e) => setNewComment(e.target.value)}
-            placeholder="Adicionar comentário..."
-            rows={2}
-          />
-          <Button
-            size="sm"
-            onClick={handlePostComment}
-            disabled={!newComment.trim() || createCommentMutation.isPending}
-          >
-            {createCommentMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
-            Comentar
-          </Button>
-        </div>
+        <CommentInput
+          onSubmit={handlePostComment}
+          pending={createCommentMutation.isPending}
+        />
       </section>
     </div>
   );
