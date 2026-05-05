@@ -23,7 +23,7 @@ import {
 import { useDemandAnalysis, useAnalyzeDemand } from "@/hooks/useDemandAnalysis";
 import { useAutoResize } from "@/hooks/useAutoResize";
 import { AttachmentThumbnail } from "./AttachmentThumbnail";
-import { DemandTasksSection } from "./DemandTasksSection";
+
 
 const ACCEPTED_FILE_TYPES = "image/*,application/pdf,.doc,.docx,.xls,.xlsx,.csv";
 
