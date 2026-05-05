@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
@@ -11,8 +11,9 @@ import {
 } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
 import { useCreateAgenda } from "@/hooks/useMeetingAgendas";
-import { useAgendaFieldConfig, type FieldVisibility, type AgendaFieldConfig } from "@/hooks/useAgendaFieldConfig";
+import { useAgendaFieldConfig, type AgendaFieldConfig } from "@/hooks/useAgendaFieldConfig";
 import { useClient } from "@/context/ClientContext";
+import { useProjects } from "@/hooks/useProjects";
 import { SatisfactionPicker } from "./SatisfactionPicker";
 
 interface CreateAgendaDialogProps {
@@ -21,19 +22,32 @@ interface CreateAgendaDialogProps {
   defaultClientId?: string;
 }
 
+type AgendaKind = "client" | "internal";
+
 export function CreateAgendaDialog({ open, onOpenChange, defaultClientId }: CreateAgendaDialogProps) {
   const { clients } = useClient();
   const { data: fieldConfig } = useAgendaFieldConfig();
   const createMutation = useCreateAgenda();
 
+  const [agendaType, setAgendaType] = useState<AgendaKind>("client");
   const [title, setTitle] = useState("");
   const [clientId, setClientId] = useState(defaultClientId ?? "");
   const [meetingDate, setMeetingDate] = useState("");
+  const [durationMinutes, setDurationMinutes] = useState<number>(60);
+  const [projectId, setProjectId] = useState<string | null>(null);
+  const [executiveSummary, setExecutiveSummary] = useState("");
   const [location, setLocation] = useState("");
   const [objective, setObjective] = useState("");
   const [contextNotes, setContextNotes] = useState("");
   const [satisfactionScore, setSatisfactionScore] = useState<number | null>(null);
   const [nextSteps, setNextSteps] = useState("");
+
+  const { data: techProjects = [] } = useProjects("tech");
+  const { data: cxProjects = [] } = useProjects("cx");
+  const projects = useMemo(
+    () => [...techProjects, ...cxProjects].sort((a, b) => a.title.localeCompare(b.title)),
+    [techProjects, cxProjects]
+  );
 
   const isVisible = (field: keyof AgendaFieldConfig) => {
     if (!fieldConfig) return true;
@@ -49,6 +63,7 @@ export function CreateAgendaDialog({ open, onOpenChange, defaultClientId }: Crea
     title.trim().length > 0 &&
     clientId &&
     meetingDate &&
+    durationMinutes >= 15 &&
     (!isRequired("objective") || objective.trim().length > 0) &&
     (!isRequired("satisfaction_score") || satisfactionScore !== null);
 
@@ -59,6 +74,10 @@ export function CreateAgendaDialog({ open, onOpenChange, defaultClientId }: Crea
         title: title.trim(),
         client_id: clientId,
         meeting_date: new Date(meetingDate).toISOString(),
+        duration_minutes: durationMinutes,
+        agenda_type: agendaType,
+        project_id: agendaType === "internal" ? projectId : null,
+        executive_summary: executiveSummary.trim() || undefined,
         location: location || undefined,
         objective: objective || undefined,
         context_notes: contextNotes || undefined,
@@ -75,9 +94,13 @@ export function CreateAgendaDialog({ open, onOpenChange, defaultClientId }: Crea
   };
 
   const resetForm = () => {
+    setAgendaType("client");
     setTitle("");
     setClientId(defaultClientId ?? "");
     setMeetingDate("");
+    setDurationMinutes(60);
+    setProjectId(null);
+    setExecutiveSummary("");
     setLocation("");
     setObjective("");
     setContextNotes("");
@@ -93,6 +116,17 @@ export function CreateAgendaDialog({ open, onOpenChange, defaultClientId }: Crea
         </DialogHeader>
 
         <div className="space-y-4">
+          <div className="space-y-1.5">
+            <Label>Tipo de pauta</Label>
+            <Select value={agendaType} onValueChange={(v) => setAgendaType(v as AgendaKind)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="client">Cliente</SelectItem>
+                <SelectItem value="internal">Interna</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="space-y-1.5">
             <Label>Título {isRequired("title") && "*"}</Label>
             <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ex: Revisão mensal do projeto" />
@@ -114,6 +148,64 @@ export function CreateAgendaDialog({ open, onOpenChange, defaultClientId }: Crea
               <Label>Data da reunião *</Label>
               <Input type="datetime-local" value={meetingDate} onChange={(e) => setMeetingDate(e.target.value)} />
             </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>
+              Duração <span className="text-destructive">*</span>
+            </Label>
+            <div className="flex items-center gap-2">
+              <Input
+                type="number"
+                min={15}
+                step={15}
+                placeholder="60"
+                value={durationMinutes}
+                onChange={(e) => setDurationMinutes(parseInt(e.target.value || "0", 10))}
+                className="w-28"
+              />
+              <span className="text-sm text-muted-foreground">minutos</span>
+              {durationMinutes > 0 && (
+                <span className="text-xs text-muted-foreground ml-auto">
+                  {(durationMinutes / 60).toFixed(1)}h
+                </span>
+              )}
+            </div>
+          </div>
+
+          {agendaType === "internal" && (
+            <div className="space-y-1.5">
+              <Label>
+                Projeto <span className="text-xs text-muted-foreground">(opcional)</span>
+              </Label>
+              <Select
+                value={projectId ?? "none"}
+                onValueChange={(v) => setProjectId(v === "none" ? null : v)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Vincular a um projeto..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Nenhum projeto</SelectItem>
+                  {projects.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.title}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          <div className="space-y-1.5">
+            <Label>
+              Resumo executivo
+              <span className="text-xs text-muted-foreground ml-2">(opcional — pode preencher depois)</span>
+            </Label>
+            <Textarea
+              placeholder="Principais pontos da reunião..."
+              value={executiveSummary}
+              onChange={(e) => setExecutiveSummary(e.target.value)}
+              rows={3}
+            />
           </div>
 
           {isVisible("location") && (
