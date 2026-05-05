@@ -35,6 +35,11 @@ import { useRfiByDemand, useCreateRfi, useRfiStatuses, useDeleteRfi } from "@/ho
 import { RfiDetailSheet } from "@/components/rfis/RfiDetailSheet";
 import { DemandTimeTrackingSection } from "../DemandTimeTrackingSection";
 import { AssigneeDisplay } from "./AssigneeDisplay";
+import { ProjectSelect } from "@/components/projects/ProjectSelect";
+import {
+  useLinkDemandToProject,
+  useUnlinkDemandFromProject,
+} from "@/hooks/useProjects";
 
 interface DemandSidebarProps {
   demand: DemandRow;
