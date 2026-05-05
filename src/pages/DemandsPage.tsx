@@ -19,6 +19,7 @@ import {
   type DemandRow, type DemandPriority, type DemandFilters,
 } from "@/hooks/useDemands";
 import { useAreasByWorkspace } from "@/hooks/useDemandAreas";
+import { useCollapsedColumns } from "@/hooks/useCollapsedColumns";
 import { KanbanColumn } from "@/components/demands/KanbanColumn";
 import { TechSwimlanePage } from "@/components/demands/TechSwimlanePage";
 // DemandDetailSheet still used elsewhere; navigation now opens dedicated page
@@ -121,6 +122,8 @@ const DemandsPage = () => {
   const moveMutation = useMoveDemand();
 
   const navigate = useNavigate();
+
+  const { isCollapsed, toggle: toggleCollapse } = useCollapsedColumns(columns);
 
   // Create dialog
   const [createOpen, setCreateOpen] = useState(false);
@@ -318,6 +321,8 @@ const DemandsPage = () => {
                     demands={demandsByColumn.get(col.id) ?? []}
                     onCardClick={handleCardClick}
                     onAddClick={handleAddClick}
+                    isCollapsed={isCollapsed(col.id)}
+                    onToggleCollapse={toggleCollapse}
                   />
                 ))}
               </div>

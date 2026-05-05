@@ -6,12 +6,14 @@ import {
   type DragEndEvent,
 } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
+import { ChevronDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { getAgingDays, getAgingStyle } from "@/lib/getAgingStyle";
 import type { DemandRow, DemandPriority } from "@/hooks/useDemands";
 import { useMoveDemand, useUpdateDemand } from "@/hooks/useDemands";
 import { useAreasByWorkspace, type DemandArea } from "@/hooks/useDemandAreas";
+import { useCollapsedColumns } from "@/hooks/useCollapsedColumns";
 import type { Tables } from "@/integrations/supabase/types";
 
 const PRIORITY_CLASSES: Record<DemandPriority, string> = {
@@ -83,7 +85,15 @@ export function TechSwimlanePage({ columns, demands }: Props) {
     }
   }, [demands, columns, moveMutation, updateMutation]);
 
-  const gridTemplate = `160px repeat(${columns.length}, minmax(220px, 1fr))`;
+  const { isCollapsed, toggle: toggleCollapse } = useCollapsedColumns(columns);
+
+  const gridTemplate = useMemo(
+    () =>
+      `160px ${columns
+        .map((c) => (isCollapsed(c.id) ? "48px" : "minmax(220px, 1fr)"))
+        .join(" ")}`,
+    [columns, isCollapsed]
+  );
 
   const columnCounts = useMemo(() => {
     const map = new Map<string, number>();
@@ -98,18 +108,43 @@ export function TechSwimlanePage({ columns, demands }: Props) {
           {/* Header */}
           <div className="grid gap-2" style={{ gridTemplateColumns: gridTemplate }}>
             <div />
-            {columns.map((col) => (
-              <div key={col.id} className="flex items-center gap-2 px-2 py-1">
+            {columns.map((col) => {
+              const collapsed = isCollapsed(col.id);
+              const count = columnCounts.get(col.id) ?? 0;
+              return (
                 <div
-                  className="h-2.5 w-2.5 rounded-full shrink-0"
-                  style={{ backgroundColor: col.color ?? "hsl(var(--muted-foreground))" }}
-                />
-                <span className="text-sm font-semibold text-foreground truncate">{col.name}</span>
-                <span className="text-xs text-muted-foreground">
-                  ({columnCounts.get(col.id) ?? 0})
-                </span>
-              </div>
-            ))}
+                  key={col.id}
+                  onClick={() => toggleCollapse(col.id)}
+                  className={cn(
+                    "flex items-center gap-2 px-2 py-1 rounded cursor-pointer select-none",
+                    "hover:bg-muted/60 transition-colors",
+                    collapsed && "justify-center"
+                  )}
+                  title={collapsed ? `${col.name} — expandir` : "Colapsar coluna"}
+                >
+                  <div
+                    className="h-2.5 w-2.5 rounded-full shrink-0"
+                    style={{ backgroundColor: col.color ?? "hsl(var(--muted-foreground))" }}
+                  />
+                  {collapsed ? (
+                    <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
+                      {count}
+                    </span>
+                  ) : (
+                    <>
+                      <span className="text-sm font-semibold text-foreground truncate">{col.name}</span>
+                      <span className="text-xs text-muted-foreground">({count})</span>
+                    </>
+                  )}
+                  <ChevronDown
+                    className={cn(
+                      "h-3 w-3 text-muted-foreground/60 ml-auto transition-transform duration-200",
+                      collapsed && "-rotate-90 ml-0"
+                    )}
+                  />
+                </div>
+              );
+            })}
           </div>
 
           {/* Lanes */}
@@ -123,6 +158,7 @@ export function TechSwimlanePage({ columns, demands }: Props) {
                 area ? d.area_id === area.id : !d.area_id
               )}
               onCardClick={(d) => navigate(`/demands/${d.id}`)}
+              isCollapsed={isCollapsed}
             />
           ))}
         </div>
@@ -137,9 +173,10 @@ interface LaneProps {
   gridTemplate: string;
   demands: DemandRow[];
   onCardClick: (d: DemandRow) => void;
+  isCollapsed: (id: string) => boolean;
 }
 
-function SwimlaneLane({ area, columns, gridTemplate, demands, onCardClick }: LaneProps) {
+function SwimlaneLane({ area, columns, gridTemplate, demands, onCardClick, isCollapsed }: LaneProps) {
   return (
     <div
       className="grid gap-2 rounded-lg border border-border bg-card/40 p-2"
@@ -177,6 +214,7 @@ function SwimlaneLane({ area, columns, gridTemplate, demands, onCardClick }: Lan
           columnId={col.id}
           demands={demands.filter((d) => d.column_id === col.id)}
           onCardClick={onCardClick}
+          collapsed={isCollapsed(col.id)}
         />
       ))}
     </div>
@@ -188,11 +226,16 @@ interface CellProps {
   columnId: string;
   demands: DemandRow[];
   onCardClick: (d: DemandRow) => void;
+  collapsed: boolean;
 }
 
-function SwimlaneCell({ areaId, columnId, demands, onCardClick }: CellProps) {
+function SwimlaneCell({ areaId, columnId, demands, onCardClick, collapsed }: CellProps) {
   const id = `${areaId ?? NO_AREA}::${columnId}`;
-  const { setNodeRef, isOver } = useDroppable({ id });
+  const { setNodeRef, isOver } = useDroppable({ id, disabled: collapsed });
+
+  if (collapsed) {
+    return <div className="min-h-20 rounded-md bg-muted/10" aria-hidden />;
+  }
 
   return (
     <div
