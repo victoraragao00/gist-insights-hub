@@ -14,6 +14,7 @@ interface KanbanColumnProps {
   onAddClick: (columnId: string) => void;
   isCollapsed: boolean;
   onToggleCollapse: (columnId: string) => void;
+  taskCounts?: Record<string, { total: number; done: number }>;
 }
 
 export function KanbanColumn({
