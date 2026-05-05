@@ -176,9 +176,10 @@ interface LaneProps {
   demands: DemandRow[];
   onCardClick: (d: DemandRow) => void;
   isCollapsed: (id: string) => boolean;
+  taskCounts?: Record<string, { total: number; done: number }>;
 }
 
-function SwimlaneLane({ area, columns, gridTemplate, demands, onCardClick, isCollapsed }: LaneProps) {
+function SwimlaneLane({ area, columns, gridTemplate, demands, onCardClick, isCollapsed, taskCounts }: LaneProps) {
   return (
     <div
       className="grid gap-2 rounded-lg border border-border bg-card/40 p-2"
@@ -217,6 +218,7 @@ function SwimlaneLane({ area, columns, gridTemplate, demands, onCardClick, isCol
           demands={demands.filter((d) => d.column_id === col.id)}
           onCardClick={onCardClick}
           collapsed={isCollapsed(col.id)}
+          taskCounts={taskCounts}
         />
       ))}
     </div>
