@@ -319,8 +319,8 @@ const DemandsPage = () => {
           <TechSwimlanePage columns={columns} demands={demands} taskCounts={taskCounts} />
         ) : (
           <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
-            <div className="h-full overflow-x-auto overflow-y-hidden">
-              <div className="flex gap-4 h-full px-6 py-4 min-w-max">
+            <div className="h-full overflow-x-auto">
+              <div className="flex gap-4 px-6 py-4 min-w-max items-start">
                 {columns.map((col) => (
                   <KanbanColumn
                     key={col.id}
