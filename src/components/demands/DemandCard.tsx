@@ -82,7 +82,7 @@ export function DemandCard({
       </div>
 
       {/* Título */}
-      <p className="text-sm font-medium leading-snug line-clamp-2 mb-2 text-foreground">
+      <p className="text-sm font-medium leading-snug break-words mb-2 text-foreground">
         {demand.title}
       </p>
 
