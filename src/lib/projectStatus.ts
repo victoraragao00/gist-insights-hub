@@ -8,6 +8,7 @@ export interface ProjectStatsData {
   completion_pct: number;
   overdue_count: number;
   total_hours: number;
+  meeting_hours?: number;
   by_column: Array<{ column_id: string; column_name: string; count: number }>;
 }
 

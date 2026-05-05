@@ -1,63 +1,57 @@
-# Plano: Notificações in-app + Menções @usuário
+# Plano: Agendas com duração/projeto/resumo + bypass TECH
 
 ## Estado atual
 
-- `NotificationBell` já existe em `src/components/NotificationBell.tsx` (montado no `DashboardLayout`).
-- `useDemandNotifications` já existe (com Realtime e mark-as-read), mas:
-  - `staleTime: 10_000` (precisa virar `0`)
-  - `limit(20)` → subir para `50`
-  - SELECT não traz `demands(id, title)` (o sino não consegue navegar pra demanda certa nem mostrar título)
-  - Helper `createDemandNotification` não cobre colaboradores/watchers nem tipos `status_changed`/`blocked`/`unblocked`/`mentioned`.
-- Comentários: `DemandConversationsTab.tsx` usa `Textarea` simples + `useCreateComment`. Sem menções, sem renderizador.
-- Mutations existentes em `useDemands.ts` (`useUpdateDemand`, `useMoveDemand`) e em `DemandSidebar.tsx` (`handleBlock`/`handleUnblock`) não disparam notificações.
+- `CreateAgendaDialog` não expõe `duration_minutes`, `project_id`, `executive_summary` nem `agenda_type` (banco tem default `'client'` e `60`).
+- `useCreateAgenda` payload não aceita esses campos — INSERT atual perde-os mesmo se preenchidos.
+- `ProjectStatsData` (`src/lib/projectStatus.ts`) e RPC já retornam `meeting_hours` (banco D), mas o tipo TS não inclui — sidebar do `ProjectDetailPage` não exibe.
+- Settings → Equipe (`UserManagementTab` / `UserPermissionsSheet`) não tem toggle de `bypass_client_access`. Coluna existe em `user_profiles` (banco D).
 
 ## Mudanças
 
-### 1. `src/hooks/useDemandNotifications.ts`
-- `staleTime: 0`, `limit(50)`, SELECT `*, demands:demand_id(id, title)` (FK existe via PostgREST).
-- Tipar `demands` opcional no `DemandNotification`.
-- Reescrever `createDemandNotification` para aceitar tipos `status_changed | blocked | unblocked | commented | mentioned | moved | assigned | created` e buscar destinatários via helper:
-  - `getNotificationRecipients(demandId, excludeUserId)` lê `demands.assignee_id` + `demand_collaborators` + `demand_watchers`, dedup com `Set`, remove `null` e o ator.
-- Exportar `createMentionNotifications(demandId, userIds, actorId)` para o caso de menção (não usa watchers).
+### 1. `src/hooks/useMeetingAgendas.ts`
+- Estender `CreateAgendaPayload` com `duration_minutes?`, `agenda_type?`, `project_id?: string | null`, `executive_summary?`.
+- INSERT já é spread — basta incluir os campos.
+- Adicionar hook `useProjectAgendas(projectId)` (`select id, title, meeting_date, duration_minutes` + `agenda_type='internal'` + `project_id=eq`, `staleTime 60s`, `enabled !!projectId`).
 
-### 2. `src/components/NotificationBell.tsx`
-- Navegar para `/demands/${n.demand_id}` (não `/demands`).
-- Mostrar título (`n.demands?.title`) abaixo da mensagem quando disponível.
-- Dot de não-lida visual (bolinha primária) à esquerda.
+### 2. `src/components/agendas/CreateAgendaDialog.tsx`
+- States novos: `agendaType` (`'client' | 'internal'`, default `'client'`), `durationMinutes` (default `60`), `projectId` (`string | null`), `executiveSummary`.
+- UI:
+  - Seletor "Tipo de pauta" (Cliente / Interna) — quando `internal`, **oculta** o seletor de Cliente (mas o campo `client_id` continua obrigatório no schema; nesse caso usa o cliente atual do `ClientContext` ou exige seleção). Manter Cliente sempre visível por simplicidade.
+  - Campo `Duração *` ao lado da Data (grid 2 colunas), `Input type=number min=15 step=15`, helper `Xh` abaixo.
+  - Quando `agendaType === 'internal'`, mostrar `Select` Projeto (busca `useProjects('tech')` + `useProjects('cx')` ou todos; usar hook existente). Opção "Nenhum projeto".
+  - Campo `Resumo executivo` (`Textarea rows=3`, opcional).
+- `canSubmit`: incluir `durationMinutes >= 15`.
+- `handleSubmit`: passar campos novos no payload (com `project_id: agendaType === 'internal' ? projectId : null`).
+- `resetForm`: resetar tudo.
 
-### 3. Disparos de notificação
-- **`src/hooks/useDemands.ts`** → `useMoveDemand` (mudança de coluna) e `useUpdateDemand` (quando `column_id`, `is_blocked`, `assignee_id` mudam): chamar `createDemandNotification` com `type: 'status_changed' | 'assigned'`. Já temos `targetColumnName`/`sourceColumnName` no payload do move.
-- **`src/components/demands/detail/DemandSidebar.tsx`** → em `handleBlock` (`blocked`, msg com nome do tipo) e `handleUnblock` (`unblocked`).
-- **`src/hooks/useDemandComments.ts`** → em `useCreateComment.onSuccess`, disparar `commented` (mensagem `Novo comentário de <full_name>`). Menções tratadas separadamente no input.
+### 3. `src/lib/projectStatus.ts`
+- Adicionar `meeting_hours: number` em `ProjectStatsData` (opcional? — mantém obrigatório com default fallback `0` na leitura).
 
-### 4. Menções @usuário em comentários
-Refatorar o bloco de input do `DemandConversationsTab.tsx` para um componente local `CommentInput`:
+### 4. `src/pages/ProjectDetailPage.tsx`
+- Após o card de "Tempo total", adicionar card "Reuniões":
+  - Mostra apenas se `meetingHours > 0`.
+  - Exibe `formatHours(meetingHours)` (ou `.toFixed(1) + 'h'`).
+  - Lista até N agendas via `useProjectAgendas(id)`, clique navega para `/agendas/:id`.
 
-- Detectar `@` antes do cursor com regex `/@([\w]*)$/`.
-- Popover/dropdown abaixo do textarea com até 5 usuários (busca `useUsers()` ou query inline em `user_profiles` ativos por nome/email).
-- Setas ↑↓ + Enter para selecionar; Esc fecha; clique também funciona.
-- Inserir como token `@[Nome do Usuário](uuid)` no texto bruto (formato estável para parsing posterior, evitando ambiguidade de nomes com espaços).
-- No submit:
-  - Extrair `[...text.matchAll(/@\[([^\]]+)\]\(([0-9a-f-]{36})\)/g)]` → array de `userId`.
-  - Salvar `content` com tokens (renderizador formata).
-  - Após `useCreateComment`, chamar `createMentionNotifications` para mencionados (excluindo autor e quem já receberá `commented`).
+### 5. Bypass TECH
+- Estender `UserWithPermissions` com `bypass_client_access?: boolean` (a RPC pode ou não retornar; o frontend lê via query suplementar caso ausente).
+- Para evitar mexer na RPC, adicionar `useUsersBypass()` simples: `select id, bypass_client_access from user_profiles` (admins têm RLS para ler) → Map id→bool. Mesclar no render.
+- Hook novo `useUpdateUserBypass` em `src/hooks/useUserManagement.ts` (`useMutation` + `toast` + invalidar `users_with_permissions` e `users_bypass`).
+- Em `UserManagementTab.tsx`, nova coluna **"Acesso TECH"** com `Switch` ao lado de Status (com tooltip), desabilitado para self.
+- `UserPermissionsSheet.tsx` ganha o mesmo toggle no topo, antes da lista de clientes, com label/descrição.
 
-Renderização: novo `CommentText` que faz split pelo regex e renderiza menções como `<span class="text-primary font-medium">@Nome</span>`. Substitui `whitespace-pre-wrap` simples na lista de comentários.
-
-### 5. Limpezas
-- Remover imports não usados resultantes (m11).
-- Sem novas dependências.
+### 6. Higiene
+- Sem novos imports não usados (m11). Toast via `sonner` (já em uso).
+- Sem `any`. Toda escrita via `useMutation` (m9).
+- Sem migrations e sem editar `supabase/*`.
 
 ## Arquivos tocados
-- `src/hooks/useDemandNotifications.ts` (refatorar)
-- `src/hooks/useDemands.ts` (disparos em move/update)
-- `src/hooks/useDemandComments.ts` (disparo `commented`)
-- `src/components/NotificationBell.tsx` (navegação + título)
-- `src/components/demands/detail/DemandSidebar.tsx` (disparos block/unblock)
-- `src/components/demands/detail/DemandConversationsTab.tsx` (CommentInput + CommentText)
-- Novo: `src/components/demands/detail/CommentInput.tsx` e `CommentText.tsx`
-
-## Não-objetivos
-- Sem migrations (tabela `demand_notifications` já existe).
-- Sem alteração em `supabase/*` ou docs.
-- Mantém `sonner` como único toast.
+- `src/hooks/useMeetingAgendas.ts`
+- `src/components/agendas/CreateAgendaDialog.tsx`
+- `src/lib/projectStatus.ts`
+- `src/pages/ProjectDetailPage.tsx`
+- `src/hooks/useUsers.ts` (estende type)
+- `src/hooks/useUserManagement.ts` (novo `useUpdateUserBypass` + helper query bypass)
+- `src/components/settings/UserManagementTab.tsx`
+- `src/components/settings/UserPermissionsSheet.tsx`

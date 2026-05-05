@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
-import { useUpdateClientAccess, useRemoveClientAccess } from "@/hooks/useUserManagement";
+import { useUpdateClientAccess, useRemoveClientAccess, useUsersBypass, useUpdateUserBypass } from "@/hooks/useUserManagement";
 import { useDebounce } from "@/hooks/useDebounce";
 import type { UserWithPermissions } from "@/hooks/useUsers";
 import {
@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
@@ -43,6 +44,8 @@ export function UserPermissionsSheet({ user, open, onClose }: Props) {
   const { user: currentUser } = useAuth();
   const updateAccess = useUpdateClientAccess();
   const removeAccess = useRemoveClientAccess();
+  const { data: bypassMap = {} } = useUsersBypass();
+  const updateBypass = useUpdateUserBypass();
 
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 300);
@@ -109,6 +112,23 @@ export function UserPermissionsSheet({ user, open, onClose }: Props) {
         </SheetHeader>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-4">
+          {/* Bypass TECH toggle */}
+          <div className="flex items-center justify-between rounded-md border border-border p-3">
+            <div className="min-w-0 pr-3">
+              <p className="text-sm font-medium">Acesso TECH completo</p>
+              <p className="text-[11px] text-muted-foreground">
+                Ver todas as demands do workspace TECH, ignorando restrições por cliente.
+              </p>
+            </div>
+            <Switch
+              checked={!!bypassMap[user.user_id]}
+              onCheckedChange={(checked) =>
+                updateBypass.mutate({ userId: user.user_id, bypass: checked })
+              }
+              disabled={updateBypass.isPending}
+            />
+          </div>
+
           {/* Info callout */}
           {user.global_role === "admin" ? (
             <Alert className="border-purple-200 bg-purple-50">

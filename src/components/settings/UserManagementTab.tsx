@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useUsers } from "@/hooks/useUsers";
-import { useUpdateUserRole, useToggleUserActive } from "@/hooks/useUserManagement";
+import { useUpdateUserRole, useToggleUserActive, useUsersBypass, useUpdateUserBypass } from "@/hooks/useUserManagement";
 import { useDebounce } from "@/hooks/useDebounce";
 import { UserPermissionsSheet } from "./UserPermissionsSheet";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -80,8 +80,10 @@ export function UserManagementTab() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { data: users = [], isLoading } = useUsers();
+  const { data: bypassMap = {} } = useUsersBypass();
   const updateRole = useUpdateUserRole();
   const toggleActive = useToggleUserActive();
+  const updateBypass = useUpdateUserBypass();
 
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 300);
@@ -176,6 +178,7 @@ export function UserManagementTab() {
                 <TableHead>Clientes</TableHead>
                 <TableHead>Último acesso</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Acesso TECH</TableHead>
                 <TableHead className="text-right pr-6">Ações</TableHead>
               </TableRow>
             </TableHeader>
@@ -188,12 +191,13 @@ export function UserManagementTab() {
                     <TableCell><Skeleton className="h-8 w-24" /></TableCell>
                     <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-10" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-10" /></TableCell>
                     <TableCell><Skeleton className="h-8 w-24" /></TableCell>
                   </TableRow>
                 ))
               ) : filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground text-sm">
+                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground text-sm">
                     Nenhum usuário encontrado
                   </TableCell>
                 </TableRow>
@@ -280,6 +284,22 @@ export function UserManagementTab() {
                           disabled={toggleActive.isPending}
                         />
                       )}
+                    </TableCell>
+                    <TableCell>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span>
+                            <Switch
+                              checked={!!bypassMap[u.user_id]}
+                              onCheckedChange={(checked) =>
+                                updateBypass.mutate({ userId: u.user_id, bypass: checked })
+                              }
+                              disabled={updateBypass.isPending}
+                            />
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>Ver todas as demands do workspace TECH</TooltipContent>
+                      </Tooltip>
                     </TableCell>
                     <TableCell className="text-right pr-6">
                       <Tooltip>
