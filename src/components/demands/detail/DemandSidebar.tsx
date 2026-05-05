@@ -215,6 +215,22 @@ export function DemandSidebar({ demand, onActivityTabSelect, onClose }: DemandSi
         </p>
 
         <div className="space-y-0">
+          <div className="flex items-center justify-between py-2 text-sm border-b border-border/50">
+            <span className="text-muted-foreground text-xs">Projeto</span>
+            <ProjectSelect
+              value={demand.project_id}
+              onSelect={(projectId) =>
+                linkDemand.mutate({ demandId: demand.id, projectId })
+              }
+              onClear={() =>
+                unlinkDemand.mutate({
+                  demandId: demand.id,
+                  projectId: demand.project_id,
+                })
+              }
+            />
+          </div>
+
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground">Coluna</Label>
             <Select value={demand.column_id} onValueChange={handleColumnChange}>
