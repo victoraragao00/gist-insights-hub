@@ -112,6 +112,23 @@ export function UserPermissionsSheet({ user, open, onClose }: Props) {
         </SheetHeader>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-4">
+          {/* Bypass TECH toggle */}
+          <div className="flex items-center justify-between rounded-md border border-border p-3">
+            <div className="min-w-0 pr-3">
+              <p className="text-sm font-medium">Acesso TECH completo</p>
+              <p className="text-[11px] text-muted-foreground">
+                Ver todas as demands do workspace TECH, ignorando restrições por cliente.
+              </p>
+            </div>
+            <Switch
+              checked={!!bypassMap[user.user_id]}
+              onCheckedChange={(checked) =>
+                updateBypass.mutate({ userId: user.user_id, bypass: checked })
+              }
+              disabled={updateBypass.isPending}
+            />
+          </div>
+
           {/* Info callout */}
           {user.global_role === "admin" ? (
             <Alert className="border-purple-200 bg-purple-50">
