@@ -28,13 +28,6 @@ interface ProjectDemandsTabProps {
   projectId: string;
 }
 
-const PRIO_LABEL: Record<string, string> = {
-  low: "Baixa",
-  medium: "Média",
-  high: "Alta",
-  urgent: "Urgente",
-};
-
 export function ProjectDemandsTab({ projectId }: ProjectDemandsTabProps) {
   const navigate = useNavigate();
   const { data: demands = [] } = useProjectDemands(projectId);
