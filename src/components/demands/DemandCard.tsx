@@ -1,7 +1,7 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Badge } from "@/components/ui/badge";
-import { Lock, Headphones, Bug, TrendingUp, Sparkles, Briefcase, Search, Clock } from "lucide-react";
+import { Lock, Headphones, Bug, TrendingUp, Sparkles, Briefcase, Search, Clock, CheckSquare } from "lucide-react";
 import { formatHours } from "@/lib/formatHours";
 import { getAgingDays, getAgingStyle } from "@/lib/getAgingStyle";
 import { formatDistanceToNow } from "date-fns";
