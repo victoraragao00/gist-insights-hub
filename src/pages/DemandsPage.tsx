@@ -321,6 +321,8 @@ const DemandsPage = () => {
                     demands={demandsByColumn.get(col.id) ?? []}
                     onCardClick={handleCardClick}
                     onAddClick={handleAddClick}
+                    isCollapsed={isCollapsed(col.id)}
+                    onToggleCollapse={toggleCollapse}
                   />
                 ))}
               </div>
