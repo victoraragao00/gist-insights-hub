@@ -40,8 +40,7 @@ import {
   useLinkDemandToProject,
   useUnlinkDemandFromProject,
 } from "@/hooks/useProjects";
-import { useSquads, useUpdateDemandSquad } from "@/hooks/useSquads";
-import { useWorkspace } from "@/hooks/useWorkspace";
+
 
 interface DemandSidebarProps {
   demand: DemandRow;
@@ -82,9 +81,7 @@ export function DemandSidebar({ demand, onActivityTabSelect, onClose }: DemandSi
 
   const linkDemand = useLinkDemandToProject();
   const unlinkDemand = useUnlinkDemandFromProject();
-  const { data: squads = [] } = useSquads();
-  const updateDemandSquad = useUpdateDemandSquad();
-  const { activeWorkspace } = useWorkspace();
+  
 
   const [rfiSheetOpen, setRfiSheetOpen] = useState(false);
   const [blockDialogOpen, setBlockDialogOpen] = useState(false);
@@ -321,36 +318,6 @@ export function DemandSidebar({ demand, onActivityTabSelect, onClose }: DemandSi
             </Select>
           </div>
 
-          {/* Squad — TECH workspace or demand has squad */}
-          {(activeWorkspace === "tech" || demand.squad_id) && (
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Squad</Label>
-              <Select
-                value={demand.squad_id ?? "none"}
-                onValueChange={(v) =>
-                  updateDemandSquad.mutate({
-                    demandId: demand.id,
-                    squadId: v === "none" ? null : v,
-                  })
-                }
-              >
-                <SelectTrigger className="h-8">
-                  <SelectValue placeholder="Sem squad" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Sem squad</SelectItem>
-                  {squads.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>
-                      <span className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: s.color }} />
-                        {s.name}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
         </div>
       </section>
 

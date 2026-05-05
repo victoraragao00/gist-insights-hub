@@ -34,7 +34,7 @@ import { AgendaSettingsTab } from "@/components/settings/AgendaSettingsTab";
 import { RfiStatusSettingsTab } from "@/components/settings/RfiStatusSettingsTab";
 import { SlaSettingsTab } from "@/components/settings/SlaSettingsTab";
 import { ClassifierSettingsTab } from "@/components/settings/ClassifierSettingsTab";
-import { SquadsSettingsTab } from "@/components/settings/SquadsSettingsTab";
+
 
 // ── Types ──────────────────────────────────────────────
 
