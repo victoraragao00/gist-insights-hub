@@ -100,6 +100,7 @@ export function KanbanColumn({
               key={demand.id}
               demand={demand}
               onClick={() => onCardClick(demand)}
+              taskCount={taskCounts?.[demand.id]}
             />
           ))}
         </SortableContext>
