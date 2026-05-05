@@ -14,6 +14,8 @@ import type { DemandRow } from "@/hooks/useDemands";
 import { useMoveDemand, useUpdateDemand } from "@/hooks/useDemands";
 import { useAreasByWorkspace, type DemandArea } from "@/hooks/useDemandAreas";
 import { useCollapsedColumns } from "@/hooks/useCollapsedColumns";
+import type { DemandCollaborator } from "@/hooks/useDemandCollaborators";
+import type { BlockerType } from "@/hooks/useBlockerTypes";
 import type { Tables } from "@/integrations/supabase/types";
 
 const NO_AREA = "no-area";
@@ -22,9 +24,11 @@ interface Props {
   columns: Tables<"ticket_columns">[];
   demands: DemandRow[];
   taskCounts?: Record<string, { total: number; done: number }>;
+  collaboratorsByDemand?: Record<string, DemandCollaborator[]>;
+  blockerTypesById?: Record<string, BlockerType>;
 }
 
-export function TechSwimlanePage({ columns, demands, taskCounts }: Props) {
+export function TechSwimlanePage({ columns, demands, taskCounts, collaboratorsByDemand, blockerTypesById }: Props) {
   const { data: areas = [] } = useAreasByWorkspace("tech");
   const moveMutation = useMoveDemand();
   const updateMutation = useUpdateDemand();
@@ -139,6 +143,8 @@ export function TechSwimlanePage({ columns, demands, taskCounts }: Props) {
               onCardClick={(d) => navigate(`/demands/${d.id}`)}
               isCollapsed={isCollapsed}
               taskCounts={taskCounts}
+              collaboratorsByDemand={collaboratorsByDemand}
+              blockerTypesById={blockerTypesById}
             />
           ))}
         </div>
