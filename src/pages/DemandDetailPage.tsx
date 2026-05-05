@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Check, Loader2 } from "lucide-react";
-import { cn } from "@/lib/utils";
+
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useDemand } from "@/hooks/useDemands";
@@ -55,10 +55,18 @@ const DemandDetailPage = () => {
             <TabsList className="mb-4">
               <TabsTrigger value="content">Conteúdo</TabsTrigger>
               <TabsTrigger value="tasks">
-                <span className={cn("flex items-center gap-1", allDone && "text-emerald-600 dark:text-emerald-400")}>
+                <span className="flex items-center gap-1.5">
                   Subdemandas
-                  {total > 0 && !allDone && <span className="text-muted-foreground">({total})</span>}
-                  {allDone && <Check className="h-3.5 w-3.5" />}
+                  {total > 0 && !allDone && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground font-medium">
+                      {done}/{total}
+                    </span>
+                  )}
+                  {allDone && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900 font-medium inline-flex items-center gap-1">
+                      <Check className="h-3 w-3" /> Tudo pronto
+                    </span>
+                  )}
                 </span>
               </TabsTrigger>
               <TabsTrigger value="conversations">Conversas</TabsTrigger>
