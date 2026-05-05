@@ -155,6 +155,12 @@ export function DemandSidebar({ demand, onActivityTabSelect, onClose }: DemandSi
         created_by: user?.id,
       });
       if (actErr) throw actErr;
+      await createDemandNotification({
+        demandId: demand.id,
+        type: "blocked",
+        message: `Demanda bloqueada: ${btName}${blockerReason.trim() ? ` — ${blockerReason.trim()}` : ""}`,
+        actorId: user?.id ?? null,
+      });
       toast.success("Demanda marcada como bloqueada");
       queryClient.invalidateQueries({ queryKey: ["demands"] });
       queryClient.invalidateQueries({ queryKey: ["demand"] });
