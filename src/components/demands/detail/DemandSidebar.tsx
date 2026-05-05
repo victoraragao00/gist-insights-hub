@@ -34,6 +34,12 @@ import { useDemandWatchers, useToggleWatcher } from "@/hooks/useDemandWatchers";
 import { useRfiByDemand, useCreateRfi, useRfiStatuses, useDeleteRfi } from "@/hooks/useRfis";
 import { RfiDetailSheet } from "@/components/rfis/RfiDetailSheet";
 import { DemandTimeTrackingSection } from "../DemandTimeTrackingSection";
+import { useDemandTaskStats } from "@/hooks/useDemandTasks";
+import {
+  useDemandTotalHours,
+  useAddManualEntry,
+} from "@/hooks/useDemandTimeEntries";
+import { formatHours } from "@/lib/formatHours";
 import { AssigneeDisplay } from "./AssigneeDisplay";
 import { ProjectSelect } from "@/components/projects/ProjectSelect";
 import {
