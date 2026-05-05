@@ -759,6 +759,73 @@ export type Database = {
           },
         ]
       }
+      demand_tasks: {
+        Row: {
+          assignee_id: string | null
+          created_at: string
+          created_by: string | null
+          demand_id: string
+          description: string | null
+          hours_actual: number | null
+          hours_estimated: number | null
+          id: string
+          position: number
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          assignee_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          demand_id: string
+          description?: string | null
+          hours_actual?: number | null
+          hours_estimated?: number | null
+          id?: string
+          position?: number
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          assignee_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          demand_id?: string
+          description?: string | null
+          hours_actual?: number | null
+          hours_estimated?: number | null
+          id?: string
+          position?: number
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "demand_tasks_assignee_id_fkey"
+            columns: ["assignee_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "demand_tasks_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "demand_tasks_demand_id_fkey"
+            columns: ["demand_id"]
+            isOneToOne: false
+            referencedRelation: "demands"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       demand_time_entries: {
         Row: {
           created_at: string
@@ -1872,6 +1939,7 @@ export type Database = {
         Args: { p_client_id?: string; p_days?: number }
         Returns: Json
       }
+      get_demand_task_stats: { Args: { p_demand_id: string }; Returns: Json }
       get_demand_total_hours: { Args: { p_demand_id: string }; Returns: number }
       get_demands_with_sla: {
         Args: { p_user_id: string }

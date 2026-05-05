@@ -1,41 +1,26 @@
-## Goal
-Add per-column collapse/expand to the Kanban (CX flat) and Swimlane (TECH) views. Default state collapses "finished" columns (`triggers_finished_at = true`); state persists in `sessionStorage`.
+## Plano: Criar tabela `demand_tasks` + trigger de auto-conclusão
 
-## New file: `src/hooks/useCollapsedColumns.ts`
-- Accepts `columns: Tables<"ticket_columns">[]`.
-- State map `Record<string, boolean>` initialized per column from `sessionStorage.getItem('kanban_col_collapsed_' + id)`; if absent, defaults to `!!col.triggers_finished_at`.
-- Returns `{ isCollapsed(id), toggle(id) }`. `toggle` writes the new value to `sessionStorage`.
-- Reconcile when `columns` array changes (new columns get default seed) using a `useEffect` that merges missing IDs without overwriting user choices.
+Implementação de migration isolada conforme spec LOVABLE_TECH_4A. Apenas backend, sem alterações no frontend.
 
-## Edit: `src/components/demands/KanbanColumn.tsx` (CX flat)
-- Remove the local `useState` for collapse; receive `isCollapsed: boolean` and `onToggleCollapse: (id) => void` as props (lifted to parent).
-- Outer wrapper width transitions:
-  - Expanded: `w-64 min-w-64 max-w-72`.
-  - Collapsed: `w-12 min-w-[48px]` with vertical layout — count badge on top + column name in `[writing-mode:vertical-rl] rotate-180`.
-- Header (expanded mode) becomes clickable to toggle; chevron rotates `-rotate-90` when collapsed.
-- Cards container wrapped in `overflow-hidden transition-all duration-200`; hidden via `max-h-0` when collapsed (drop zone + Plus button hidden too).
-- Keep dnd-kit `useDroppable` active so drag-over a collapsed column is a no-op visually but doesn't break.
+### Etapas
 
-## Edit: `src/pages/DemandsPage.tsx` (CX parent)
-- Call `const { isCollapsed, toggle } = useCollapsedColumns(columns);`.
-- Pass `isCollapsed={isCollapsed(col.id)}` and `onToggleCollapse={toggle}` to each `<KanbanColumn>`.
+1. **Criar migration única** com os 3 blocos SQL na ordem especificada:
+   - Tabela `demand_tasks` (8 campos, 3 índices, trigger `updated_at`, RLS com 4 policies usando `IN (SELECT user_accessible_client_ids(auth.uid()))`)
+   - Função `get_demand_task_stats(p_demand_id UUID)` retornando JSON com totais, completion_pct e somas de horas
+   - Função + trigger `check_demand_auto_complete` (AFTER UPDATE OF status) que move a demanda para a coluna `triggers_finished_at = true` quando todas as tasks ficam `done`, protegendo demandas já canceladas (`cancellation_reason IS NULL`) e já concluídas (`finished_at IS NULL`)
 
-## Edit: `src/components/demands/TechSwimlanePage.tsx`
-- Use `useCollapsedColumns(columns)`.
-- Compute `gridTemplate` dynamically: `160px ` + columns mapped to `48px` if collapsed else `minmax(220px, 1fr)`.
-- Header row: each column header is clickable (`onClick={() => toggle(col.id)}`); when collapsed show only count + chevron (or vertical name); chevron rotates.
-- `SwimlaneCell`: add `isCollapsed` prop; when true render compact placeholder `<div className="min-h-20 rounded-md bg-muted/10 w-full" />` with no cards (still mount `useDroppable`? — skip droppable when collapsed to avoid accidental drops).
-- Lane label column unchanged.
+2. **Verificação pós-deploy** via `supabase--read_query`:
+   - Confirmar `rowsecurity = true` em `demand_tasks`
+   - Confirmar os 3 índices criados
+   - Confirmar o trigger `trg_demand_tasks_auto_complete`
+   - Testar `get_demand_task_stats()` com uma demanda existente
 
-## Behavior summary
-| State | Default |
-|---|---|
-| Column with `triggers_finished_at=true` | collapsed |
-| Other columns | expanded |
-| User toggle | persisted to `sessionStorage` per column id |
-| New session | resets to defaults |
+### Garantias de conformidade
 
-## Quality
-- m11: prune unused imports (e.g. drop `useState`/`ChevronRight` from `KanbanColumn` if no longer needed; keep `ChevronDown` only).
-- No new libs. Smooth transitions via existing Tailwind utilities (`transition-all duration-200`).
-- No DB / edge-function changes; no `localStorage`; no `use-toast`.
+- SQL copiado **na íntegra** sem adaptações
+- Sem coluna `parent_demand_id` em `demands`
+- Sem alterações em arquivos protegidos (`src/integrations/supabase/*`, `.env`, etc.)
+- Sem alterações de frontend
+- Sem alterações em `CONTEXT.md`, `AGENTS.md`, `CLAUDE.md`
+- RLS usa `IN (SELECT ...)` conforme exigido (não `= ANY`)
+- Trigger respeita as duas guardas: `cancellation_reason IS NULL AND finished_at IS NULL`
