@@ -84,6 +84,7 @@ function FilterCombobox({ value, onValueChange, placeholder, searchPlaceholder, 
 
 const DemandsPage = () => {
   const { clients } = useClient();
+  const { activeWorkspace } = useWorkspace();
   const { data: columns = [], isLoading: colsLoading } = useTicketColumns();
   const { data: types = [] } = useDemandTypes();
   const { data: areas = [] } = useDemandAreas();
@@ -108,7 +109,8 @@ const DemandsPage = () => {
     demand_type_id: filterType || undefined,
     priority: (filterPriority as DemandPriority) || undefined,
     area_id: filterArea || undefined,
-  }), [debouncedSearch, filterClient, filterType, filterPriority, filterArea]);
+    workspace: activeWorkspace,
+  }), [debouncedSearch, filterClient, filterType, filterPriority, filterArea, activeWorkspace]);
 
   const { data: demands = [], isLoading: demandsLoading } = useDemands(filters);
   const moveMutation = useMoveDemand();
