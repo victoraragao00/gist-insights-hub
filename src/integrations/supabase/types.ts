@@ -766,10 +766,12 @@ export type Database = {
           created_by: string | null
           demand_id: string
           description: string | null
+          finished_at: string | null
           hours_actual: number | null
           hours_estimated: number | null
           id: string
           position: number
+          started_at: string | null
           status: string
           title: string
           updated_at: string
@@ -780,10 +782,12 @@ export type Database = {
           created_by?: string | null
           demand_id: string
           description?: string | null
+          finished_at?: string | null
           hours_actual?: number | null
           hours_estimated?: number | null
           id?: string
           position?: number
+          started_at?: string | null
           status?: string
           title: string
           updated_at?: string
@@ -794,10 +798,12 @@ export type Database = {
           created_by?: string | null
           demand_id?: string
           description?: string | null
+          finished_at?: string | null
           hours_actual?: number | null
           hours_estimated?: number | null
           id?: string
           position?: number
+          started_at?: string | null
           status?: string
           title?: string
           updated_at?: string
