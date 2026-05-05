@@ -1,4 +1,4 @@
-import { useMemo, useCallback } from "react";
+import { useMemo, useCallback, Fragment } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   DndContext, closestCorners, PointerSensor, useSensor, useSensors,
@@ -91,114 +91,114 @@ export function TechSwimlanePage({ columns, demands, taskCounts }: Props) {
     return map;
   }, [demands]);
 
+  // Total grid rows = 1 (header) + lanes.length
+  const totalRows = lanes.length + 1;
+
   return (
     <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
       <div className="h-full overflow-auto px-6 py-4">
-        <div className="min-w-max space-y-2">
-          {/* Header */}
+        <div className="min-w-max">
           <div
             className="grid gap-2"
-            style={{ gridTemplateColumns: gridTemplate, transition: "grid-template-columns 0.2s" }}
+            style={{
+              gridTemplateColumns: gridTemplate,
+              transition: "grid-template-columns 0.2s",
+            }}
           >
+            {/* Header row — top-left empty cell */}
             <div />
             {columns.map((col) => {
-              const collapsed = isCollapsed(col.id);
-              const count = columnCounts.get(col.id) ?? 0;
-              if (collapsed) {
-                return (
-                  <CollapsedColumnStub
-                    key={col.id}
-                    column={col}
-                    count={count}
-                    onClick={() => toggleCollapse(col.id)}
-                  />
-                );
+              if (isCollapsed(col.id)) {
+                // Slot reservado — o stub full-height será posicionado depois
+                return <div key={`h-${col.id}`} aria-hidden />;
               }
               return (
                 <KanbanColumnHeader
-                  key={col.id}
+                  key={`h-${col.id}`}
                   column={col}
-                  count={count}
+                  count={columnCounts.get(col.id) ?? 0}
                   isCollapsed={false}
                   onToggle={() => toggleCollapse(col.id)}
                 />
               );
             })}
-          </div>
 
-          {/* Lanes */}
-          {lanes.map((area) => (
-            <SwimlaneLane
-              key={area?.id ?? NO_AREA}
-              area={area}
-              columns={columns}
-              gridTemplate={gridTemplate}
-              demands={demands.filter((d) =>
+            {/* Lanes */}
+            {lanes.map((area) => {
+              const laneDemands = demands.filter((d) =>
                 area ? d.area_id === area.id : !d.area_id
-              )}
-              onCardClick={(d) => navigate(`/demands/${d.id}`)}
-              isCollapsed={isCollapsed}
-              taskCounts={taskCounts}
-            />
-          ))}
+              );
+              return (
+                <Fragment key={area?.id ?? NO_AREA}>
+                  <LaneLabel area={area} count={laneDemands.length} />
+                  {columns.map((col) => {
+                    if (isCollapsed(col.id)) {
+                      return <div key={`${area?.id ?? NO_AREA}-${col.id}`} aria-hidden />;
+                    }
+                    return (
+                      <SwimlaneCell
+                        key={`${area?.id ?? NO_AREA}-${col.id}`}
+                        areaId={area?.id ?? null}
+                        columnId={col.id}
+                        demands={laneDemands.filter((d) => d.column_id === col.id)}
+                        onCardClick={(d) => navigate(`/demands/${d.id}`)}
+                        taskCounts={taskCounts}
+                      />
+                    );
+                  })}
+                </Fragment>
+              );
+            })}
+
+            {/* Stubs colapsados — atravessam header + todas as raias */}
+            {columns.map((col, idx) =>
+              isCollapsed(col.id) ? (
+                <div
+                  key={`stub-${col.id}`}
+                  style={{
+                    gridColumn: idx + 2,
+                    gridRow: `1 / span ${totalRows}`,
+                  }}
+                >
+                  <CollapsedColumnStub
+                    column={col}
+                    count={columnCounts.get(col.id) ?? 0}
+                    onClick={() => toggleCollapse(col.id)}
+                  />
+                </div>
+              ) : null
+            )}
+          </div>
         </div>
       </div>
     </DndContext>
   );
 }
 
-interface LaneProps {
-  area: DemandArea | null;
-  columns: Tables<"ticket_columns">[];
-  gridTemplate: string;
-  demands: DemandRow[];
-  onCardClick: (d: DemandRow) => void;
-  isCollapsed: (id: string) => boolean;
-  taskCounts?: Record<string, { total: number; done: number }>;
-}
-
-function SwimlaneLane({ area, columns, gridTemplate, demands, onCardClick, isCollapsed, taskCounts }: LaneProps) {
+function LaneLabel({ area, count }: { area: DemandArea | null; count: number }) {
   return (
-    <div
-      className="grid gap-2 rounded-lg border border-border bg-card/40 p-2"
-      style={{ gridTemplateColumns: gridTemplate, transition: "grid-template-columns 0.2s" }}
-    >
-      {/* Lane label */}
-      <div className="flex items-start gap-2 px-2 py-2">
-        {area ? (
-          <>
-            <div
-              className="h-3 w-3 rounded-full mt-1 shrink-0"
-              style={{ backgroundColor: area.color ?? "hsl(var(--muted-foreground))" }}
-            />
-            <div className="min-w-0">
-              <p className="text-sm font-semibold text-foreground truncate">{area.name}</p>
-              <p className="text-xs text-muted-foreground">
-                {demands.length} demanda{demands.length !== 1 ? "s" : ""}
-              </p>
-            </div>
-          </>
-        ) : (
+    <div className="flex items-start gap-2 px-2 py-2 rounded-lg border border-border bg-card/40">
+      {area ? (
+        <>
+          <div
+            className="h-3 w-3 rounded-full mt-1 shrink-0"
+            style={{ backgroundColor: area.color ?? "hsl(var(--muted-foreground))" }}
+          />
           <div className="min-w-0">
-            <p className="text-sm font-medium text-muted-foreground">Sem área</p>
+            <p className="text-sm font-semibold text-foreground truncate">{area.name}</p>
             <p className="text-xs text-muted-foreground">
-              {demands.length} demanda{demands.length !== 1 ? "s" : ""}
+              {count} demanda{count !== 1 ? "s" : ""}
             </p>
           </div>
-        )}
-      </div>
-
-      {columns.map((col) => (
-        <SwimlaneCell
-          key={col.id}
-          areaId={area?.id ?? null}
-          columnId={col.id}
-          demands={demands.filter((d) => d.column_id === col.id)}
-          onCardClick={onCardClick}
-          collapsed={isCollapsed(col.id)}
-          taskCounts={taskCounts}
-        />
-      ))}
+        </>
+      ) : (
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-muted-foreground">Sem área</p>
+          <p className="text-xs text-muted-foreground">
+            {count} demanda{count !== 1 ? "s" : ""}
+          </p>
+        </div>
+      )}
     </div>
   );
 }
@@ -208,24 +208,19 @@ interface CellProps {
   columnId: string;
   demands: DemandRow[];
   onCardClick: (d: DemandRow) => void;
-  collapsed: boolean;
   taskCounts?: Record<string, { total: number; done: number }>;
 }
 
-function SwimlaneCell({ areaId, columnId, demands, onCardClick, collapsed, taskCounts }: CellProps) {
+function SwimlaneCell({ areaId, columnId, demands, onCardClick, taskCounts }: CellProps) {
   const id = `${areaId ?? NO_AREA}::${columnId}`;
-  const { setNodeRef, isOver } = useDroppable({ id, disabled: collapsed });
-
-  if (collapsed) {
-    return <div className="min-h-20 rounded-md bg-muted/10" aria-hidden />;
-  }
+  const { setNodeRef, isOver } = useDroppable({ id });
 
   return (
     <div
       ref={setNodeRef}
       className={cn(
-        "min-h-20 rounded-md p-1.5 space-y-1.5 transition-colors",
-        isOver ? "bg-primary/5 ring-2 ring-primary/20" : "bg-muted/20"
+        "min-h-20 rounded-md p-1.5 space-y-1.5 transition-colors border border-border bg-card/40",
+        isOver && "bg-primary/5 ring-2 ring-primary/20"
       )}
     >
       {demands.map((d) => (
