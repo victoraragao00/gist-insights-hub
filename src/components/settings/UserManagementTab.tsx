@@ -285,6 +285,22 @@ export function UserManagementTab() {
                         />
                       )}
                     </TableCell>
+                    <TableCell>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span>
+                            <Switch
+                              checked={!!bypassMap[u.user_id]}
+                              onCheckedChange={(checked) =>
+                                updateBypass.mutate({ userId: u.user_id, bypass: checked })
+                              }
+                              disabled={updateBypass.isPending}
+                            />
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>Ver todas as demands do workspace TECH</TooltipContent>
+                      </Tooltip>
+                    </TableCell>
                     <TableCell className="text-right pr-6">
                       <Tooltip>
                         <TooltipTrigger asChild>
