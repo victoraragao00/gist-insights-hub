@@ -164,6 +164,7 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaul
     setExternalLink("");
     setCreatedDemandId(null);
     setShowLinkDialog(false);
+    setSquadId("none");
   };
 
   const handleFinish = () => {
