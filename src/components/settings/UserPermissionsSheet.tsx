@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
-import { useUpdateClientAccess, useRemoveClientAccess } from "@/hooks/useUserManagement";
+import { useUpdateClientAccess, useRemoveClientAccess, useUsersBypass, useUpdateUserBypass } from "@/hooks/useUserManagement";
 import { useDebounce } from "@/hooks/useDebounce";
 import type { UserWithPermissions } from "@/hooks/useUsers";
 import {
