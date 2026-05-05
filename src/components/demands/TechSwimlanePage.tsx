@@ -1,4 +1,4 @@
-import { useMemo, useCallback, useState } from "react";
+import { useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   DndContext, closestCorners, PointerSensor, useSensor, useSensors,
@@ -6,26 +6,14 @@ import {
   type DragEndEvent,
 } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { ChevronDown, CheckSquare } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { getAgingDays, getAgingStyle } from "@/lib/getAgingStyle";
-import type { DemandRow, DemandPriority } from "@/hooks/useDemands";
+import { DemandCard } from "./DemandCard";
+import type { DemandRow } from "@/hooks/useDemands";
 import { useMoveDemand, useUpdateDemand } from "@/hooks/useDemands";
 import { useAreasByWorkspace, type DemandArea } from "@/hooks/useDemandAreas";
 import { useCollapsedColumns } from "@/hooks/useCollapsedColumns";
 import type { Tables } from "@/integrations/supabase/types";
-
-const PRIORITY_CLASSES: Record<DemandPriority, string> = {
-  urgent: "text-red-600 bg-red-50 dark:text-red-400 dark:bg-red-950",
-  high: "text-orange-600 bg-orange-50 dark:text-orange-400 dark:bg-orange-950",
-  medium: "text-yellow-600 bg-yellow-50 dark:text-yellow-400 dark:bg-yellow-950",
-  low: "text-emerald-600 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-950",
-};
-
-const PRIORITY_LABELS: Record<DemandPriority, string> = {
-  urgent: "Urgente", high: "Alta", medium: "Média", low: "Baixa",
-};
 
 const NO_AREA = "no-area";
 
