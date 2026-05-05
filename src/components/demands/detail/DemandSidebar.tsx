@@ -40,7 +40,7 @@ import {
   useLinkDemandToProject,
   useUnlinkDemandFromProject,
 } from "@/hooks/useProjects";
-import { useWorkspace } from "@/hooks/useWorkspace";
+
 
 interface DemandSidebarProps {
   demand: DemandRow;
@@ -81,7 +81,7 @@ export function DemandSidebar({ demand, onActivityTabSelect, onClose }: DemandSi
 
   const linkDemand = useLinkDemandToProject();
   const unlinkDemand = useUnlinkDemandFromProject();
-  const { activeWorkspace } = useWorkspace();
+  
 
   const [rfiSheetOpen, setRfiSheetOpen] = useState(false);
   const [blockDialogOpen, setBlockDialogOpen] = useState(false);
