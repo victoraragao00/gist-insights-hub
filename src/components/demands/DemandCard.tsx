@@ -3,6 +3,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { Badge } from "@/components/ui/badge";
 import { Lock, Headphones, Bug, TrendingUp, Sparkles, Briefcase, Search, Clock } from "lucide-react";
 import { formatHours } from "@/lib/formatHours";
+import { getAgingDays, getAgingStyle } from "@/lib/getAgingStyle";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import type { DemandRow, DemandPriority } from "@/hooks/useDemands";
