@@ -110,9 +110,6 @@ export function DemandContentTab({ demand }: DemandContentTabProps) {
           className="resize-none overflow-hidden min-h-[80px]"
         />
       </div>
-
-      <DemandTasksSection demandId={demand.id} />
-
       <div className="space-y-1.5">
         <Label className="text-xs text-muted-foreground">Notas internas</Label>
         <Textarea
