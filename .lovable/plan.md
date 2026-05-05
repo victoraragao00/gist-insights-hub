@@ -1,36 +1,71 @@
 
-## Plano: Migration C+D — Block History, Agendas Project, Bypass Access
+## Plano: Frontend A — Tasks, Collaborators, Blockers
 
-Estado atual no banco (verificado):
-- `demand_block_history` — não existe
-- Trigger `trg_demand_block_history` — não existe
-- `user_profiles.bypass_client_access` — não existe
-- `meeting_agendas.project_id` — não existe
-- `get_demand_block_metrics` — não existe
+### Hooks novos
 
-Nada do escopo C+D foi aplicado ainda. Executar as 4 migrations exatamente como no prompt, em uma única migration tool call:
+**`src/hooks/useDemandCollaborators.ts`**
+- `useDemandCollaborators(demandId)` — lista colaboradores de uma demanda (join `user_profiles!demand_collaborators_user_id_fkey`), `staleTime: 30s`
+- `useDemandCollaboratorsBatch(demandIds[])` — batch para o Kanban evitar N+1, retorna `Record<demand_id, Collaborator[]>`
+- `useMyCollaboratorDemandIds(enabled)` — IDs onde o usuário logado é colaborador (filtro "Minhas tasks")
+- `useAddCollaborator()` — INSERT, ignora erro `23505` (unique) → idempotente
+- `useRemoveCollaborator()` — DELETE composto por `demand_id + user_id`
+- Todos invalidam `demand_collaborators`, `demand_collaborators_batch`, `my_collaborator_demand_ids`
 
-### Migration 1 — `demand_block_history`
-- Tabela com FKs para `demands`, `blocker_types`, `user_profiles`
-- 3 índices (demand, active partial, type partial)
-- RLS via `user_accessible_client_ids(auth.uid())` (SELECT/INSERT)
+**`src/hooks/useBlockerTypes.ts`**
+- `useBlockerTypes()` — apenas ativos, ordem por `position`, `staleTime: 5min`
+- `useAllBlockerTypes()` — incluindo inativos (Settings)
+- `useCreateBlockerType()`, `useUpdateBlockerType()`, `useToggleBlockerTypeActive()` (sem delete — preserva histórico)
 
-### Migration 2 — Trigger + RPC
-- `track_demand_block_history()` SECURITY DEFINER, dispara em UPDATE OF `is_blocked`
-- Insere registro ao bloquear, fecha (`unblocked_at`/`unblocked_by`) ao desbloquear
-- `get_demand_block_metrics(p_demand_id)` retorna JSON com totals, ativo, horas totais, média, breakdown por tipo
+### Filtro "Minhas tasks"
 
-### Migration 3 — `meeting_agendas`
-- `ADD COLUMN IF NOT EXISTS project_id UUID REFERENCES projects(id) ON DELETE SET NULL`
-- `ALTER COLUMN duration_minutes SET DEFAULT 60`
-- Índice parcial `idx_meeting_agendas_project`
+`DemandsPage.tsx`: adiciona toggle button no header com ícone `User` e estado `myTasksOnly`. Adiciona ao `filters: DemandFilters` o campo opcional `mine_user_id` (só preenchido quando ligado).
 
-### Migration 4 — Bypass + Funções
-- `user_profiles.bypass_client_access BOOLEAN NOT NULL DEFAULT false`
-- Recriar `user_accessible_client_ids(_user_id UUID DEFAULT auth.uid())` honrando `bypass_client_access`
-- Recriar `get_project_stats(p_project_id)` adicionando campo `meeting_hours` (somatório de `duration_minutes/60` de pautas `internal` vinculadas ao projeto)
+`useDemands.ts`:
+- Estende `DemandFilters` com `mine_user_id?: string` e `mine_collab_ids?: string[]`
+- Quando `mine_user_id` presente, aplica `.or("assignee_id.eq.<id>,id.in.(<collab_ids>)")` (PostgREST). Se `mine_collab_ids` vazio, usa apenas `eq("assignee_id", id)`.
 
-### Verificação pós-deploy
-Rodar as 5 queries de verificação do prompt e confirmar que `get_project_stats` retorna `meeting_hours`.
+`DemandsPage`: chama `useMyCollaboratorDemandIds(myTasksOnly)` antes de montar `filters`, repassa IDs.
 
-Nenhuma alteração de frontend ou de arquivos protegidos.
+### Avatares no DemandCard (owner + colabs)
+
+`DemandCard.tsx` recebe novas props opcionais `collaborators?: DemandCollaborator[]` e `blockerType?: BlockerType | null`.
+- Avatar do owner ganha `ring-2 ring-primary` para destaque
+- Empilha até 2 avatares de colaboradores com `-ml-1.5`, fundo escuro neutro
+- Excedente vira chip `+N`
+- Badge de bloqueio passa a usar `blockerType.icon + name` quando disponível, fallback `🔒 Bloqueado`
+
+`KanbanColumn` e `TechSwimlanePage` passam `collaboratorsByDemand` e `blockerTypesById` (Maps) para cada `DemandCard`.
+
+`DemandsPage` e `TechSwimlanePage`:
+- Chamam `useDemandCollaboratorsBatch(demandIds)` e `useBlockerTypes()`
+- Constroem map por demanda e passam adiante
+
+### DemandSidebar — bloqueio com tipo + colaboradores
+
+Substitui o `Dialog` atual de bloqueio:
+- Grid 2 cols com botões dos `blocker_types` (ícone + nome), seleção visual
+- Textarea opcional `blocker_reason` (livre)
+- `handleBlock` agora salva `is_blocked, blocker_type_id, blocker_reason, blocked_at, blocked_by` (texto livre opcional). Trigger SQL gravará histórico.
+- Estado bloqueado mostra badge com `icon + name` do tipo + razão + botão Desbloquear
+
+Nova seção "Colaboradores" entre Responsável e RFI:
+- Lista colaboradores como chips com avatar 4x4 + primeiro nome + X (visível em hover)
+- Chip "+ Adicionar" abre `Popover` com `Command` (search) listando `userProfiles` excluindo `assignee_id` e já presentes
+- Usa `useAddCollaborator` / `useRemoveCollaborator`
+
+### Settings → aba "Bloqueios" (admin)
+
+**Novo:** `src/components/settings/BlockerTypesSettingsTab.tsx` — segue padrão de `AreaSettingsTab`:
+- Form de adicionar (nome, seletor de ícone simples — input texto pequeno aceitando emoji, paleta de cores preset)
+- Tabela com inline edit de nome, paleta de cores, contador (opcional pular para v1), toggle ativo/inativo (sem botão Excluir)
+- Hook: `useAllBlockerTypes`, `useCreateBlockerType`, `useUpdateBlockerType`, `useToggleBlockerTypeActive`
+
+`SettingsPage.tsx`:
+- Adiciona `<TabsTrigger value="blockers">Bloqueios</TabsTrigger>` (admin only) entre "Áreas" e "Pautas"
+- Adiciona `<TabsContent value="blockers"><BlockerTypesSettingsTab /></TabsContent>`
+
+### Qualidade
+- Todos os `useQuery` com `staleTime ≥ 30s` e `queryKey` incluindo `user?.id` quando aplicável (m4, m5)
+- Toda escrita via `useMutation` com `toast` `sonner` (m9)
+- `{ data, error }` destructurado em todas as queries (m8)
+- Sem `any`, sem imports órfãos (m1, m11)
