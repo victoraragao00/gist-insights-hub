@@ -57,6 +57,7 @@ const App = () => (
                 <Route path="/settings" element={<ErrorBoundary><SettingsPage /></ErrorBoundary>} />
                 <Route path="/projects" element={<ErrorBoundary><ProjectsPage /></ErrorBoundary>} />
                 <Route path="/projects/:id" element={<ErrorBoundary><ProjectDetailPage /></ErrorBoundary>} />
+                <Route path="/tech/dashboard" element={<ErrorBoundary><TechDashboardPage /></ErrorBoundary>} />
               </Route>
             </Route>
             <Route path="*" element={<NotFound />} />
