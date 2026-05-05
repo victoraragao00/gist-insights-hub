@@ -10,8 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { getAgingDays, getAgingStyle } from "@/lib/getAgingStyle";
 import type { DemandRow, DemandPriority } from "@/hooks/useDemands";
-import { useMoveDemand } from "@/hooks/useDemands";
-import { useSquads, useUpdateDemandSquad, type SquadRow } from "@/hooks/useSquads";
+import { useMoveDemand, useUpdateDemand } from "@/hooks/useDemands";
+import { useAreasByWorkspace, type DemandArea } from "@/hooks/useDemandAreas";
 import type { Tables } from "@/integrations/supabase/types";
 
 const PRIORITY_CLASSES: Record<DemandPriority, string> = {
@@ -25,7 +25,7 @@ const PRIORITY_LABELS: Record<DemandPriority, string> = {
   urgent: "Urgente", high: "Alta", medium: "Média", low: "Baixa",
 };
 
-const NO_SQUAD = "no-squad";
+const NO_AREA = "no-area";
 
 interface Props {
   columns: Tables<"ticket_columns">[];
@@ -33,16 +33,16 @@ interface Props {
 }
 
 export function TechSwimlanePage({ columns, demands }: Props) {
-  const { data: squads = [] } = useSquads();
+  const { data: areas = [] } = useAreasByWorkspace("tech");
   const moveMutation = useMoveDemand();
-  const updateSquadMutation = useUpdateDemandSquad();
+  const updateMutation = useUpdateDemand();
   const navigate = useNavigate();
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
   );
 
-  const lanes = useMemo<(SquadRow | null)[]>(() => [...squads, null], [squads]);
+  const lanes = useMemo<(DemandArea | null)[]>(() => [...areas, null], [areas]);
 
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event;
@@ -51,9 +51,9 @@ export function TechSwimlanePage({ columns, demands }: Props) {
     const overId = String(over.id);
     const sep = overId.indexOf("::");
     if (sep === -1) return;
-    const targetSquadRaw = overId.slice(0, sep);
+    const targetAreaRaw = overId.slice(0, sep);
     const targetColumnId = overId.slice(sep + 2);
-    const targetSquadId = targetSquadRaw === NO_SQUAD ? null : targetSquadRaw;
+    const targetAreaId = targetAreaRaw === NO_AREA ? null : targetAreaRaw;
 
     const demand = demands.find((d) => d.id === demandId);
     if (!demand) return;
@@ -74,15 +74,17 @@ export function TechSwimlanePage({ columns, demands }: Props) {
       }
     }
 
-    if ((demand.squad_id ?? null) !== targetSquadId) {
-      updateSquadMutation.mutate({ demandId, squadId: targetSquadId });
+    if ((demand.area_id ?? null) !== targetAreaId) {
+      updateMutation.mutate({
+        id: demandId,
+        fields: { area_id: targetAreaId },
+        fieldLabel: "Área",
+      });
     }
-  }, [demands, columns, moveMutation, updateSquadMutation]);
+  }, [demands, columns, moveMutation, updateMutation]);
 
-  // Grid template: label col fixed + N column tracks
   const gridTemplate = `160px repeat(${columns.length}, minmax(220px, 1fr))`;
 
-  // Counts by column (across all squads)
   const columnCounts = useMemo(() => {
     const map = new Map<string, number>();
     for (const d of demands) map.set(d.column_id, (map.get(d.column_id) ?? 0) + 1);
@@ -95,7 +97,7 @@ export function TechSwimlanePage({ columns, demands }: Props) {
         <div className="min-w-max space-y-2">
           {/* Header */}
           <div className="grid gap-2" style={{ gridTemplateColumns: gridTemplate }}>
-            <div /> {/* corner */}
+            <div />
             {columns.map((col) => (
               <div key={col.id} className="flex items-center gap-2 px-2 py-1">
                 <div
@@ -111,14 +113,14 @@ export function TechSwimlanePage({ columns, demands }: Props) {
           </div>
 
           {/* Lanes */}
-          {lanes.map((squad) => (
+          {lanes.map((area) => (
             <SwimlaneLane
-              key={squad?.id ?? NO_SQUAD}
-              squad={squad}
+              key={area?.id ?? NO_AREA}
+              area={area}
               columns={columns}
               gridTemplate={gridTemplate}
               demands={demands.filter((d) =>
-                squad ? d.squad_id === squad.id : !d.squad_id
+                area ? d.area_id === area.id : !d.area_id
               )}
               onCardClick={(d) => navigate(`/demands/${d.id}`)}
             />
@@ -130,14 +132,14 @@ export function TechSwimlanePage({ columns, demands }: Props) {
 }
 
 interface LaneProps {
-  squad: SquadRow | null;
+  area: DemandArea | null;
   columns: Tables<"ticket_columns">[];
   gridTemplate: string;
   demands: DemandRow[];
   onCardClick: (d: DemandRow) => void;
 }
 
-function SwimlaneLane({ squad, columns, gridTemplate, demands, onCardClick }: LaneProps) {
+function SwimlaneLane({ area, columns, gridTemplate, demands, onCardClick }: LaneProps) {
   return (
     <div
       className="grid gap-2 rounded-lg border border-border bg-card/40 p-2"
@@ -145,14 +147,14 @@ function SwimlaneLane({ squad, columns, gridTemplate, demands, onCardClick }: La
     >
       {/* Lane label */}
       <div className="flex items-start gap-2 px-2 py-2">
-        {squad ? (
+        {area ? (
           <>
             <div
               className="h-3 w-3 rounded-full mt-1 shrink-0"
-              style={{ backgroundColor: squad.color }}
+              style={{ backgroundColor: area.color ?? "hsl(var(--muted-foreground))" }}
             />
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-foreground truncate">{squad.name}</p>
+              <p className="text-sm font-semibold text-foreground truncate">{area.name}</p>
               <p className="text-xs text-muted-foreground">
                 {demands.length} demanda{demands.length !== 1 ? "s" : ""}
               </p>
@@ -160,7 +162,7 @@ function SwimlaneLane({ squad, columns, gridTemplate, demands, onCardClick }: La
           </>
         ) : (
           <div className="min-w-0">
-            <p className="text-sm font-medium text-muted-foreground">Sem squad</p>
+            <p className="text-sm font-medium text-muted-foreground">Sem área</p>
             <p className="text-xs text-muted-foreground">
               {demands.length} demanda{demands.length !== 1 ? "s" : ""}
             </p>
@@ -168,11 +170,10 @@ function SwimlaneLane({ squad, columns, gridTemplate, demands, onCardClick }: La
         )}
       </div>
 
-      {/* Cells */}
       {columns.map((col) => (
         <SwimlaneCell
           key={col.id}
-          squadId={squad?.id ?? null}
+          areaId={area?.id ?? null}
           columnId={col.id}
           demands={demands.filter((d) => d.column_id === col.id)}
           onCardClick={onCardClick}
@@ -183,14 +184,14 @@ function SwimlaneLane({ squad, columns, gridTemplate, demands, onCardClick }: La
 }
 
 interface CellProps {
-  squadId: string | null;
+  areaId: string | null;
   columnId: string;
   demands: DemandRow[];
   onCardClick: (d: DemandRow) => void;
 }
 
-function SwimlaneCell({ squadId, columnId, demands, onCardClick }: CellProps) {
-  const id = `${squadId ?? NO_SQUAD}::${columnId}`;
+function SwimlaneCell({ areaId, columnId, demands, onCardClick }: CellProps) {
+  const id = `${areaId ?? NO_AREA}::${columnId}`;
   const { setNodeRef, isOver } = useDroppable({ id });
 
   return (
@@ -204,9 +205,7 @@ function SwimlaneCell({ squadId, columnId, demands, onCardClick }: CellProps) {
       {demands.map((d) => (
         <SwimlaneDemandCard key={d.id} demand={d} onClick={() => onCardClick(d)} />
       ))}
-      {demands.length === 0 && (
-        <div className="h-12" aria-hidden />
-      )}
+      {demands.length === 0 && <div className="h-12" aria-hidden />}
     </div>
   );
 }
