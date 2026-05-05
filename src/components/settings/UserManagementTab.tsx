@@ -80,8 +80,10 @@ export function UserManagementTab() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { data: users = [], isLoading } = useUsers();
+  const { data: bypassMap = {} } = useUsersBypass();
   const updateRole = useUpdateUserRole();
   const toggleActive = useToggleUserActive();
+  const updateBypass = useUpdateUserBypass();
 
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 300);
