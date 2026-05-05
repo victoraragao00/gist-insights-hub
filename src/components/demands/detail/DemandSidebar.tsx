@@ -82,6 +82,9 @@ export function DemandSidebar({ demand, onActivityTabSelect, onClose }: DemandSi
 
   const linkDemand = useLinkDemandToProject();
   const unlinkDemand = useUnlinkDemandFromProject();
+  const { data: squads = [] } = useSquads();
+  const updateDemandSquad = useUpdateDemandSquad();
+  const { activeWorkspace } = useWorkspace();
 
   const [rfiSheetOpen, setRfiSheetOpen] = useState(false);
   const [blockDialogOpen, setBlockDialogOpen] = useState(false);
