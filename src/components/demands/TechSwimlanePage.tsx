@@ -161,7 +161,7 @@ export function TechSwimlanePage({ columns, demands }: Props) {
               isCollapsed={isCollapsed}
             />
           ))}
-
+        </div>
       </div>
     </DndContext>
   );
