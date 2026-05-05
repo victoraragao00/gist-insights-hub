@@ -161,22 +161,7 @@ export function TechSwimlanePage({ columns, demands }: Props) {
               isCollapsed={isCollapsed}
             />
           ))}
-        </div>
 
-          {/* Lanes */}
-          {lanes.map((area) => (
-            <SwimlaneLane
-              key={area?.id ?? NO_AREA}
-              area={area}
-              columns={columns}
-              gridTemplate={gridTemplate}
-              demands={demands.filter((d) =>
-                area ? d.area_id === area.id : !d.area_id
-              )}
-              onCardClick={(d) => navigate(`/demands/${d.id}`)}
-            />
-          ))}
-        </div>
       </div>
     </DndContext>
   );
