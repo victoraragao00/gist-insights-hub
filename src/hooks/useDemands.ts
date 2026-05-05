@@ -303,6 +303,16 @@ export function useUpdateDemand() {
         created_by: user?.id ?? null,
       });
       if (actError) console.error("Activity log error:", actError.message);
+
+      // Notify on assignee change
+      if ("assignee_id" in input.fields && input.fields.assignee_id) {
+        await createDemandNotification({
+          demandId: input.id,
+          type: "assigned",
+          message: "Você foi atribuído a uma demanda",
+          actorId: user?.id ?? null,
+        });
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["demands"] });
