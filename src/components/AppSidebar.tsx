@@ -40,9 +40,9 @@ const cxItems = [
 ];
 
 const techItems = [
+  { title: "Dashboard", url: "/tech/dashboard", icon: BarChart2 },
   { title: "Kanban", url: "/demands", icon: Kanban },
   { title: "Projetos", url: "/projects", icon: FolderKanban },
-  { title: "Dashboard TECH", url: "/tech/dashboard", icon: BarChart2 },
   { title: "Pautas Internas", url: "/agendas?type=internal", icon: Calendar },
 ];
 
@@ -84,7 +84,14 @@ export function AppSidebar() {
         </SidebarHeader>
 
         {!collapsed && (
-          <WorkspaceSwitcher active={activeWorkspace} onChange={setWorkspace} />
+          <WorkspaceSwitcher
+            active={activeWorkspace}
+            onChange={(ws) => {
+              setWorkspace(ws);
+              if (ws === "tech") navigate("/tech/dashboard");
+              else navigate("/");
+            }}
+          />
         )}
 
         <SidebarContent>
