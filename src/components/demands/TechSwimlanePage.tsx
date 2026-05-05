@@ -160,6 +160,7 @@ export function TechSwimlanePage({ columns, demands, taskCounts }: Props) {
               )}
               onCardClick={(d) => navigate(`/demands/${d.id}`)}
               isCollapsed={isCollapsed}
+              taskCounts={taskCounts}
             />
           ))}
         </div>
