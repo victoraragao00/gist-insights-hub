@@ -57,14 +57,13 @@ export function DemandTimeTrackingSection({ demandId, taskId = null }: Props) {
     return Math.floor((now - new Date(activeEntry.started_at).getTime()) / 1000);
   }, [activeEntry?.started_at, now]);
 
-  const otherTimerActive =
-    !!userActiveTimer && userActiveTimer.demand_id !== demandId && !activeEntry;
+  const otherTimerActive = !!userActiveTimer && !activeEntry;
 
   const handleAddManual = () => {
     const hours = Number(manualHours.replace(",", "."));
     if (!hours || hours <= 0) return;
     addManualMutation.mutate(
-      { demandId, hours, description: manualDescription },
+      { demandId, taskId, hours, description: manualDescription },
       {
         onSuccess: () => {
           setManualHours("");
