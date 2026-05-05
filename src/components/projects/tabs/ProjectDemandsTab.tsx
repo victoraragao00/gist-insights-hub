@@ -32,6 +32,8 @@ interface ProjectDemandsTabProps {
 export function ProjectDemandsTab({ projectId }: ProjectDemandsTabProps) {
   const navigate = useNavigate();
   const { data: demands = [] } = useProjectDemands(projectId);
+  const demandIds = demands.map((d) => d.id);
+  const { data: taskCounts = {} } = useDemandTaskCounts(demandIds);
   const unlink = useUnlinkDemandFromProject();
   const [showLink, setShowLink] = useState(false);
   const [unlinkId, setUnlinkId] = useState<string | null>(null);
