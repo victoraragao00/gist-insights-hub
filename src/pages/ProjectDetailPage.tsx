@@ -237,6 +237,35 @@ export default function ProjectDetailPage() {
             </div>
           </section>
 
+          {meetingHours > 0 && (
+            <section className="rounded-lg border border-border bg-card p-4">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-3">
+                Reuniões
+              </p>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs text-muted-foreground">Horas em reunião</span>
+                <span className="text-sm font-semibold">{meetingHours.toFixed(1)}h</span>
+              </div>
+              {projectAgendas.length > 0 && (
+                <div className="space-y-1.5 mt-3 pt-3 border-t border-border/50">
+                  {projectAgendas.map((agenda) => (
+                    <button
+                      key={agenda.id}
+                      type="button"
+                      onClick={() => navigate(`/agendas/${agenda.id}`)}
+                      className="w-full flex items-center justify-between text-xs hover:text-primary transition-colors text-left"
+                    >
+                      <span className="truncate flex-1">{agenda.title}</span>
+                      <span className="text-muted-foreground ml-2 shrink-0">
+                        {agenda.duration_minutes ? `${(agenda.duration_minutes / 60).toFixed(1)}h` : "—"}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
+
           {isOwner && !project.cancelled_at && (
             <section className="rounded-lg border border-border bg-card p-4">
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-3">
