@@ -123,11 +123,11 @@ export function KanbanColumn({
           strategy={verticalListSortingStrategy}
         >
           {demands.map((demand) => (
-            <DemandCard
+            <SortableDemandCard
               key={demand.id}
               demand={demand}
               onClick={() => onCardClick(demand)}
-              taskCount={taskCounts?.[demand.id]}
+              taskCounts={taskCounts}
             />
           ))}
         </SortableContext>
