@@ -123,6 +123,8 @@ const DemandsPage = () => {
 
   const navigate = useNavigate();
 
+  const { isCollapsed, toggle: toggleCollapse } = useCollapsedColumns(columns);
+
   // Create dialog
   const [createOpen, setCreateOpen] = useState(false);
   const [createColumnId, setCreateColumnId] = useState<string | undefined>();
