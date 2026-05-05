@@ -4,34 +4,24 @@ import { useNavigate } from "react-router-dom";
 import { formatHours } from "@/lib/formatHours";
 import { getDemandCardData } from "@/lib/demandCardData";
 import { cn } from "@/lib/utils";
-import type { DemandRow, DemandPriority } from "@/hooks/useDemands";
+import { priorityBadgeClass, priorityLabel } from "./detail/priorityBadgeStyles";
+import type { DemandRow } from "@/hooks/useDemands";
 import type { CSSProperties } from "react";
 
-const PRIORITY_CLASSES: Record<DemandPriority, string> = {
-  urgent: "text-red-600 bg-red-50 dark:text-red-400 dark:bg-red-950",
-  high: "text-orange-600 bg-orange-50 dark:text-orange-400 dark:bg-orange-950",
-  medium: "text-yellow-600 bg-yellow-50 dark:text-yellow-400 dark:bg-yellow-950",
-  low: "text-emerald-600 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-950",
-};
-
-const PRIORITY_LABELS: Record<DemandPriority, string> = {
-  urgent: "Urgente",
-  high: "Alta",
-  medium: "Média",
-  low: "Baixa",
-};
+export interface DemandCardDraggable {
+  ref: (node: HTMLElement | null) => void;
+  attributes: Record<string, unknown>;
+  listeners: Record<string, unknown>;
+  isDragging: boolean;
+  style?: CSSProperties;
+}
 
 export interface DemandCardProps {
   demand: DemandRow;
   taskCounts?: Record<string, { total: number; done: number }>;
   hoursTotals?: Record<string, number>;
   onClick?: () => void;
-  // DnD props (optional, supplied by drag wrappers)
-  dragAttributes?: Record<string, unknown>;
-  dragListeners?: Record<string, unknown>;
-  dragRef?: (node: HTMLElement | null) => void;
-  dragStyle?: CSSProperties;
-  isDragging?: boolean;
+  draggable?: DemandCardDraggable;
 }
 
 export function DemandCard({
@@ -39,11 +29,7 @@ export function DemandCard({
   taskCounts,
   hoursTotals,
   onClick,
-  dragAttributes,
-  dragListeners,
-  dragRef,
-  dragStyle,
-  isDragging,
+  draggable,
 }: DemandCardProps) {
   const navigate = useNavigate();
   const d = getDemandCardData(demand, taskCounts, hoursTotals);
@@ -55,29 +41,26 @@ export function DemandCard({
 
   return (
     <div
-      ref={dragRef}
-      style={dragStyle}
-      {...(dragAttributes ?? {})}
-      {...(dragListeners ?? {})}
+      ref={draggable?.ref}
+      style={draggable?.style}
+      {...(draggable?.attributes ?? {})}
+      {...(draggable?.listeners ?? {})}
       onClick={handleClick}
       className={cn(
-        "border border-border rounded-xl p-3 bg-card",
-        "hover:border-primary/40 hover:shadow-sm transition-all",
-        dragListeners ? "cursor-grab active:cursor-grabbing" : "cursor-pointer",
-        isDragging && "opacity-50 ring-2 ring-primary/30 shadow-lg",
+        "border border-border rounded-xl p-3 bg-card w-full",
+        "transition-all select-none",
+        draggable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer",
+        "hover:border-primary/40 hover:shadow-sm",
         demand.is_blocked && "border-destructive/30",
+        draggable?.isDragging && "opacity-50 ring-2 ring-primary/30 shadow-lg",
       )}
     >
       {/* Linha 1: Tipo + Área + Prioridade */}
-      <div className="flex flex-wrap items-center gap-1.5">
+      <div className="flex flex-wrap gap-1.5 mb-2">
         {d.typeName && (
           <Badge
             variant="outline"
-            className="text-[10px] px-1.5 py-0 h-4"
-            style={{
-              borderColor: d.typeColor ?? undefined,
-              color: d.typeColor ?? undefined,
-            }}
+            className="text-[11px] px-1.5 py-0 h-5 bg-teal-50 text-teal-800 border-teal-200 dark:bg-teal-950 dark:text-teal-300 dark:border-teal-900"
           >
             {d.typeName}
           </Badge>
@@ -85,84 +68,85 @@ export function DemandCard({
         {d.areaName && (
           <Badge
             variant="outline"
-            className="text-[10px] px-1.5 py-0 h-4"
-            style={{
-              borderColor: d.areaColor ?? undefined,
-              color: d.areaColor ?? undefined,
-            }}
+            className="text-[11px] px-1.5 py-0 h-5 bg-muted/60 text-muted-foreground border-border"
           >
             {d.areaName}
           </Badge>
         )}
-        <Badge className={cn("text-[10px] px-1.5 py-0 h-4 border-0", PRIORITY_CLASSES[demand.priority])}>
-          {PRIORITY_LABELS[demand.priority]}
+        <Badge
+          variant="outline"
+          className={cn("text-[11px] px-1.5 py-0 h-5", priorityBadgeClass(demand.priority))}
+        >
+          {priorityLabel(demand.priority)}
         </Badge>
       </div>
 
       {/* Título */}
-      <p className="mt-2 text-sm font-medium text-foreground line-clamp-2">
+      <p className="text-sm font-medium leading-snug line-clamp-2 mb-2 text-foreground">
         {demand.title}
       </p>
 
-      {/* Linha 3: Bloqueado + Aging */}
+      {/* Bloqueado + Aging */}
       {(demand.is_blocked || d.aging) && (
-        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+        <div className="flex flex-wrap gap-1.5 mb-2">
           {demand.is_blocked && (
-            <Badge className="text-[10px] px-1.5 py-0 h-4 border-0 bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300">
-              <Lock className="h-3 w-3 mr-0.5" /> Bloqueado
+            <Badge
+              variant="outline"
+              className="text-[11px] px-1.5 py-0 h-5 bg-destructive/10 text-destructive border-destructive/30 gap-1"
+            >
+              <Lock className="h-2.5 w-2.5" /> Bloqueado
             </Badge>
           )}
           {d.aging && (
-            <Badge variant="outline" className={cn("text-[10px] px-1.5 py-0 h-4", d.aging.className)}>
+            <Badge variant="outline" className={cn("text-[11px] px-1.5 py-0 h-5", d.aging.className)}>
               {d.aging.label}
             </Badge>
           )}
         </div>
       )}
 
-      {/* Linha 4: Cliente + tempo */}
-      <div className="mt-2 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+      {/* Cliente + tempo */}
+      <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
         <span className="truncate">{d.clientName ?? "—"}</span>
-        {d.createdAgo && <span className="shrink-0">há {d.createdAgo}</span>}
+        {d.createdAgo && <span className="shrink-0 ml-2">há {d.createdAgo}</span>}
       </div>
 
-      {/* Linha 5: Responsável + chips */}
-      <div className="mt-2 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5 min-w-0">
-          {d.assigneeInitials ? (
-            <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-primary/10 text-primary text-[10px] font-semibold shrink-0">
-              {d.assigneeInitials}
-            </span>
-          ) : (
-            <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-muted text-muted-foreground shrink-0">
-              <User className="h-3 w-3" />
-            </span>
-          )}
-          <span className="text-xs text-muted-foreground truncate">
-            {d.assigneeName ?? "—"}
-          </span>
+      {/* Responsável + chips */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground min-w-0">
+          <div
+            className={cn(
+              "w-5 h-5 rounded-full text-[9px] font-semibold flex items-center justify-center shrink-0",
+              d.assigneeInitials
+                ? "bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300"
+                : "bg-muted text-muted-foreground",
+            )}
+          >
+            {d.assigneeInitials ?? <User className="h-2.5 w-2.5" />}
+          </div>
+          <span className="truncate">{d.assigneeName ?? "—"}</span>
         </div>
 
-        <div className="flex items-center gap-1 shrink-0">
+        <div className="flex items-center gap-1.5 shrink-0">
           {d.totalHours > 0 && (
-            <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 gap-0.5">
+            <span className="flex items-center gap-0.5 text-xs text-muted-foreground border border-border rounded-full px-1.5 py-0.5">
               <Clock className="h-3 w-3" />
               {formatHours(d.totalHours)}
-            </Badge>
+            </span>
           )}
           {d.taskCount && d.taskCount.total > 0 && (
-            <Badge
-              variant="outline"
+            <span
               className={cn(
-                "text-[10px] px-1.5 py-0 h-4 gap-0.5",
-                d.taskCount.done === d.taskCount.total &&
-                  "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-900",
+                "flex items-center gap-0.5 text-xs font-medium border rounded-full px-1.5 py-0.5",
+                d.taskCount.done === d.taskCount.total
+                  ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-900"
+                  : "bg-muted text-muted-foreground border-border",
               )}
               title={`${d.taskCount.done} de ${d.taskCount.total} subdemandas`}
             >
               <CheckSquare className="h-3 w-3" />
               {d.taskCount.done}/{d.taskCount.total}
-            </Badge>
+            </span>
           )}
         </div>
       </div>

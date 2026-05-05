@@ -6,9 +6,10 @@ import {
   type DragEndEvent,
 } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DemandCard } from "./DemandCard";
+import { KanbanColumnHeader } from "./KanbanColumnHeader";
+import { CollapsedColumnStub } from "./CollapsedColumnStub";
 import type { DemandRow } from "@/hooks/useDemands";
 import { useMoveDemand, useUpdateDemand } from "@/hooks/useDemands";
 import { useAreasByWorkspace, type DemandArea } from "@/hooks/useDemandAreas";
@@ -78,8 +79,8 @@ export function TechSwimlanePage({ columns, demands, taskCounts }: Props) {
 
   const gridTemplate = useMemo(
     () =>
-      `160px ${columns
-        .map((c) => (isCollapsed(c.id) ? "48px" : "minmax(220px, 1fr)"))
+      `180px ${columns
+        .map((c) => (isCollapsed(c.id) ? "48px" : "minmax(280px, 1fr)"))
         .join(" ")}`,
     [columns, isCollapsed]
   );
@@ -95,43 +96,32 @@ export function TechSwimlanePage({ columns, demands, taskCounts }: Props) {
       <div className="overflow-x-auto pb-4">
         <div className="min-w-max space-y-2">
           {/* Header */}
-          <div className="grid gap-2" style={{ gridTemplateColumns: gridTemplate }}>
+          <div
+            className="grid gap-2"
+            style={{ gridTemplateColumns: gridTemplate, transition: "grid-template-columns 0.2s" }}
+          >
             <div />
             {columns.map((col) => {
               const collapsed = isCollapsed(col.id);
               const count = columnCounts.get(col.id) ?? 0;
+              if (collapsed) {
+                return (
+                  <CollapsedColumnStub
+                    key={col.id}
+                    column={col}
+                    count={count}
+                    onClick={() => toggleCollapse(col.id)}
+                  />
+                );
+              }
               return (
-                <div
+                <KanbanColumnHeader
                   key={col.id}
-                  onClick={() => toggleCollapse(col.id)}
-                  className={cn(
-                    "flex items-center gap-2 px-2 py-1 rounded cursor-pointer select-none",
-                    "hover:bg-muted/60 transition-colors",
-                    collapsed && "justify-center"
-                  )}
-                  title={collapsed ? `${col.name} — expandir` : "Colapsar coluna"}
-                >
-                  <div
-                    className="h-2.5 w-2.5 rounded-full shrink-0"
-                    style={{ backgroundColor: col.color ?? "hsl(var(--muted-foreground))" }}
-                  />
-                  {collapsed ? (
-                    <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
-                      {count}
-                    </span>
-                  ) : (
-                    <>
-                      <span className="text-sm font-semibold text-foreground truncate">{col.name}</span>
-                      <span className="text-xs text-muted-foreground">({count})</span>
-                    </>
-                  )}
-                  <ChevronDown
-                    className={cn(
-                      "h-3 w-3 text-muted-foreground/60 ml-auto transition-transform duration-200",
-                      collapsed && "-rotate-90 ml-0"
-                    )}
-                  />
-                </div>
+                  column={col}
+                  count={count}
+                  isCollapsed={false}
+                  onToggle={() => toggleCollapse(col.id)}
+                />
               );
             })}
           </div>
@@ -171,7 +161,7 @@ function SwimlaneLane({ area, columns, gridTemplate, demands, onCardClick, isCol
   return (
     <div
       className="grid gap-2 rounded-lg border border-border bg-card/40 p-2"
-      style={{ gridTemplateColumns: gridTemplate }}
+      style={{ gridTemplateColumns: gridTemplate, transition: "grid-template-columns 0.2s" }}
     >
       {/* Lane label */}
       <div className="flex items-start gap-2 px-2 py-2">
@@ -268,12 +258,13 @@ function DraggableDemandCard({
       demand={demand}
       taskCounts={taskCounts}
       onClick={onClick}
-      dragRef={setNodeRef}
-      dragAttributes={attributes as unknown as Record<string, unknown>}
-      dragListeners={listeners as unknown as Record<string, unknown>}
-      dragStyle={{ transform: CSS.Translate.toString(transform) }}
-      isDragging={isDragging}
+      draggable={{
+        ref: setNodeRef,
+        attributes: attributes as unknown as Record<string, unknown>,
+        listeners: (listeners ?? {}) as unknown as Record<string, unknown>,
+        isDragging,
+        style: { transform: CSS.Translate.toString(transform) },
+      }}
     />
   );
 }
-
