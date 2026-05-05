@@ -1,12 +1,8 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Clock, Plus, Trash2, Check } from "lucide-react";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -22,7 +18,6 @@ import {
   type DemandTaskRow,
   type DemandTaskStatus,
 } from "@/hooks/useDemandTasks";
-import { useTaskTotalHours } from "@/hooks/useDemandTimeEntries";
 
 interface UserProfileMini {
   id: string;
@@ -30,38 +25,57 @@ interface UserProfileMini {
   email: string | null;
 }
 
-const STATUS_CONFIG: Record<
-  DemandTaskStatus,
-  { label: string; className: string; dot: string }
-> = {
-  open: {
-    label: "Aberto",
-    className: "text-muted-foreground",
-    dot: "border border-muted-foreground/50 bg-transparent",
-  },
-  in_progress: {
-    label: "Em andamento",
-    className: "text-blue-600 dark:text-blue-400",
-    dot: "border-2 border-blue-500 bg-blue-500/30",
-  },
-  done: {
-    label: "Concluído",
-    className: "text-emerald-600 dark:text-emerald-400",
-    dot: "bg-emerald-500 border border-emerald-500",
-  },
-};
-
 const NEXT_STATUS: Record<DemandTaskStatus, DemandTaskStatus> = {
   open: "in_progress",
   in_progress: "done",
   done: "open",
 };
 
-interface DemandTasksSectionProps {
+const STATUS_CHIP: Record<DemandTaskStatus, { label: string; chip: string }> = {
+  open: {
+    label: "Aberto",
+    chip: "bg-muted/60 text-muted-foreground border-border/60",
+  },
+  in_progress: {
+    label: "Em andamento",
+    chip: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900",
+  },
+  done: {
+    label: "Concluído",
+    chip: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900",
+  },
+};
+
+function getInitials(label?: string | null) {
+  if (!label) return "?";
+  return label.split(/\s+/).filter(Boolean).map((p) => p[0]).slice(0, 2).join("").toUpperCase();
+}
+
+function StatusIcon({ status }: { status: DemandTaskStatus }) {
+  if (status === "done") {
+    return (
+      <div className="w-[18px] h-[18px] rounded-full border-[1.5px] border-emerald-500 bg-emerald-500 flex items-center justify-center">
+        <Check className="h-2.5 w-2.5 text-white" strokeWidth={2.5} />
+      </div>
+    );
+  }
+  if (status === "in_progress") {
+    return (
+      <div className="w-[18px] h-[18px] rounded-full border-[1.5px] border-blue-400 bg-blue-50 dark:bg-blue-950 flex items-center justify-center">
+        <div className="w-2 h-2 rounded-full bg-blue-500" />
+      </div>
+    );
+  }
+  return (
+    <div className="w-[18px] h-[18px] rounded-full border-[1.5px] border-border hover:border-primary hover:bg-primary/10 transition-colors" />
+  );
+}
+
+interface Props {
   demandId: string;
 }
 
-export function DemandTasksSection({ demandId }: DemandTasksSectionProps) {
+export function DemandTasksSection({ demandId }: Props) {
   const { data: tasks = [] } = useDemandTasks(demandId);
   const { data: stats } = useDemandTaskStats(demandId);
   const { data: userProfiles = [] } = useQuery<UserProfileMini[]>({
@@ -82,56 +96,90 @@ export function DemandTasksSection({ demandId }: DemandTasksSectionProps) {
   const updateMutation = useUpdateDemandTask();
   const deleteMutation = useDeleteDemandTask();
 
-  const [adding, setAdding] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<DemandTaskRow | null>(null);
 
   const total = stats?.total ?? tasks.length;
   const done = stats?.done ?? tasks.filter((t) => t.status === "done").length;
+  const inProgress =
+    stats?.in_progress ?? tasks.filter((t) => t.status === "in_progress").length;
   const completionPct =
-    stats?.completion_pct ??
-    (total > 0 ? Math.round((done / total) * 1000) / 10 : 0);
-  const hoursEstimatedSum = stats?.hours_estimated_sum ?? 0;
+    stats?.completion_pct ?? (total > 0 ? Math.round((done / total) * 100) : 0);
+  const hoursEstSum = stats?.hours_estimated_sum ?? 0;
 
-  const handleAdd = (title: string) => {
-    if (!title.trim()) return;
-    createMutation.mutate(
-      {
-        demand_id: demandId,
-        title: title.trim(),
-        position: tasks.length,
-      },
-      { onSuccess: () => setAdding(false) },
-    );
-  };
+  const { hoursActualDone, hoursActualInProgress, totalActualHours } = useMemo(() => {
+    let dDone = 0, dProg = 0, dAll = 0;
+    for (const t of tasks) {
+      const v = Number(t.hours_actual ?? 0);
+      if (!v) continue;
+      dAll += v;
+      if (t.status === "done") dDone += v;
+      else if (t.status === "in_progress") dProg += v;
+    }
+    return { hoursActualDone: dDone, hoursActualInProgress: dProg, totalActualHours: dAll };
+  }, [tasks]);
+
+  const summaryCards = [
+    {
+      key: "total",
+      num: total,
+      label: "Total",
+      sub: hoursEstSum > 0 ? `${formatHours(hoursEstSum)} estimadas` : null,
+      color: "text-primary",
+    },
+    {
+      key: "in_progress",
+      num: inProgress,
+      label: "Em andamento",
+      sub: hoursActualInProgress > 0 ? `${formatHours(hoursActualInProgress)} real` : null,
+      color: "text-blue-600 dark:text-blue-400",
+    },
+    {
+      key: "done",
+      num: done,
+      label: "Concluídas",
+      sub: hoursActualDone > 0 ? `${formatHours(hoursActualDone)} real` : null,
+      color: "text-emerald-600 dark:text-emerald-400",
+    },
+  ];
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <Label className="text-xs text-muted-foreground">Subdemandas</Label>
-        {!adding && (
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-7 text-xs"
-            onClick={() => setAdding(true)}
+    <div className="space-y-4">
+      {/* Summary cards */}
+      <div className="grid grid-cols-3 gap-3">
+        {summaryCards.map((card) => (
+          <div
+            key={card.key}
+            className="border border-border rounded-xl p-3 text-center bg-card"
           >
-            <Plus className="h-3 w-3 mr-1" /> Adicionar
-          </Button>
-        )}
+            <div className={cn("text-2xl font-semibold", card.color)}>{card.num}</div>
+            <div className="text-xs text-muted-foreground mt-0.5">{card.label}</div>
+            {card.sub && (
+              <div className="text-[11px] text-muted-foreground/60 mt-1">{card.sub}</div>
+            )}
+          </div>
+        ))}
       </div>
 
+      {/* Progress bar */}
       {total > 0 && (
         <div>
-          <div className="flex items-center justify-between text-xs text-muted-foreground mb-1.5">
+          <div className="flex items-center justify-between text-xs text-muted-foreground mb-1.5 flex-wrap gap-2">
             <span>
-              <span className="font-medium text-foreground">{done}</span>/{total} concluídas
-              {completionPct > 0 && (
-                <span className="ml-1.5 text-muted-foreground/70">· {completionPct}%</span>
-              )}
+              <span className="font-medium text-foreground">{done}</span>
+              /{total} concluídas <span className="text-muted-foreground/70">· {completionPct}%</span>
             </span>
-            {hoursEstimatedSum > 0 && (
-              <span>{formatHours(hoursEstimatedSum)} estimadas</span>
-            )}
+            <div className="flex items-center gap-3">
+              {hoursEstSum > 0 && (
+                <span className="inline-flex items-center gap-1">
+                  <Clock className="h-3 w-3" /> {formatHours(hoursEstSum)} estimadas
+                </span>
+              )}
+              {totalActualHours > 0 && (
+                <span className="inline-flex items-center gap-1">
+                  <Check className="h-3 w-3" /> {formatHours(totalActualHours)} reais
+                </span>
+              )}
+            </div>
           </div>
           <div className="h-1.5 rounded-full bg-muted overflow-hidden">
             <div
@@ -145,12 +193,12 @@ export function DemandTasksSection({ demandId }: DemandTasksSectionProps) {
         </div>
       )}
 
+      {/* Tasks list */}
       <div className="space-y-1.5">
         {tasks.map((task) => (
           <DemandTaskItem
             key={task.id}
             task={task}
-            demandId={demandId}
             userProfiles={userProfiles}
             onUpdate={(fields) =>
               updateMutation.mutate({ id: task.id, demand_id: demandId, ...fields })
@@ -159,13 +207,24 @@ export function DemandTasksSection({ demandId }: DemandTasksSectionProps) {
           />
         ))}
 
-        {tasks.length === 0 && !adding && (
+        {tasks.length === 0 && (
           <p className="text-xs text-muted-foreground py-4 text-center border border-dashed border-border rounded-md">
             Nenhuma subdemanda. Quebre essa demanda em passos menores.
           </p>
         )}
 
-        {adding && <AddTaskInline onAdd={handleAdd} onCancel={() => setAdding(false)} />}
+        <AddTaskInline
+          userProfiles={userProfiles}
+          onAdd={(input) =>
+            createMutation.mutate({
+              demand_id: demandId,
+              title: input.title,
+              assignee_id: input.assignee_id,
+              hours_estimated: input.hours_estimated,
+              position: tasks.length,
+            })
+          }
+        />
       </div>
 
       <AlertDialog
@@ -200,124 +259,146 @@ export function DemandTasksSection({ demandId }: DemandTasksSectionProps) {
 
 // ── Task item ──
 
+interface ItemUpdate {
+  title?: string;
+  assignee_id?: string | null;
+  hours_estimated?: number | null;
+  hours_actual?: number | null;
+  status?: DemandTaskStatus;
+}
+
 interface DemandTaskItemProps {
   task: DemandTaskRow;
-  demandId: string;
   userProfiles: UserProfileMini[];
-  onUpdate: (fields: Partial<{
-    title: string;
-    description: string | null;
-    assignee_id: string | null;
-    hours_estimated: number | null;
-    hours_actual: number | null;
-    status: DemandTaskStatus;
-  }>) => void;
+  onUpdate: (fields: ItemUpdate) => void;
   onDelete: () => void;
 }
 
-const STATUS_CHIP: Record<DemandTaskStatus, string> = {
-  open: "bg-muted/60 text-muted-foreground border-border/60",
-  in_progress: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-900",
-  done: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-900",
-};
-
-function getInitials(label?: string | null) {
-  if (!label) return "?";
-  return label.split(/\s+/).filter(Boolean).map((p) => p[0]).slice(0, 2).join("").toUpperCase();
-}
-
 function DemandTaskItem({ task, userProfiles, onUpdate, onDelete }: DemandTaskItemProps) {
-  const navigate = useNavigate();
   const status = (task.status ?? "open") as DemandTaskStatus;
-  const cfg = STATUS_CONFIG[status];
-  const { data: taskHours = 0 } = useTaskTotalHours(task.id);
-
+  const cfg = STATUS_CHIP[status];
   const assignee = userProfiles.find((u) => u.id === task.assignee_id);
   const assigneeLabel = assignee?.full_name ?? assignee?.email ?? null;
 
   return (
     <div
       className={cn(
-        "group border border-border rounded-lg transition-all bg-card cursor-pointer",
+        "group border border-border rounded-xl px-3 py-2.5 transition-all bg-card",
         "hover:border-primary/30 hover:shadow-sm",
         status === "done" && "opacity-60 bg-muted/20",
       )}
-      onClick={() => navigate(`/tasks/${task.id}`)}
     >
-      <div className="flex items-center gap-3 px-3 py-2.5">
+      <div className="flex items-start gap-2.5">
+        {/* Status toggle */}
         <button
           type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onUpdate({ status: NEXT_STATUS[status] });
-          }}
-          className={cn(
-            "h-4 w-4 rounded-full shrink-0 transition-transform hover:scale-110 flex items-center justify-center",
-            cfg.dot,
-          )}
-          title={cfg.label}
+          onClick={() => onUpdate({ status: NEXT_STATUS[status] })}
+          className="mt-0.5 shrink-0 transition-transform hover:scale-110"
+          title={`Marcar como ${STATUS_CHIP[NEXT_STATUS[status]].label}`}
           aria-label={`Status: ${cfg.label}`}
         >
-          {status === "done" && <Check className="h-2.5 w-2.5 text-white" />}
+          <StatusIcon status={status} />
         </button>
 
-        <span
-          className={cn(
-            "flex-1 text-sm font-medium truncate",
-            status === "done" && "line-through text-muted-foreground",
-          )}
-        >
-          {task.title}
-        </span>
+        {/* Title + meta */}
+        <div className="flex-1 min-w-0">
+          <input
+            type="text"
+            defaultValue={task.title}
+            onBlur={(e) => {
+              const v = e.target.value.trim();
+              if (v && v !== task.title) onUpdate({ title: v });
+              else if (!v) e.target.value = task.title;
+            }}
+            className={cn(
+              "w-full bg-transparent text-sm font-medium border-0 p-0",
+              "focus:outline-none focus:ring-0",
+              status === "done" && "line-through text-muted-foreground",
+            )}
+          />
 
-        <div className="flex items-center gap-2 shrink-0">
-          {assigneeLabel && (
-            <div
-              className="w-5 h-5 rounded-full bg-purple-50 dark:bg-purple-950 text-purple-700 dark:text-purple-300 text-[9px] font-semibold flex items-center justify-center"
-              title={assigneeLabel}
+          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+            {/* Assignee */}
+            <select
+              value={task.assignee_id ?? ""}
+              onChange={(e) => onUpdate({ assignee_id: e.target.value || null })}
+              className="text-[11px] px-2 py-0.5 rounded-full border border-border/60 bg-muted/40 text-muted-foreground focus:outline-none"
             >
-              {getInitials(assigneeLabel)}
+              <option value="">Sem responsável</option>
+              {userProfiles.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.full_name || u.email}
+                </option>
+              ))}
+            </select>
+
+            {assigneeLabel && (
+              <div
+                className="w-5 h-5 rounded-full bg-primary/10 text-primary text-[9px] font-semibold flex items-center justify-center"
+                title={assigneeLabel}
+              >
+                {getInitials(assigneeLabel)}
+              </div>
+            )}
+
+            {/* Hours est / real */}
+            <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-border/60 bg-muted/40 text-xs text-muted-foreground">
+              <Clock className="h-3 w-3" />
+              <input
+                type="number"
+                step="0.5"
+                min="0"
+                defaultValue={task.hours_estimated ?? ""}
+                onBlur={(e) => {
+                  const v = e.target.value === "" ? null : parseFloat(e.target.value);
+                  if (v !== Number(task.hours_estimated ?? null)) {
+                    onUpdate({ hours_estimated: Number.isFinite(v as number) ? v : null });
+                  }
+                }}
+                placeholder="0"
+                className="w-8 bg-transparent border-0 p-0 text-xs focus:outline-none"
+              />
+              <span className="text-muted-foreground/60">est</span>
+
+              {status !== "open" && (
+                <>
+                  <span className="text-muted-foreground/30 mx-0.5">/</span>
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    defaultValue={task.hours_actual ?? ""}
+                    onBlur={(e) => {
+                      const v = e.target.value === "" ? null : parseFloat(e.target.value);
+                      if (v !== Number(task.hours_actual ?? null)) {
+                        onUpdate({ hours_actual: Number.isFinite(v as number) ? v : null });
+                      }
+                    }}
+                    placeholder="0"
+                    className="w-8 bg-transparent border-0 p-0 text-xs focus:outline-none"
+                  />
+                  <span className="text-muted-foreground/60">real</span>
+                </>
+              )}
             </div>
-          )}
 
-          <div className="text-xs text-muted-foreground flex items-center gap-1">
-            <Clock className="h-3 w-3" />
-            {task.hours_estimated ? (
-              <span>{formatHours(Number(task.hours_estimated))} est</span>
-            ) : (
-              <span className="text-muted-foreground/40">—</span>
-            )}
-            {taskHours > 0 && (
-              <>
-                <span className="text-muted-foreground/30">/</span>
-                <span className="font-medium text-foreground">{formatHours(taskHours)}</span>
-              </>
-            )}
+            {/* Status chip */}
+            <span
+              className={cn(
+                "text-[11px] px-2 py-0.5 rounded-full border font-medium",
+                cfg.chip,
+              )}
+            >
+              {cfg.label}
+            </span>
           </div>
-
-          <span className={cn("text-[11px] px-1.5 py-0.5 rounded border font-medium", STATUS_CHIP[status])}>
-            {cfg.label}
-          </span>
-
-          {task.started_at && !task.finished_at && (
-            <span className="text-[11px] text-blue-600 dark:text-blue-400 hidden sm:inline">
-              desde {format(new Date(task.started_at), "dd/MM", { locale: ptBR })}
-            </span>
-          )}
-          {task.finished_at && (
-            <span className="text-[11px] text-emerald-600 dark:text-emerald-400 hidden sm:inline">
-              ✓ {format(new Date(task.finished_at), "dd/MM", { locale: ptBR })}
-            </span>
-          )}
         </div>
 
+        {/* Delete on hover */}
         <button
           type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete();
-          }}
-          className="opacity-0 group-hover:opacity-100 p-1 rounded shrink-0 hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-opacity"
+          onClick={onDelete}
+          className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded shrink-0 hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
           aria-label="Excluir subdemanda"
         >
           <Trash2 className="h-3.5 w-3.5" />
@@ -327,59 +408,111 @@ function DemandTaskItem({ task, userProfiles, onUpdate, onDelete }: DemandTaskIt
   );
 }
 
-
 // ── Add inline ──
 
-interface AddTaskInlineProps {
-  onAdd: (title: string) => void;
-  onCancel: () => void;
+interface AddInput {
+  title: string;
+  assignee_id: string | null;
+  hours_estimated: number | null;
 }
 
-function AddTaskInline({ onAdd, onCancel }: AddTaskInlineProps) {
+interface AddTaskInlineProps {
+  userProfiles: UserProfileMini[];
+  onAdd: (input: AddInput) => void;
+}
+
+function AddTaskInline({ userProfiles, onAdd }: AddTaskInlineProps) {
+  const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
+  const [assigneeId, setAssigneeId] = useState<string | null>(null);
+  const [hoursEst, setHoursEst] = useState("");
+
+  const reset = () => {
+    setTitle("");
+    setAssigneeId(null);
+    setHoursEst("");
+    setOpen(false);
+  };
+
+  const submit = () => {
+    if (!title.trim()) return;
+    onAdd({
+      title: title.trim(),
+      assignee_id: assigneeId,
+      hours_estimated: hoursEst === "" ? null : parseFloat(hoursEst) || null,
+    });
+    reset();
+  };
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="flex items-center gap-2 w-full text-sm text-muted-foreground hover:text-foreground transition-colors py-2 px-1 mt-1"
+      >
+        <Plus className="h-3.5 w-3.5" />
+        Adicionar subdemanda
+      </button>
+    );
+  }
 
   return (
-    <div className="border border-primary/40 rounded-md p-3">
+    <div className="border border-primary/50 rounded-xl p-3 mt-1 bg-card">
       <input
         autoFocus
         type="text"
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         onKeyDown={(e) => {
-          if (e.key === "Enter" && title.trim()) {
-            onAdd(title.trim());
-            setTitle("");
-          }
-          if (e.key === "Escape") {
-            setTitle("");
-            onCancel();
-          }
+          if (e.key === "Enter" && title.trim()) submit();
+          if (e.key === "Escape") reset();
         }}
-        placeholder="Título da subdemanda... (Enter para salvar, Esc para cancelar)"
-        className="w-full bg-transparent text-sm border-0 p-0 focus:outline-none focus:ring-0"
+        placeholder="Título da subdemanda..."
+        className="w-full bg-transparent text-sm font-medium border-0 p-0 focus:outline-none focus:ring-0 mb-3"
       />
-      <div className="flex gap-2 mt-2">
-        <Button
-          size="sm"
-          onClick={() => {
-            if (title.trim()) {
-              onAdd(title.trim());
-              setTitle("");
-            }
-          }}
-        >
-          Salvar
-        </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={() => {
-            setTitle("");
-            onCancel();
-          }}
-        >
-          Cancelar
-        </Button>
+
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex items-center gap-2">
+          <select
+            value={assigneeId ?? ""}
+            onChange={(e) => setAssigneeId(e.target.value || null)}
+            className="text-xs px-2 py-1 rounded-md border border-border bg-background text-muted-foreground"
+          >
+            <option value="">Sem responsável</option>
+            {userProfiles.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.full_name || u.email}
+              </option>
+            ))}
+          </select>
+
+          <div className="flex items-center gap-1 text-xs text-muted-foreground px-2 py-1 rounded-md border border-border bg-background">
+            <Clock className="h-3 w-3" />
+            <input
+              type="number"
+              step="0.5"
+              min="0"
+              value={hoursEst}
+              onChange={(e) => setHoursEst(e.target.value)}
+              placeholder="0h est"
+              className="w-14 bg-transparent border-0 p-0 text-xs focus:outline-none"
+            />
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={reset}
+            className="text-xs text-muted-foreground hover:text-foreground"
+          >
+            Cancelar
+          </button>
+          <Button size="sm" disabled={!title.trim()} onClick={submit} className="h-7 text-xs">
+            Salvar
+          </Button>
+        </div>
       </div>
     </div>
   );
