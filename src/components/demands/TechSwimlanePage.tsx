@@ -161,15 +161,16 @@ interface LaneProps {
   onCardClick: (d: DemandRow) => void;
   isCollapsed: (id: string) => boolean;
   taskCounts?: Record<string, { total: number; done: number }>;
+  collaboratorsByDemand?: Record<string, DemandCollaborator[]>;
+  blockerTypesById?: Record<string, BlockerType>;
 }
 
-function SwimlaneLane({ area, columns, gridTemplate, demands, onCardClick, isCollapsed, taskCounts }: LaneProps) {
+function SwimlaneLane({ area, columns, gridTemplate, demands, onCardClick, isCollapsed, taskCounts, collaboratorsByDemand, blockerTypesById }: LaneProps) {
   return (
     <div
       className="grid gap-2 rounded-lg border border-border bg-card/40 p-2"
       style={{ gridTemplateColumns: gridTemplate, transition: "grid-template-columns 0.2s" }}
     >
-      {/* Lane label */}
       <div className="flex items-start gap-2 px-2 py-2">
         {area ? (
           <>
@@ -203,6 +204,8 @@ function SwimlaneLane({ area, columns, gridTemplate, demands, onCardClick, isCol
           onCardClick={onCardClick}
           collapsed={isCollapsed(col.id)}
           taskCounts={taskCounts}
+          collaboratorsByDemand={collaboratorsByDemand}
+          blockerTypesById={blockerTypesById}
         />
       ))}
     </div>
@@ -216,9 +219,11 @@ interface CellProps {
   onCardClick: (d: DemandRow) => void;
   collapsed: boolean;
   taskCounts?: Record<string, { total: number; done: number }>;
+  collaboratorsByDemand?: Record<string, DemandCollaborator[]>;
+  blockerTypesById?: Record<string, BlockerType>;
 }
 
-function SwimlaneCell({ areaId, columnId, demands, onCardClick, collapsed, taskCounts }: CellProps) {
+function SwimlaneCell({ areaId, columnId, demands, onCardClick, collapsed, taskCounts, collaboratorsByDemand, blockerTypesById }: CellProps) {
   const id = `${areaId ?? NO_AREA}::${columnId}`;
   const { setNodeRef, isOver } = useDroppable({ id, disabled: collapsed });
 
@@ -240,6 +245,8 @@ function SwimlaneCell({ areaId, columnId, demands, onCardClick, collapsed, taskC
             demand={d}
             onClick={() => onCardClick(d)}
             taskCounts={taskCounts}
+            collaborators={collaboratorsByDemand?.[d.id]}
+            blockerType={d.blocker_type_id ? blockerTypesById?.[d.blocker_type_id] ?? null : null}
           />
         </div>
       ))}
@@ -252,10 +259,14 @@ function DraggableDemandCard({
   demand,
   onClick,
   taskCounts,
+  collaborators,
+  blockerType,
 }: {
   demand: DemandRow;
   onClick: () => void;
   taskCounts?: Record<string, { total: number; done: number }>;
+  collaborators?: DemandCollaborator[];
+  blockerType?: BlockerType | null;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: demand.id,
@@ -264,6 +275,8 @@ function DraggableDemandCard({
     <DemandCard
       demand={demand}
       taskCounts={taskCounts}
+      collaborators={collaborators}
+      blockerType={blockerType}
       onClick={onClick}
       draggable={{
         ref: setNodeRef,
@@ -275,3 +288,4 @@ function DraggableDemandCard({
     />
   );
 }
+
