@@ -142,6 +142,36 @@ export type Database = {
           },
         ]
       }
+      blocker_types: {
+        Row: {
+          active: boolean
+          color: string
+          created_at: string
+          icon: string
+          id: string
+          name: string
+          position: number
+        }
+        Insert: {
+          active?: boolean
+          color?: string
+          created_at?: string
+          icon?: string
+          id?: string
+          name: string
+          position?: number
+        }
+        Update: {
+          active?: boolean
+          color?: string
+          created_at?: string
+          icon?: string
+          id?: string
+          name?: string
+          position?: number
+        }
+        Relationships: []
+      }
       channel_bindings: {
         Row: {
           active: boolean | null
@@ -609,6 +639,52 @@ export type Database = {
           },
         ]
       }
+      demand_collaborators: {
+        Row: {
+          added_at: string
+          added_by: string | null
+          demand_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          added_at?: string
+          added_by?: string | null
+          demand_id: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          added_at?: string
+          added_by?: string | null
+          demand_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "demand_collaborators_added_by_fkey"
+            columns: ["added_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "demand_collaborators_demand_id_fkey"
+            columns: ["demand_id"]
+            isOneToOne: false
+            referencedRelation: "demands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "demand_collaborators_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       demand_comments: {
         Row: {
           content: string
@@ -965,6 +1041,7 @@ export type Database = {
           blocked_at: string | null
           blocked_by: string | null
           blocker_reason: string | null
+          blocker_type_id: string | null
           cancellation_reason: string | null
           client_id: string
           column_id: string
@@ -997,6 +1074,7 @@ export type Database = {
           blocked_at?: string | null
           blocked_by?: string | null
           blocker_reason?: string | null
+          blocker_type_id?: string | null
           cancellation_reason?: string | null
           client_id: string
           column_id: string
@@ -1029,6 +1107,7 @@ export type Database = {
           blocked_at?: string | null
           blocked_by?: string | null
           blocker_reason?: string | null
+          blocker_type_id?: string | null
           cancellation_reason?: string | null
           client_id?: string
           column_id?: string
@@ -1066,6 +1145,13 @@ export type Database = {
             columns: ["assignee_id"]
             isOneToOne: false
             referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "demands_blocker_type_id_fkey"
+            columns: ["blocker_type_id"]
+            isOneToOne: false
+            referencedRelation: "blocker_types"
             referencedColumns: ["id"]
           },
           {
