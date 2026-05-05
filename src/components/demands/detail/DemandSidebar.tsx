@@ -385,7 +385,7 @@ export function DemandSidebar({ demand, onActivityTabSelect, onClose }: DemandSi
 
       {/* Time tracking */}
       <section className="rounded-lg border border-border bg-card p-4">
-        <DemandTimeTrackingSection demandId={demand.id} />
+        <TimeTrackingWidget demandId={demand.id} />
       </section>
 
       {/* Bloqueio */}
