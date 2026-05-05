@@ -173,9 +173,10 @@ interface LaneProps {
   gridTemplate: string;
   demands: DemandRow[];
   onCardClick: (d: DemandRow) => void;
+  isCollapsed: (id: string) => boolean;
 }
 
-function SwimlaneLane({ area, columns, gridTemplate, demands, onCardClick }: LaneProps) {
+function SwimlaneLane({ area, columns, gridTemplate, demands, onCardClick, isCollapsed }: LaneProps) {
   return (
     <div
       className="grid gap-2 rounded-lg border border-border bg-card/40 p-2"
@@ -213,6 +214,7 @@ function SwimlaneLane({ area, columns, gridTemplate, demands, onCardClick }: Lan
           columnId={col.id}
           demands={demands.filter((d) => d.column_id === col.id)}
           onCardClick={onCardClick}
+          collapsed={isCollapsed(col.id)}
         />
       ))}
     </div>
@@ -224,11 +226,16 @@ interface CellProps {
   columnId: string;
   demands: DemandRow[];
   onCardClick: (d: DemandRow) => void;
+  collapsed: boolean;
 }
 
-function SwimlaneCell({ areaId, columnId, demands, onCardClick }: CellProps) {
+function SwimlaneCell({ areaId, columnId, demands, onCardClick, collapsed }: CellProps) {
   const id = `${areaId ?? NO_AREA}::${columnId}`;
-  const { setNodeRef, isOver } = useDroppable({ id });
+  const { setNodeRef, isOver } = useDroppable({ id, disabled: collapsed });
+
+  if (collapsed) {
+    return <div className="min-h-20 rounded-md bg-muted/10" aria-hidden />;
+  }
 
   return (
     <div
