@@ -100,11 +100,10 @@ export function ProjectDemandsTab({ projectId }: ProjectDemandsTabProps) {
               <span
                 className={cn(
                   "text-[10px] font-medium px-2 py-0.5 rounded-full border",
-                  priorityBadgeStyles[d.priority] ??
-                    "border-border text-muted-foreground",
+                  priorityBadgeClass(d.priority as DemandPriority),
                 )}
               >
-                {PRIO_LABEL[d.priority] ?? d.priority}
+                {priorityLabel(d.priority as DemandPriority)}
               </span>
               <button
                 onClick={() => setUnlinkId(d.id)}
