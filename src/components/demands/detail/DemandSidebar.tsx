@@ -40,6 +40,8 @@ import {
   useLinkDemandToProject,
   useUnlinkDemandFromProject,
 } from "@/hooks/useProjects";
+import { useSquads, useUpdateDemandSquad } from "@/hooks/useSquads";
+import { useWorkspace } from "@/hooks/useWorkspace";
 
 interface DemandSidebarProps {
   demand: DemandRow;
