@@ -481,6 +481,7 @@ export type Database = {
           id: string
           name: string
           position: number
+          workspace: string
         }
         Insert: {
           active?: boolean | null
@@ -489,6 +490,7 @@ export type Database = {
           id?: string
           name: string
           position?: number
+          workspace?: string
         }
         Update: {
           active?: boolean | null
@@ -497,6 +499,7 @@ export type Database = {
           id?: string
           name?: string
           position?: number
+          workspace?: string
         }
         Relationships: []
       }
@@ -899,7 +902,6 @@ export type Database = {
           resolution: string | null
           sla_first_response_at: string | null
           source_demand_id: string | null
-          squad_id: string | null
           started_at: string | null
           title: string
           workspace: string
@@ -932,7 +934,6 @@ export type Database = {
           resolution?: string | null
           sla_first_response_at?: string | null
           source_demand_id?: string | null
-          squad_id?: string | null
           started_at?: string | null
           title: string
           workspace?: string
@@ -965,7 +966,6 @@ export type Database = {
           resolution?: string | null
           sla_first_response_at?: string | null
           source_demand_id?: string | null
-          squad_id?: string | null
           started_at?: string | null
           title?: string
           workspace?: string
@@ -1018,13 +1018,6 @@ export type Database = {
             columns: ["source_demand_id"]
             isOneToOne: false
             referencedRelation: "demands"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "demands_squad_id_fkey"
-            columns: ["squad_id"]
-            isOneToOne: false
-            referencedRelation: "squads"
             referencedColumns: ["id"]
           },
         ]
@@ -1622,75 +1615,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      squad_members: {
-        Row: {
-          added_at: string
-          id: string
-          role: string
-          squad_id: string
-          user_id: string
-        }
-        Insert: {
-          added_at?: string
-          id?: string
-          role?: string
-          squad_id: string
-          user_id: string
-        }
-        Update: {
-          added_at?: string
-          id?: string
-          role?: string
-          squad_id?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "squad_members_squad_id_fkey"
-            columns: ["squad_id"]
-            isOneToOne: false
-            referencedRelation: "squads"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "squad_members_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "user_profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      squads: {
-        Row: {
-          active: boolean
-          color: string
-          created_at: string
-          id: string
-          name: string
-          position: number
-          updated_at: string
-        }
-        Insert: {
-          active?: boolean
-          color?: string
-          created_at?: string
-          id?: string
-          name: string
-          position?: number
-          updated_at?: string
-        }
-        Update: {
-          active?: boolean
-          color?: string
-          created_at?: string
-          id?: string
-          name?: string
-          position?: number
-          updated_at?: string
-        }
-        Relationships: []
       }
       sync_jobs: {
         Row: {

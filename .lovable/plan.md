@@ -1,65 +1,93 @@
-## Sprint TECH 3-B — Swimlane Kanban (Frontend)
+## Contexto
 
-Implementar branch CX vs TECH na página de demandas, com layout swimlane por squad no workspace TECH e CRUD de squads em Settings.
+Esta sprint **revisa a arquitetura** do Sprint 3-A anterior. Em vez de manter tabelas dedicadas `squads` / `squad_members` + coluna `demands.squad_id`, vamos usar a tabela existente `demand_areas` (já vinculada via `demands.area_id`) como definição das raias do swimlane TECH, controlada por uma nova coluna `workspace`.
 
-### 1. Hook `useSquads` (novo `src/hooks/useSquads.ts`)
-Hooks com `staleTime: 300_000`:
-- `useSquads()` — squads ativos + members com user_profiles (join `squad_members(user_id, role, user_profiles(...))`)
-- `useAllSquads()` — inclui inativos (Settings)
-- `useUpdateDemandSquad({ demandId, squadId | null })` — invalida `["demands"]`
-- `useCreateSquad`, `useUpdateSquad`, `useDeleteSquad`
-- `useAddSquadMember`, `useRemoveSquadMember`
+Estado atual no banco (verificado):
+- `demands.workspace` **já existe** (criado no 3-A) — backfill já feito
+- `demands.squad_id` existe — precisa ser removido
+- Tabelas `squads` e `squad_members` existem — precisam ser removidas
+- `demand_areas.workspace` **não existe** — precisa ser criado
+- Frontend tem `useSquads.ts`, `SquadsSettingsTab.tsx`, lógica de squad em `TechSwimlanePage`, `CreateDemandDialog`, `DemandSidebar` — precisa ser refatorado
 
-Padrão: `{ data, error }` destructurado, `useMutation` para escrita, `sonner` para toasts.
+---
 
-### 2. `useDemands` — adicionar filtro workspace
-- Adicionar `workspace?: 'cx' | 'tech'` a `DemandFilters`.
-- `.eq('workspace', filters.workspace)` quando definido.
-- queryKey já inclui `filters`, então passa automaticamente.
+## Plano
 
-### 3. `useCreateDemand` — aceitar workspace e squad_id
-- Adicionar campos opcionais `workspace` e `squad_id` ao input do mutation.
-- Default `workspace = 'cx'` (compatibilidade).
+### 1. Migration de banco (única, executa tudo na ordem)
 
-### 4. `DemandsPage` — branch CX vs TECH
-- Importar `useWorkspace`.
-- Passar `workspace: activeWorkspace` ao `useDemands`.
-- Se `activeWorkspace === 'tech'`: renderizar `<TechSwimlanePage ... />` no lugar do bloco kanban (preservar SLA view e botão Nova demanda).
-- Se `cx`: layout flat atual integralmente preservado.
-- `CreateDemandDialog` recebe novo prop `workspace` para bloquear/forçar valor.
+```sql
+-- A. Garantir demands.workspace (idempotente, já existe)
+ALTER TABLE demands
+  ADD COLUMN IF NOT EXISTS workspace TEXT NOT NULL DEFAULT 'cx'
+  CHECK (workspace IN ('cx','tech'));
+UPDATE demands SET workspace = 'cx' WHERE workspace IS NULL;
+CREATE INDEX IF NOT EXISTS idx_demands_workspace ON demands(workspace);
+COMMENT ON COLUMN demands.workspace IS '...';
 
-### 5. `TechSwimlanePage` (novo `src/components/demands/TechSwimlanePage.tsx`)
-Layout grid: coluna fixa 160px (squad label) + N colunas (`1fr` cada) para colunas do kanban.
-- Header: nome + contagem por coluna.
-- Linhas: 1 por squad ativo + 1 "Sem squad".
-- Componentes internos:
-  - `SwimlaneLane`: label + N células.
-  - `SwimlaneCell`: `useDroppable` com id `${squadId|'no-squad'}::${columnId}`.
-  - `SwimlaneDemandCard`: card compacto (`useDraggable`), título clicável (navigate `/demands/:id`), badge prioridade, primeiro nome do assignee, aging badge (reusa `getAgingStyle`).
-- `handleDragEnd`: parse `over.id` → se `column_id` mudou chama `useMoveDemand`; se `squad_id` mudou chama `useUpdateDemandSquad`.
-- DnD via `@dnd-kit/core` (`DndContext`, `PointerSensor`, `closestCorners`).
+-- B. demand_areas.workspace (NOVO)
+ALTER TABLE demand_areas
+  ADD COLUMN IF NOT EXISTS workspace TEXT NOT NULL DEFAULT 'both'
+  CHECK (workspace IN ('cx','tech','both'));
 
-### 6. `CreateDemandDialog` — campo Squad no TECH
-- Aceitar prop opcional `workspace?: 'cx' | 'tech'` (default `'cx'`).
-- Se `tech`: exibir Select de Squads (com "Sem squad").
-- Pré-preencher se usuário pertence a exatamente 1 squad.
-- INSERT inclui `workspace` e `squad_id` apropriados.
+UPDATE demand_areas
+SET workspace = CASE
+  WHEN LOWER(name) LIKE '%opera%' THEN 'cx'
+  ELSE 'tech'
+END;
 
-### 7. `DemandSidebar` — campo Squad
-- Adicionar linha "Squad" após Responsável.
-- Visível se `activeWorkspace === 'tech'` ou `demand.squad_id` existe.
-- Select com bolinha colorida + "Sem squad" + lista de squads. Usa `useUpdateDemandSquad`.
+CREATE INDEX IF NOT EXISTS idx_demand_areas_workspace
+  ON demand_areas(workspace) WHERE active = true;
+COMMENT ON COLUMN demand_areas.workspace IS '...';
 
-### 8. Settings → aba "Squads" (admin only)
-- Novo `src/components/settings/SquadsSettingsTab.tsx` no mesmo padrão de `AreaSettingsTab`:
-  - Adicionar squad: nome + color picker (presets) + posição calculada.
-  - Lista: bolinha colorida (color picker inline), nome (inline edit on blur), avatares de membros + botão remover, botão adicionar membro (Select com user_profiles ativos não-membros), toggle ativo/inativo, delete se sem demandas vinculadas.
-- Registrar tab em `SettingsPage.tsx` (`isAdmin && <TabsTrigger value="squads">Squads</TabsTrigger>`).
+-- C. Cleanup do 3-A (squads)
+DROP INDEX IF EXISTS idx_demands_squad;
+ALTER TABLE demands DROP COLUMN IF EXISTS squad_id;
+DROP TABLE IF EXISTS squad_members CASCADE;
+DROP TABLE IF EXISTS squads CASCADE;
+```
 
-### Quality (m1–m11)
-- Sem `any`, sem `use-toast`, todos `{ data, error }`, queryKeys completos, `staleTime > 0`, sem imports não usados.
-- Layout flat do CX permanece intocado — toda lógica TECH é branch condicional.
+### 2. Refatoração frontend (raias = áreas com `workspace IN ('tech','both')`)
 
-### Sem alterações
-- Nenhuma migration (banco já pronto via Sprint 3-A).
-- `src/integrations/supabase/*`, `.env`, docs `CONTEXT.md`/`AGENTS.md`/`CLAUDE.md` intocados.
+**Remover:**
+- `src/hooks/useSquads.ts`
+- `src/components/settings/SquadsSettingsTab.tsx`
+- Aba "Squads" em `src/pages/SettingsPage.tsx`
+
+**Atualizar `src/hooks/useDemandAreas.ts`:**
+- Adicionar campo `workspace` no tipo
+- Adicionar `useAreasByWorkspace(ws)` retornando áreas ativas filtradas por workspace (`tech`/`cx`/`both`)
+- `useManageAreas` aceitar `workspace` em add/update
+
+**Atualizar `src/components/demands/AreaSettingsTab.tsx`:**
+- Coluna/seletor de workspace por área (cx | tech | both) com badge
+- Filtro/agrupamento por workspace
+
+**Atualizar `src/components/demands/TechSwimlanePage.tsx`:**
+- Trocar todas as referências de `squad`/`squad_id` por `area`/`area_id`
+- Raias = áreas com workspace tech/both + raia "Sem área" no fim
+- DnD vertical chama `useUpdateDemand({ area_id })` em vez de `useUpdateDemandSquad`
+- DroppableId continua `${areaId}::${columnId}`
+
+**Atualizar `src/hooks/useDemands.ts`:**
+- Remover filtro `squad_id` do `DemandFilters` e da query
+- Remover `squad_id` do payload de `useCreateDemand`
+
+**Atualizar `src/components/demands/CreateDemandDialog.tsx`:**
+- Remover seleção de Squad
+- Quando `workspace === 'tech'`, pré-selecionar Área filtrando por `useAreasByWorkspace('tech')` (auto-default na primeira área tech disponível, opcional)
+- Sempre enviar `workspace` ativo
+
+**Atualizar `src/components/demands/detail/DemandSidebar.tsx`:**
+- Remover linha "Squad"
+- Linha "Área" já existente passa a ser o controle único (já filtrar opções por workspace da demanda)
+
+### 3. Verificação pós-deploy
+Queries do prompt + smoke test: `/demands` em workspace TECH deve renderizar swimlane com áreas como raias; criação de demanda em TECH grava `workspace='tech'` + `area_id` da área tech.
+
+---
+
+## Observações
+
+- A migration é idempotente — segura mesmo se 3-A já estava parcialmente aplicado.
+- Toda a lógica de "membros do squad" (avatares na raia) deixa de existir nesta arquitetura. Se a UI atual da swimlane mostra avatares por squad, eles serão removidos — raias passam a ter apenas nome + cor da área.
+- Aprovado o plano, executo migration + refactor de uma vez.
