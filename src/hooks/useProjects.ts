@@ -145,7 +145,7 @@ const DEMAND_SELECT = `
   cancellation_reason, is_blocked, client_id,
   demand_types(name, color),
   ticket_columns(name, color, triggers_finished_at),
-  user_profiles!demands_assignee_id_fkey(id, full_name, email),
+  user_profiles!demands_assignee_id_user_profiles_fkey(id, full_name, email),
   clients(id, name)
 `;
 
