@@ -57,6 +57,8 @@ export function DemandCard({ demand, onClick }: DemandCardProps) {
     ? ICON_MAP[demand.demand_types.icon] ?? null
     : null;
 
+  const aging = getAgingStyle(getAgingDays(demand));
+
   return (
     <div
       ref={setNodeRef}
@@ -118,6 +120,12 @@ export function DemandCard({ demand, onClick }: DemandCardProps) {
         {demand.total_hours != null && demand.total_hours > 0 && (
           <Badge variant="outline" className="text-xs gap-1">
             <Clock className="h-3 w-3" /> {formatHours(demand.total_hours)}
+          </Badge>
+        )}
+
+        {aging && (
+          <Badge variant="outline" className={cn("text-[10px] px-1.5 py-0 h-4", aging.className)}>
+            {aging.label}
           </Badge>
         )}
       </div>
