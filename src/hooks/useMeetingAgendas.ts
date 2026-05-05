@@ -96,6 +96,10 @@ interface CreateAgendaPayload {
   context_notes?: string;
   satisfaction_score?: number;
   next_steps?: string;
+  duration_minutes?: number;
+  agenda_type?: string;
+  project_id?: string | null;
+  executive_summary?: string;
 }
 
 export function useCreateAgenda() {
