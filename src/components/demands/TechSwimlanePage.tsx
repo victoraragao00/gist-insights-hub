@@ -239,11 +239,11 @@ function SwimlaneCell({ areaId, columnId, demands, onCardClick, collapsed, taskC
       )}
     >
       {demands.map((d) => (
-        <SwimlaneDemandCard
+        <DraggableDemandCard
           key={d.id}
           demand={d}
           onClick={() => onCardClick(d)}
-          taskCount={taskCounts?.[d.id]}
+          taskCounts={taskCounts}
         />
       ))}
       {demands.length === 0 && <div className="h-12" aria-hidden />}
@@ -251,77 +251,29 @@ function SwimlaneCell({ areaId, columnId, demands, onCardClick, collapsed, taskC
   );
 }
 
-interface CardProps {
+function DraggableDemandCard({
+  demand,
+  onClick,
+  taskCounts,
+}: {
   demand: DemandRow;
   onClick: () => void;
-  taskCount?: { total: number; done: number };
-}
-
-function SwimlaneDemandCard({ demand, onClick, taskCount }: CardProps) {
-  const [pressed, setPressed] = useState(false);
+  taskCounts?: Record<string, { total: number; done: number }>;
+}) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: demand.id,
   });
-
-  const style = {
-    transform: CSS.Translate.toString(transform),
-    opacity: isDragging ? 0.5 : 1,
-  };
-
-  const aging = getAgingStyle(getAgingDays(demand));
-  const assigneeFirst =
-    demand.user_profiles?.full_name?.split(" ")[0] ??
-    demand.user_profiles?.email ?? null;
-
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      {...attributes}
-      {...listeners}
-      onPointerDown={() => setPressed(false)}
-      onPointerMove={() => setPressed(true)}
-      onClick={(e) => {
-        if (pressed || isDragging) return;
-        e.stopPropagation();
-        onClick();
-      }}
-      className={cn(
-        "rounded-md border bg-card p-2 cursor-pointer text-left",
-        "transition-shadow duration-200 hover:shadow-md",
-        isDragging && "shadow-lg ring-2 ring-primary/20"
-      )}
-    >
-      <p className="text-xs font-medium line-clamp-2 text-foreground">{demand.title}</p>
-      <div className="mt-1.5 flex items-center gap-1 flex-wrap">
-        <Badge className={cn("text-[10px] px-1.5 py-0 h-4 border-0", PRIORITY_CLASSES[demand.priority])}>
-          {PRIORITY_LABELS[demand.priority]}
-        </Badge>
-        {assigneeFirst && (
-          <span className="text-[10px] text-muted-foreground truncate max-w-[80px]">
-            {assigneeFirst}
-          </span>
-        )}
-        {taskCount && taskCount.total > 0 && (
-          <span
-            className={cn(
-              "inline-flex items-center gap-0.5 text-[10px] font-medium px-1 py-0 h-4 rounded",
-              taskCount.done === taskCount.total
-                ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
-                : "bg-muted text-muted-foreground",
-            )}
-            title={`${taskCount.done} de ${taskCount.total} subdemandas`}
-          >
-            <CheckSquare className="h-3 w-3" />
-            {taskCount.done}/{taskCount.total}
-          </span>
-        )}
-        {aging && (
-          <Badge variant="outline" className={cn("text-[10px] px-1.5 py-0 h-4 ml-auto", aging.className)}>
-            {aging.label}
-          </Badge>
-        )}
-      </div>
-    </div>
+    <DemandCard
+      demand={demand}
+      taskCounts={taskCounts}
+      onClick={onClick}
+      dragRef={setNodeRef}
+      dragAttributes={attributes as unknown as Record<string, unknown>}
+      dragListeners={listeners as unknown as Record<string, unknown>}
+      dragStyle={{ transform: CSS.Translate.toString(transform) }}
+      isDragging={isDragging}
+    />
   );
 }
+
