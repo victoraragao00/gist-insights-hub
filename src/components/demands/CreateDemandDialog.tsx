@@ -100,7 +100,6 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaul
         expected_result: expectedResult || undefined,
         notes: notes || undefined,
         workspace,
-        squad_id: workspace === "tech" && squadId !== "none" ? squadId : null,
       },
       {
         onSuccess: async (data) => {
@@ -160,7 +159,6 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaul
     setExternalLink("");
     setCreatedDemandId(null);
     setShowLinkDialog(false);
-    setSquadId("none");
   };
 
   const handleFinish = () => {
