@@ -122,13 +122,19 @@ export function DemandTimeTrackingSection({ demandId, taskId = null }: Props) {
                     </span>
                   </TooltipTrigger>
                   <TooltipContent>
-                    Você já tem um timer ativo em outra demanda. Finalize antes de iniciar.
+                    Você já tem um timer ativo
+                    {userActiveTimer?.task_title
+                      ? ` na subdemanda "${userActiveTimer.task_title}"`
+                      : userActiveTimer?.demand_title
+                        ? ` na demanda "${userActiveTimer.demand_title}"`
+                        : ""}
+                    . Finalize antes de iniciar.
                   </TooltipContent>
                 </Tooltip>
               ) : (
                 <Button
                   size="sm"
-                  onClick={() => startMutation.mutate({ demandId })}
+                  onClick={() => startMutation.mutate({ demandId, taskId })}
                   disabled={startMutation.isPending}
                 >
                   {startMutation.isPending ? (
