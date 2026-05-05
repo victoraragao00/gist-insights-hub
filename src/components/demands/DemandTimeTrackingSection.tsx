@@ -24,9 +24,10 @@ import { formatHours, formatStopwatch } from "@/lib/formatHours";
 interface Props {
   demandId: string;
   taskId?: string | null;
+  compact?: boolean;
 }
 
-export function DemandTimeTrackingSection({ demandId, taskId = null }: Props) {
+export function DemandTimeTrackingSection({ demandId, taskId = null, compact = false }: Props) {
   const { user } = useAuth();
   const navigate = useNavigate();
 
