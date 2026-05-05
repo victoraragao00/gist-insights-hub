@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
+import { createDemandNotification } from "@/hooks/useDemandNotifications";
 import type { Tables } from "@/integrations/supabase/types";
 
 // ── Types ──
@@ -264,6 +265,13 @@ export function useMoveDemand() {
         created_by: user?.id ?? null,
       });
       if (actError) console.error("Activity log error:", actError.message);
+
+      await createDemandNotification({
+        demandId: input.demandId,
+        type: "status_changed",
+        message: `Status alterado para "${input.targetColumnName}"`,
+        actorId: user?.id ?? null,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["demands"] });
@@ -295,6 +303,16 @@ export function useUpdateDemand() {
         created_by: user?.id ?? null,
       });
       if (actError) console.error("Activity log error:", actError.message);
+
+      // Notify on assignee change
+      if ("assignee_id" in input.fields && input.fields.assignee_id) {
+        await createDemandNotification({
+          demandId: input.id,
+          type: "assigned",
+          message: "Você foi atribuído a uma demanda",
+          actorId: user?.id ?? null,
+        });
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["demands"] });

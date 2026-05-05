@@ -28,7 +28,7 @@ export function NotificationBell() {
       markRead.mutate(notification.id);
     }
     if (notification.demand_id) {
-      navigate("/demands");
+      navigate(`/demands/${notification.demand_id}`);
     }
   };
 
@@ -68,16 +68,29 @@ export function NotificationBell() {
                 type="button"
                 onClick={() => handleClick(n)}
                 className={cn(
-                  "w-full text-left px-4 py-3 border-b last:border-b-0 hover:bg-muted/50 transition-colors",
+                  "w-full text-left px-4 py-3 border-b last:border-b-0 hover:bg-muted/50 transition-colors flex gap-2 items-start",
                   !n.read && "bg-primary/5"
                 )}
               >
-                <p className="text-sm text-foreground line-clamp-2">{n.message}</p>
-                {n.created_at && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {formatDistanceToNow(new Date(n.created_at), { addSuffix: true, locale: ptBR })}
-                  </p>
-                )}
+                <span
+                  className={cn(
+                    "mt-1.5 h-2 w-2 rounded-full shrink-0",
+                    !n.read ? "bg-primary" : "bg-transparent"
+                  )}
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-foreground line-clamp-2">{n.message}</p>
+                  {n.demands?.title && (
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                      {n.demands.title}
+                    </p>
+                  )}
+                  {n.created_at && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {formatDistanceToNow(new Date(n.created_at), { addSuffix: true, locale: ptBR })}
+                    </p>
+                  )}
+                </div>
               </button>
             ))
           )}

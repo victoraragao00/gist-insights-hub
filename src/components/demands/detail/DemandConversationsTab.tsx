@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { Link2, MessageSquare, Sparkles, Loader2, X, ChevronDown } from "lucide-react";
+import { CommentInput } from "./CommentInput";
+import { CommentText } from "./CommentText";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
@@ -44,7 +46,6 @@ export function DemandConversationsTab({ demand }: DemandConversationsTabProps) 
   const createCommentMutation = useCreateComment();
 
   const [linkConvOpen, setLinkConvOpen] = useState(false);
-  const [newComment, setNewComment] = useState("");
 
   const convGroups = linkedInteractions.reduce<Record<string, typeof linkedInteractions>>((acc, li) => {
     const key = li.interactions?.conversation_id ?? "sem-conversa";
@@ -53,12 +54,12 @@ export function DemandConversationsTab({ demand }: DemandConversationsTabProps) 
     return acc;
   }, {});
 
-  const handlePostComment = () => {
-    if (!newComment.trim() || createCommentMutation.isPending) return;
-    createCommentMutation.mutate(
-      { demandId: demand.id, content: newComment.trim() },
-      { onSuccess: () => setNewComment("") }
-    );
+  const handlePostComment = ({
+    content,
+    mentionedUserIds,
+  }: { content: string; mentionedUserIds: string[] }) => {
+    if (createCommentMutation.isPending) return;
+    createCommentMutation.mutate({ demandId: demand.id, content, mentionedUserIds });
   };
 
   return (
@@ -218,22 +219,10 @@ export function DemandConversationsTab({ demand }: DemandConversationsTabProps) 
           ))}
         </div>
 
-        <div className="space-y-1.5">
-          <Textarea
-            value={newComment}
-            onChange={(e) => setNewComment(e.target.value)}
-            placeholder="Adicionar comentário..."
-            rows={2}
-          />
-          <Button
-            size="sm"
-            onClick={handlePostComment}
-            disabled={!newComment.trim() || createCommentMutation.isPending}
-          >
-            {createCommentMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
-            Comentar
-          </Button>
-        </div>
+        <CommentInput
+          onSubmit={handlePostComment}
+          pending={createCommentMutation.isPending}
+        />
       </section>
     </div>
   );
@@ -343,7 +332,7 @@ function CommentItem({
             </div>
           </div>
         ) : (
-          <p className="text-foreground whitespace-pre-wrap">{comment.content}</p>
+          <CommentText text={comment.content} />
         )}
       </div>
     </div>

@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
+import { createDemandNotification, createMentionNotifications } from "@/hooks/useDemandNotifications";
 
 export interface DemandComment {
   id: string;
@@ -72,9 +73,11 @@ export function useCreateComment() {
     mutationFn: async ({
       demandId,
       content,
+      mentionedUserIds,
     }: {
       demandId: string;
       content: string;
+      mentionedUserIds?: string[];
     }) => {
       const { error: commentErr } = await supabase.from("demand_comments").insert({
         demand_id: demandId,
@@ -91,6 +94,23 @@ export function useCreateComment() {
         created_by: user?.id ?? null,
       });
       if (actErr) throw actErr;
+
+      // Notify owner + collaborators + watchers
+      await createDemandNotification({
+        demandId,
+        type: "commented",
+        message: "Novo comentário em uma demanda",
+        actorId: user?.id ?? null,
+      });
+
+      // Notify mentioned users (separate notification type)
+      if (mentionedUserIds && mentionedUserIds.length > 0) {
+        await createMentionNotifications({
+          demandId,
+          userIds: mentionedUserIds,
+          actorId: user?.id ?? null,
+        });
+      }
     },
     onSuccess: (_data, vars) => {
       queryClient.invalidateQueries({ queryKey: ["demand_comments", vars.demandId] });
