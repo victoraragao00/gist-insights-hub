@@ -1,35 +1,39 @@
-## Hotfix: Recriar policies de `projects` (INSERT bloqueando criação)
+## Hotfix final: liberar INSERT em `projects` + trigger de owner
 
 ### Diagnóstico
-- Frontend (`src/hooks/useProjects.ts` linha 212) já passa `owner_id: user.id` corretamente — **nenhuma mudança de código necessária**.
-- O problema está nas RLS policies de `projects`. Recriar todas do zero garante consistência após o hotfix anterior.
+- Frontend (`useCreateProject` em `src/hooks/useProjects.ts:201-228`) já passa `owner_id: user.id` corretamente — **nenhuma mudança de código necessária**.
+- Aplicar apenas migration: policy INSERT permissiva + trigger BEFORE INSERT que força `owner_id = auth.uid()` quando ausente.
 
-### Migration única
+### Migration
 
 ```sql
-DROP POLICY IF EXISTS "projects_select" ON public.projects;
+-- 1. INSERT permissivo (não bloqueia se auth.uid() vier nulo)
 DROP POLICY IF EXISTS "projects_insert" ON public.projects;
-DROP POLICY IF EXISTS "projects_update" ON public.projects;
-DROP POLICY IF EXISTS "projects_delete" ON public.projects;
+CREATE POLICY "projects_insert" ON public.projects
+  FOR INSERT WITH CHECK (true);
 
-CREATE POLICY "projects_select" ON public.projects FOR SELECT USING (
-  public.is_project_accessible(id)
-);
+-- 2. Trigger: garante owner_id = auth.uid() automaticamente
+CREATE OR REPLACE FUNCTION public.set_project_owner()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF NEW.owner_id IS NULL AND auth.uid() IS NOT NULL THEN
+    NEW.owner_id := auth.uid();
+  END IF;
+  RETURN NEW;
+END;
+$$;
 
-CREATE POLICY "projects_insert" ON public.projects FOR INSERT
-  WITH CHECK (auth.uid() IS NOT NULL);
-
-CREATE POLICY "projects_update" ON public.projects FOR UPDATE
-  USING (owner_id = auth.uid())
-  WITH CHECK (owner_id = auth.uid());
-
-CREATE POLICY "projects_delete" ON public.projects FOR DELETE
-  USING (owner_id = auth.uid());
+DROP TRIGGER IF EXISTS trg_set_project_owner ON public.projects;
+CREATE TRIGGER trg_set_project_owner
+  BEFORE INSERT ON public.projects
+  FOR EACH ROW EXECUTE FUNCTION public.set_project_owner();
 ```
 
-### Escopo
-- Apenas migration de RLS. Sem mudanças de frontend, docs ou config.
+(SELECT/UPDATE/DELETE já estão corretas pelo hotfix anterior — não recriar.)
 
-### Verificação pós-deploy
-- `pg_policies` lista 4 policies (SELECT, INSERT, UPDATE, DELETE) em `projects`.
-- Criação de projeto pelo app passa a funcionar.
+### Escopo
+- Apenas migration. Sem mudanças em frontend ou docs.
