@@ -1,39 +1,41 @@
-## Estado atual
+## Goal
+Add per-column collapse/expand to the Kanban (CX flat) and Swimlane (TECH) views. Default state collapses "finished" columns (`triggers_finished_at = true`); state persists in `sessionStorage`.
 
-A implementação do Sprint 3-A revisado já cobriu ~95% do escopo do 3-B revisado. Verifiquei os arquivos e o que está pronto:
+## New file: `src/hooks/useCollapsedColumns.ts`
+- Accepts `columns: Tables<"ticket_columns">[]`.
+- State map `Record<string, boolean>` initialized per column from `sessionStorage.getItem('kanban_col_collapsed_' + id)`; if absent, defaults to `!!col.triggers_finished_at`.
+- Returns `{ isCollapsed(id), toggle(id) }`. `toggle` writes the new value to `sessionStorage`.
+- Reconcile when `columns` array changes (new columns get default seed) using a `useEffect` that merges missing IDs without overwriting user choices.
 
-| Item OBRIGATÓRIO | Status |
+## Edit: `src/components/demands/KanbanColumn.tsx` (CX flat)
+- Remove the local `useState` for collapse; receive `isCollapsed: boolean` and `onToggleCollapse: (id) => void` as props (lifted to parent).
+- Outer wrapper width transitions:
+  - Expanded: `w-64 min-w-64 max-w-72`.
+  - Collapsed: `w-12 min-w-[48px]` with vertical layout — count badge on top + column name in `[writing-mode:vertical-rl] rotate-180`.
+- Header (expanded mode) becomes clickable to toggle; chevron rotates `-rotate-90` when collapsed.
+- Cards container wrapped in `overflow-hidden transition-all duration-200`; hidden via `max-h-0` when collapsed (drop zone + Plus button hidden too).
+- Keep dnd-kit `useDroppable` active so drag-over a collapsed column is a no-op visually but doesn't break.
+
+## Edit: `src/pages/DemandsPage.tsx` (CX parent)
+- Call `const { isCollapsed, toggle } = useCollapsedColumns(columns);`.
+- Pass `isCollapsed={isCollapsed(col.id)}` and `onToggleCollapse={toggle}` to each `<KanbanColumn>`.
+
+## Edit: `src/components/demands/TechSwimlanePage.tsx`
+- Use `useCollapsedColumns(columns)`.
+- Compute `gridTemplate` dynamically: `160px ` + columns mapped to `48px` if collapsed else `minmax(220px, 1fr)`.
+- Header row: each column header is clickable (`onClick={() => toggle(col.id)}`); when collapsed show only count + chevron (or vertical name); chevron rotates.
+- `SwimlaneCell`: add `isCollapsed` prop; when true render compact placeholder `<div className="min-h-20 rounded-md bg-muted/10 w-full" />` with no cards (still mount `useDroppable`? — skip droppable when collapsed to avoid accidental drops).
+- Lane label column unchanged.
+
+## Behavior summary
+| State | Default |
 |---|---|
-| 1. Filtro `workspace='cx'` no Kanban CX | OK — `useDemands` aplica `.eq("workspace", filters.workspace)` (linha 84) |
-| 2. Filtro `workspace='tech'` + swimlane | OK — branch em `DemandsPage.tsx:304` |
-| 3. Raias = `demand_areas` com `workspace IN ('tech','both')` + `active=true` | OK — `useAreasByWorkspace("tech")` |
-| 4. DnD horizontal muda `column_id`, vertical muda `area_id` | OK — `TechSwimlanePage.handleDragEnd` |
-| 5. `CreateDemandDialog` define workspace pelo workspace ativo | OK — recebe prop `workspace`, insere com ele (linha 102) |
-| 6. Settings → Áreas com seletor cx/tech/both por área | OK — `AreaSettingsTab.tsx` linhas 212-226 |
-| 7. Layout flat CX preservado | OK — branch só ativa swimlane se `activeWorkspace === "tech"` |
-| 8. `staleTime > 0` em todas queries | OK |
-| 9. `useMutation` para escrita | OK |
-| 10. `{ data, error }` destructurado | OK |
+| Column with `triggers_finished_at=true` | collapsed |
+| Other columns | expanded |
+| User toggle | persisted to `sessionStorage` per column id |
+| New session | resets to defaults |
 
-## Gaps identificados (pequenos)
-
-1. **`useDemands` queryKey (m5):** o key é `["demands", user?.id, filters]` — `filters` é objeto recriado, mas funcional. Aceitável.
-2. **Filtro Área no Kanban CX:** o `<FilterCombobox>` de Área lista todas as áreas (`useDemandAreas()`), incluindo as `tech`. No workspace CX deveria filtrar áreas com `workspace IN ('cx','both')`, e no TECH com `('tech','both')`.
-3. **Empty state vazio no swimlane TECH:** mensagem "Nenhuma demanda encontrada com filtros" precede o branch `tech` em `DemandsPage.tsx:300-305` — ordem está correta, mas vale confirmar que swimlane também aparece quando `demands.length === 0` sem filtros (atualmente cai no branch tech, OK).
-
-## Mudanças propostas
-
-### 1. `src/pages/DemandsPage.tsx`
-- Filtrar `areas` exibidas no Combobox de filtro pela mesma regra do swimlane: `useAreasByWorkspace(activeWorkspace)` em vez de `useDemandAreas()` para o select de filtro.
-- Resetar `filterArea` quando `activeWorkspace` mudar (área selecionada pode não existir no novo workspace).
-
-### 2. Verificação manual pós-deploy
-Rodar a checklist 1–12 do prompt no preview.
-
-## Não vou alterar
-
-- `TechSwimlanePage.tsx` — completo e funcional
-- `AreaSettingsTab.tsx` — seletor já presente
-- `CreateDemandDialog.tsx` — já filtra áreas por workspace
-- `useDemandAreas.ts` / `useDemands.ts` — sem mudanças necessárias
-- Migrations — proibido
+## Quality
+- m11: prune unused imports (e.g. drop `useState`/`ChevronRight` from `KanbanColumn` if no longer needed; keep `ChevronDown` only).
+- No new libs. Smooth transitions via existing Tailwind utilities (`transition-all duration-200`).
+- No DB / edge-function changes; no `localStorage`; no `use-toast`.
