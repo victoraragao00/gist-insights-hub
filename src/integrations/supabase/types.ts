@@ -835,6 +835,7 @@ export type Database = {
           hours_manual: number | null
           id: string
           started_at: string | null
+          task_id: string | null
           user_id: string
         }
         Insert: {
@@ -845,6 +846,7 @@ export type Database = {
           hours_manual?: number | null
           id?: string
           started_at?: string | null
+          task_id?: string | null
           user_id: string
         }
         Update: {
@@ -855,6 +857,7 @@ export type Database = {
           hours_manual?: number | null
           id?: string
           started_at?: string | null
+          task_id?: string | null
           user_id?: string
         }
         Relationships: [
@@ -863,6 +866,13 @@ export type Database = {
             columns: ["demand_id"]
             isOneToOne: false
             referencedRelation: "demands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "demand_time_entries_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "demand_tasks"
             referencedColumns: ["id"]
           },
           {
