@@ -18,7 +18,11 @@ import {
   useUnlinkDemandFromProject,
 } from "@/hooks/useProjects";
 import { LinkDemandDialog } from "../LinkDemandDialog";
-import { priorityBadgeStyles } from "@/components/demands/detail/priorityBadgeStyles";
+import {
+  priorityBadgeClass,
+  priorityLabel,
+} from "@/components/demands/detail/priorityBadgeStyles";
+import type { DemandPriority } from "@/hooks/useDemands";
 
 interface ProjectDemandsTabProps {
   projectId: string;
