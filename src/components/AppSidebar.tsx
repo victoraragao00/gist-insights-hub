@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
-import { LayoutDashboard, Search, ShieldAlert, Settings, Users, Kanban, BarChart2, ClipboardList, LogOut, Loader2 } from "lucide-react";
+import { LayoutDashboard, Search, ShieldAlert, Settings, Users, Kanban, BarChart2, ClipboardList, LogOut, Loader2, FolderKanban, Calendar } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
+import { WorkspaceSwitcher } from "@/components/layout/WorkspaceSwitcher";
+import { useWorkspace } from "@/hooks/useWorkspace";
 import umodeLogo from "@/assets/umode-logo-full.png";
 import umodeIcon from "@/assets/umode-icon.png";
 import { useLocation } from "react-router-dom";
@@ -27,7 +29,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
-const modules = [
+const cxItems = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
   { title: "Clientes", url: "/clients", icon: Users },
   { title: "Demandas", url: "/demands", icon: Kanban },
@@ -35,6 +37,13 @@ const modules = [
   { title: "Pautas", url: "/agendas", icon: ClipboardList },
   { title: "Busca", url: "/search", icon: Search },
   { title: "Auditorias", url: "/audits", icon: ShieldAlert },
+];
+
+const techItems = [
+  { title: "Kanban", url: "/demands", icon: Kanban },
+  { title: "Projetos", url: "/projects", icon: FolderKanban },
+  { title: "Dashboard TECH", url: "/tech/dashboard", icon: BarChart2 },
+  { title: "Pautas Internas", url: "/agendas?type=internal", icon: Calendar },
 ];
 
 const bottomItems = [
@@ -47,6 +56,8 @@ export function AppSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
+  const { activeWorkspace, setWorkspace } = useWorkspace();
+  const modules = activeWorkspace === "tech" ? techItems : cxItems;
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
@@ -72,9 +83,13 @@ export function AppSidebar() {
           </div>
         </SidebarHeader>
 
+        {!collapsed && (
+          <WorkspaceSwitcher active={activeWorkspace} onChange={setWorkspace} />
+        )}
+
         <SidebarContent>
           <SidebarGroup>
-            <SidebarGroupLabel>Módulos</SidebarGroupLabel>
+            <SidebarGroupLabel>{activeWorkspace === "tech" ? "TECH" : "Módulos"}</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 {modules.map((item) => (
