@@ -35,9 +35,10 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
 interface DemandCardProps {
   demand: DemandRow;
   onClick: () => void;
+  taskCount?: { total: number; done: number };
 }
 
-export function DemandCard({ demand, onClick }: DemandCardProps) {
+export function DemandCard({ demand, onClick, taskCount }: DemandCardProps) {
   const {
     attributes,
     listeners,
