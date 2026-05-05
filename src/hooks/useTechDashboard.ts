@@ -29,7 +29,12 @@ export interface TechDashboardData {
       by_area?: DeliveredByArea[];
     };
   };
-  throughput: Array<{ week_label: string; done: number; created: number }>;
+  throughput: {
+    weekly: Array<{ week_label: string; done: number; created: number }>;
+    total_done: number;
+    total_created: number;
+    delivery_rate: number;
+  };
   cycle_time: {
     p50_cycle: number | null;
     p85_cycle: number | null;
