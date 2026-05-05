@@ -1,37 +1,83 @@
-## Plano: RPC `get_tech_dashboard_metrics`
+# Plan — DASH-1B Frontend Dashboard TECH
 
-Criar a RPC conforme spec, com **3 ajustes obrigatórios** ao SQL devido a divergências reais entre o spec e o schema do banco. Sem isso, a função falha no `CREATE`.
+## Discrepância importante a confirmar
+O prompt afirma "todos os gráficos via Chart.js (já usado no projeto)" — porém o projeto **não usa Chart.js**, usa **Recharts** (`recharts ^2.15.4`, presente em `Index.tsx`, `DemandsDashboardPage.tsx`, `ClientDetailPage.tsx`). Adicionar Chart.js criaria stack duplicado e violaria o princípio de consistência do Playbook.
 
-### Divergências detectadas (verificadas no banco)
+**Proposta:** implementar throughput e cycle time com **Recharts** (mesmo visual do mock — barras empilhadas e histograma). Se o Operador insistir em Chart.js, instalo `chart.js` + `react-chartjs-2`.
 
-1. **`demands.updated_at` não existe.** A coluna real é `last_updated`. Spec usa `d.updated_at` em alertas (blocked/forgotten).
-   - Ajuste: trocar `d.updated_at` → `d.last_updated` nos blocos de `blocked` e `forgotten`.
+## Escopo
 
-2. **`demand_activities` não tem `action_type`, `metadata` nem `moved_at`.** Colunas reais: `event_type` (enum `demand_event_type`), `from_value`, `to_value`, `description`, `created_by`, `created_at`. Enum não tem `column_changed` nem `reopened` — tem `moved`, `created`, `assigned`, `blocked`, `unblocked`, `edited`, `cancelled`, `linked_interaction`, `commented`.
-   - Ajuste **§4 Tempo médio por coluna**: usar `event_type = 'moved'` e calcular duração entre eventos consecutivos via `LEAD(created_at) OVER (PARTITION BY demand_id ORDER BY created_at)`. O `column_id` de destino vem de `to_value::uuid` (assumindo que o trigger grava UUID em `to_value`). Se `to_value` armazenar nome em vez de UUID, fazer JOIN por nome com `ticket_columns`.
-   - Ajuste **§7 reopen_count**: enum não tem `reopened`. Aproximar como demandas com `finished_at IS NULL` que possuem ao menos um evento `moved` posterior a um momento em que estiveram em coluna com `triggers_finished_at=true` — ou simplificar para `reopen_count: 0` com `TODO` comentado (preferida; menos risco). Confirmar abordagem com o time antes de inferir.
+### 1. Roteamento e workspace switch
+- `App.tsx`: registrar `<Route path="/tech/dashboard" element={<ErrorBoundary><TechDashboardPage /></ErrorBoundary>} />` dentro do `DashboardLayout`.
+- `useWorkspace.ts`: o hook **não tem acesso a `navigate`** (é puro). Em vez de injetar `useNavigate` aqui (acopla o hook ao router), expor `setWorkspace` como hoje e fazer o redirect no **chamador** (`WorkspaceSwitcher.tsx`):
+  ```ts
+  const handleSelect = (ws: Workspace) => {
+    setWorkspace(ws);
+    if (ws === 'tech') navigate('/tech/dashboard');
+    else navigate('/');
+  };
+  ```
+  Isso preserva o hook como utilitário sem dependência de rota.
 
-3. **Convenção CTO §SQL**: o spec viola "IN (SELECT …) — não `= ANY(…)`" só em texto; o SQL em si está OK. Manter.
+### 2. Sidebar TECH
+`AppSidebar.tsx`: reordenar `techItems` para que **Dashboard** fique em primeiro lugar e renomear:
+```
+Dashboard | Kanban | Projetos | Pautas Internas
+```
+Highlight do item ativo já é tratado pelo `isActive` existente.
 
-### Mudanças aplicadas no SQL final
+### 3. Hook `useTechDashboard`
+Novo arquivo `src/hooks/useTechDashboard.ts`:
+- `useQuery` com `queryKey: ['tech-dashboard', user?.id, periodDays, areaId, projectId]` (inclui `user?.id` por regra de cache do projeto).
+- `staleTime: 60_000`, `enabled: !!user`.
+- Chama RPC `get_tech_dashboard_metrics`.
+- Tipo `TechDashboardData` declarado no próprio arquivo (alerts, throughput, cycle_time, people, forecast, column_time, hours, is_admin).
+- Destructure `{ data, error }` e `throw error` (m8).
 
-- `d.updated_at` → `d.last_updated` (2 ocorrências em alertas).
-- Bloco §4 reescrito com `LEAD()` sobre `demand_activities` filtrado por `event_type='moved'`, JOIN em `ticket_columns` por `to_value::uuid`.
-- Bloco §7 `reopen_count` retorna `0` por enquanto (sem evento `reopened` no enum) com comentário `-- TODO: definir evento de reabertura`.
-- Resto do SQL permanece **idêntico ao spec**, incluindo: `SECURITY DEFINER`, `STABLE`, `search_path = public`, defaults dos parâmetros, regra admin/self em `overloaded` e `people`, `RAISE EXCEPTION` se não autenticado, `COMMENT ON FUNCTION`.
+### 4. Página `TechDashboardPage.tsx`
+`src/pages/TechDashboardPage.tsx` com:
+- Header sticky: título + seletor de período (botões 7/30/90 + DateRangePicker custom desabilitado por ora — adicionar como TODO se ainda não existir componente).
+- `FilterChips` (novo componente) — chips clicáveis para áreas e projetos usando `useDemandAreas` e `useProjects` existentes.
+- `AlertCards` — 4 cards clicáveis navegando para `/demands?workspace=tech&filter=<key>`.
+- 3 grids de 2 colunas: Throughput+CycleTime, People+Forecast, ColumnTime+Hours.
+- `DashboardSkeleton` em loading.
+- Tratamento de `error` com toast `sonner`.
 
-### Verificação pós-deploy (do spec, sem mudanças)
+### 5. Componentes em `src/components/tech-dashboard/`
+- `AlertCards.tsx` + `AlertCard.tsx`
+- `FilterChips.tsx`
+- `ThroughputChart.tsx` (Recharts BarChart empilhado)
+- `CycleTimeCard.tsx` (Recharts BarChart histograma + lista de percentis)
+- `PeopleCard.tsx` (lista com avatares + barra WIP)
+- `ForecastCard.tsx` (3 cenários + barra de progresso)
+- `ColumnTimeCard.tsx` (lista com destaque de gargalo)
+- `HoursCard.tsx` (totais + breakdown por área)
+- `DashboardSkeleton.tsx`
 
-1. `SELECT proname, prosecdef FROM pg_proc WHERE proname='get_tech_dashboard_metrics';` → `prosecdef=true`
-2. `SELECT get_tech_dashboard_metrics(30, NULL, NULL);` → JSON com todas as seções
-3. `SELECT get_tech_dashboard_metrics(7, NULL, NULL);`
-4. Como usuário não-admin: `SELECT (get_tech_dashboard_metrics())::json->>'is_admin';` → `'false'`
+Tokens: usar `bg-card`, `border-border`, `text-muted-foreground`, `text-emerald-600`, `text-amber-600`, `text-destructive`. Cores específicas dos gráficos via constantes (`#1D9E75`, `#7F77DD`, `#EF9F27`, `#E24B4A`) — manter como no spec pois são tokens de gráfico.
 
-### Arquivos tocados
+### 6. Filtros via query params no Kanban
+`DemandsPage.tsx`:
+- Ler `searchParams.get('filter')`.
+- `useEffect` aplicando: `blocked` → `is_blocked=true`; `forgotten` → última atividade > 7 dias; `delivered` → `finished_at` no período; `overloaded` → sem filtro extra (o destaque é visual no card).
+- Verificar como o estado de filtros atual de `DemandsPage` é gerenciado antes de implementar, para não conflitar com filtros existentes.
 
-- 1 migration nova (criada pela migration tool do Lovable).
-- Nenhum arquivo de frontend, nenhum dos protegidos (`src/integrations/supabase/*`, `supabase/config.toml`, `.env`).
+### 7. Visibilidade admin/usuário
+A RPC já entrega `is_admin` + lista filtrada. `PeopleCard` apenas renderiza o que recebe; título muda conforme `isAdmin`.
 
-### Aprovação necessária
+## Conformidade Checklist CTO
+- m1 sem `any` (tipo `TechDashboardData` explícito)
+- m2 `ErrorBoundary` na rota
+- m3 apenas `sonner`
+- m4 `staleTime: 60_000`
+- m5 `queryKey` inclui `user?.id` + filtros
+- m8 `{ data, error }` destruturado
+- m11 sem imports não usados
 
-Confirmar tratamento do **§7 `reopen_count`** (manter `0` com TODO) e do **§4 `to_value`** (assumir UUID). Se preferir o `reopen_count` real, precisamos definir antes qual evento marca reabertura (provável: trigger novo gravando `event_type='moved'` com `from_value` = coluna `triggers_finished_at`).
+## Fora de escopo
+- Não cria migration (DASH-1A já entregou a RPC).
+- Não altera `src/integrations/supabase/*`, `.env` nem docs.
+- DateRangePicker custom: stub com TODO se não existir componente reutilizável (a verificar na implementação).
+
+## Pergunta para destravar
+Manter **Recharts** (recomendado, já no projeto) ou instalar Chart.js como o prompt pede?
