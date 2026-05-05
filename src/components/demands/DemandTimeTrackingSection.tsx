@@ -23,14 +23,15 @@ import { formatHours, formatStopwatch } from "@/lib/formatHours";
 
 interface Props {
   demandId: string;
+  taskId?: string | null;
 }
 
-export function DemandTimeTrackingSection({ demandId }: Props) {
+export function DemandTimeTrackingSection({ demandId, taskId = null }: Props) {
   const { user } = useAuth();
   const navigate = useNavigate();
 
   const { data: entries = [] } = useDemandTimeEntries(demandId);
-  const { data: activeEntry } = useActiveTimerEntry(demandId);
+  const { data: activeEntry } = useActiveTimerEntry({ demandId, taskId });
   const { data: userActiveTimer } = useUserActiveTimer();
   const { data: totalHours = 0 } = useDemandTotalHours(demandId);
 
