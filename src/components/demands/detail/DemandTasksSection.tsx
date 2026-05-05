@@ -161,6 +161,7 @@ export function DemandTasksSection({ demandId }: DemandTasksSectionProps) {
           <DemandTaskItem
             key={task.id}
             task={task}
+            demandId={demandId}
             userProfiles={userProfiles}
             onUpdate={(fields) =>
               updateMutation.mutate({ id: task.id, demand_id: demandId, ...fields })
