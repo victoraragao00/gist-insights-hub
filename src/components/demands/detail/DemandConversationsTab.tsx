@@ -332,7 +332,7 @@ function CommentItem({
             </div>
           </div>
         ) : (
-          <p className="text-foreground whitespace-pre-wrap">{comment.content}</p>
+          <CommentText text={comment.content} />
         )}
       </div>
     </div>
