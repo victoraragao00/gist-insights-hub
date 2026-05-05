@@ -1,91 +1,36 @@
-## Objetivo
+## Workspace Switcher (CX | TECH)
 
-Corrigir o efeito colateral da limpeza anterior (PUKET inativado por engano) e ajustar o critério de proteção para que clientes com interações reais não sejam mais inativados em futuras execuções.
+Adds a top-of-sidebar workspace toggle that swaps the entire navigation, plus aging badges on Kanban cards and TECH defaults for the demands page.
 
-## Diagnóstico
+### Files
 
-| Cliente | Status atual | Demandas | Agendas | Interações | Motivo |
-|---------|--------------|----------|---------|------------|--------|
-| `loftystyle.com.br` | **Ativo** | 51 | 67 | 1.297 | Protegido por ter demandas/agendas |
-| `puket.com.br` | **Inativo** | 0 | 0 | 61 | Removido — interações sozinhas não eram critério |
+**New**
+- `src/hooks/useUserProfile.ts` — reads `user_profiles` (id, default_workspace, global_role, active) for current user. Separate from `useUserRole` (which only selects `global_role, active`) to expose `default_workspace` cleanly. `staleTime: 5min`, `queryKey: ["user-profile", user?.id]`.
+- `src/hooks/useWorkspace.ts` — returns `{ activeWorkspace, setWorkspace, defaultWorkspace }`. Persists in `sessionStorage` under `cx_hub_active_workspace`. Initializes from session; on profile load, applies `default_workspace` if no session entry. `'both'` falls back to `'cx'`.
+- `src/components/layout/WorkspaceSwitcher.tsx` — segmented toggle (Users icon / Code2 icon) using design system tokens (`bg-muted/60`, `bg-background`). Hidden when sidebar is collapsed (icon-only mode).
+- `src/lib/getAgingStyle.ts` — `getAgingDays(demand)` and `getAgingStyle(days)` per spec. Returns `null` for `<3d`; yellow `3–6d`; orange `7–13d`; red `≥14d`.
 
-A regra anterior só protegia clientes com demandas/agendas/RFIs. Interações (mesmo 61) não contavam.
+**Modified**
+- `src/components/AppSidebar.tsx`
+  - Import `useWorkspace`, `WorkspaceSwitcher`, plus `Code2`, `FolderKanban`, `Calendar` from lucide.
+  - Render `<WorkspaceSwitcher>` between `SidebarHeader` and `SidebarContent` (only when `!collapsed`).
+  - Replace static `modules` with `cxItems` / `techItems` arrays and pick by `activeWorkspace`.
+  - TECH items: Kanban (`/demands`), Projetos (`/projects`), Dashboard TECH (`/tech/dashboard`), Pautas Internas (`/agendas?type=internal`).
+  - Group label switches to "TECH" / "Módulos" accordingly.
+- `src/pages/DemandsPage.tsx`
+  - Import `useWorkspace`. When `activeWorkspace === 'tech'`, default `filterClient` stays empty (already shows all) — confirmed current behavior matches; no functional change beyond reading the workspace for future label tweaks. Will leave the existing client filter visible (still useful), but not pre-select. (No-op verified — keep change minimal: just consume hook to ensure remount key on workspace change via `key={activeWorkspace}` on the page root, so filters reset between workspaces.)
+- `src/components/demands/DemandCard.tsx`
+  - Import `getAgingDays`, `getAgingStyle`. Render aging Badge in the badges row next to hours badge.
 
-## Ações
+### Notes / decisions
 
-### 1. Migration: reativar PUKET e ajustar critério de proteção
+- `useWorkspace` is intentionally split from `useUserRole` so `useUserRole`'s shape stays untouched (avoids invalidating its cached consumers).
+- Sidebar switcher hidden in collapsed state (icon mode) — keeps the icon strip clean; user can expand to switch.
+- `sessionStorage` only (per spec); cleared automatically on browser/tab close.
+- TECH "Pautas Internas" link uses query string `?type=internal` — assumes `AgendasPage` will read it later (out of scope here; link works regardless).
+- No DB or migration changes.
+- No `localStorage`, no `use-toast`, no unused imports. `staleTime` set on the new profile query.
 
-```sql
--- Reativar PUKET (tem 61 interações reais)
-UPDATE clients
-SET active = true
-WHERE id = '12abfda9-f8a2-48e5-ac9c-a23350c4f2d2';
+### Verification
 
--- Reativar quaisquer outros clientes inativados na limpeza anterior
--- que tinham interações (segurança retroativa)
-UPDATE clients c
-SET active = true
-WHERE c.active = false
-  AND c.metadata->>'auto_created' = 'true'
-  AND EXISTS (SELECT 1 FROM interactions i WHERE i.client_id = c.id);
-```
-
-### 2. Atualizar `deactivate_stale_clients` para preservar interações
-
-Atualmente a função inativa por `last_seen_at` antigo sem checar interações. Vou adicionar uma cláusula que **nunca** inativa um cliente que tenha qualquer interação, demanda, agenda ou RFI vinculados.
-
-```sql
-CREATE OR REPLACE FUNCTION public.deactivate_stale_clients(_days integer)
-RETURNS integer
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
-AS $$
-DECLARE affected integer;
-BEGIN
-  UPDATE clients c
-  SET active = false
-  WHERE c.active = true
-    AND c.metadata->>'auto_created' = 'true'
-    AND (c.metadata->>'last_seen_at')::timestamptz < NOW() - make_interval(days => _days)
-    AND NOT EXISTS (SELECT 1 FROM interactions i  WHERE i.client_id = c.id)
-    AND NOT EXISTS (SELECT 1 FROM demands d       WHERE d.client_id = c.id)
-    AND NOT EXISTS (SELECT 1 FROM meeting_agendas m WHERE m.client_id = c.id);
-  GET DIAGNOSTICS affected = ROW_COUNT;
-  RETURN affected;
-END;
-$$;
-```
-
-### 3. Renomear LOFTY manualmente
-
-```sql
-UPDATE clients
-SET name = 'Lofty Style'
-WHERE id = 'a33f0682-fbeb-41cd-88d4-a54aed4a883e';
-```
-
-> Slug fica `loftystyle-com-br` (não altero para não quebrar links existentes). O nome exibido na UI passa a ser "Lofty Style".
-
-### 4. Atualizar memória
-
-Atualizar `mem://tech/client-inactivation-safety-logic` com o novo critério: clientes auto-criados só são inativados se não tiverem **nenhuma** interação, demanda ou agenda.
-
-## Sobre PUKET no futuro
-
-Mantemos a decisão "Aceitar como está": quando o Gist enviar `company_name = "puket.com.br"`, o cliente continuará sendo criado com esse nome e você renomeia manualmente. Como agora há proteção por interações, ele não será mais inativado por engano.
-
-## Arquivos afetados
-
-- Migration nova (1 arquivo): reativação + redefinição de função + rename
-- `mem://tech/client-inactivation-safety-logic` (atualização de memória)
-
-## Validação pós-execução
-
-```sql
-SELECT id, name, active FROM clients
-WHERE id IN (
-  '12abfda9-f8a2-48e5-ac9c-a23350c4f2d2',  -- PUKET deve estar ativo
-  'a33f0682-fbeb-41cd-88d4-a54aed4a883e'   -- LOFTY deve aparecer como "Lofty Style"
-);
-```
-
-PUKET volta a aparecer na listagem de clientes na UI imediatamente após a migration.
+Matches the 11-point checklist in the prompt: switcher visible, sidebar swaps, session persistence, aging badge thresholds, TECH Kanban defaults to all clients.
