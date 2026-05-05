@@ -1,57 +1,31 @@
-## Hotfix — largura do card no swimlane TECH
+## Colunas colapsadas atravessando raias + sem scroll interno
 
-Três ajustes pontuais de CSS/layout. Sem mudanças de lógica.
+### 1. TECH swimlane: stub colapsado full-height
 
-### 1. `src/components/demands/DemandCard.tsx` (linha 87)
+**Arquivo:** `src/components/demands/TechSwimlanePage.tsx`
 
-Reaplicar `line-clamp-2` junto com `break-words` no título, para que títulos longos quebrem em até 2 linhas com reticências em ambos os contextos (CX e TECH):
+Substituir os múltiplos grids (header + 1 grid por raia) por **um único grid 2D** onde a coluna colapsada ocupa uma célula com `gridRow: 1 / -1`, atravessando header e todas as raias (igual ao print).
 
-```tsx
-<p className="text-sm font-medium leading-snug line-clamp-2 break-words mb-2 text-foreground">
-  {demand.title}
-</p>
-```
+- `gridTemplateColumns`: `180px` + `48px` (colapsada) ou `300px` (expandida) por coluna.
+- `gridTemplateRows`: `auto` para header + `auto` por raia.
+- Headers e células de colunas **expandidas** entram via fluxo normal do grid.
+- Para cada coluna **colapsada**, renderizar UM `CollapsedColumnStub` posicionado em `gridColumn: idx + 2, gridRow: 1 / span (lanes.length + 1)` — pular os slots dela no header e nas raias para não duplicar.
+- Manter label da raia na primeira coluna de cada linha.
 
-### 2. `src/components/demands/TechSwimlanePage.tsx` — grid template
+**Arquivo:** `src/components/demands/CollapsedColumnStub.tsx`
+- Trocar layout fixo por `h-full` com flex-col: bolinha + contador no topo, nome vertical centralizado (sem `max-h-48`), chevron no rodapé. Assim o stub realmente preenche toda a altura do board.
 
-Trocar `minmax(280px, 1fr)` por `300px` fixo no `gridTemplate`, para todas as colunas expandidas terem a mesma largura (e o card não esticar com a tela):
+### 2. Remover scroll vertical interno das colunas (CX)
 
-```ts
-const gridTemplate = useMemo(
-  () =>
-    `180px ${columns
-      .map((c) => (isCollapsed(c.id) ? "48px" : "300px"))
-      .join(" ")}`,
-  [columns, isCollapsed]
-);
-```
+**Arquivo:** `src/components/demands/KanbanColumn.tsx`
 
-### 3. `SwimlaneCell` (mesmo arquivo) — limitar largura do card
+Na área que recebe os cards, remover `flex-1 min-h-0 overflow-y-auto` e o `h-full` do wrapper — a coluna cresce com o conteúdo e o scroll fica a cargo do board externo (que já tem `overflow-auto`). Resultado: zero barra interna por coluna; uma única barra horizontal no board.
 
-Envelopar cada `DraggableDemandCard` em um wrapper `max-w-[280px]`:
-
-```tsx
-{demands.map((d) => (
-  <div key={d.id} className="max-w-[280px]">
-    <DraggableDemandCard
-      demand={d}
-      onClick={() => onCardClick(d)}
-      taskCounts={taskCounts}
-    />
-  </div>
-))}
-```
-
-(Removendo o `key` do componente interno para evitar duplicação.)
-
-### Notas
-
-- CX Kanban (`KanbanColumn`) não é tocado — largura preservada.
-- Nenhum import novo é necessário; nada deixa de ser usado (m11 ok).
-- Arquivos protegidos não são tocados.
+TECH não tem scroll interno por célula hoje, então nada a alterar lá além do item 1.
 
 ### Verificação
 
-1. TECH: cards com ~280px, colunas todas iguais.
-2. Título longo: 2 linhas + reticências.
-3. CX: sem alteração visual.
+1. TECH: colapsar coluna → tira contínua do topo até o fim da última raia.
+2. TECH: largura das raias permanece uniforme.
+3. CX: muitas demandas em uma coluna → sem scrollbar interna.
+4. CX e TECH: apenas UMA barra horizontal, zero scroll de página.
