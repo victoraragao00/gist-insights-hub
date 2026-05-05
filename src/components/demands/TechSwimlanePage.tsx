@@ -93,7 +93,7 @@ export function TechSwimlanePage({ columns, demands, taskCounts }: Props) {
 
   return (
     <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
-      <div className="h-full overflow-x-auto overflow-y-hidden px-6 py-4">
+      <div className="h-full overflow-x-auto px-6 py-4">
         <div className="min-w-max space-y-2">
           {/* Header */}
           <div
@@ -217,7 +217,7 @@ function SwimlaneCell({ areaId, columnId, demands, onCardClick, collapsed, taskC
   const { setNodeRef, isOver } = useDroppable({ id, disabled: collapsed });
 
   if (collapsed) {
-    return <div className="min-h-20 rounded-md bg-muted/10" aria-hidden />;
+    return <div className="bg-muted/10" aria-hidden />;
   }
 
   return (
