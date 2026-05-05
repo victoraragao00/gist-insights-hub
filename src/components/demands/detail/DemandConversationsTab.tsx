@@ -46,7 +46,6 @@ export function DemandConversationsTab({ demand }: DemandConversationsTabProps) 
   const createCommentMutation = useCreateComment();
 
   const [linkConvOpen, setLinkConvOpen] = useState(false);
-  const [newComment, setNewComment] = useState("");
 
   const convGroups = linkedInteractions.reduce<Record<string, typeof linkedInteractions>>((acc, li) => {
     const key = li.interactions?.conversation_id ?? "sem-conversa";
@@ -55,12 +54,12 @@ export function DemandConversationsTab({ demand }: DemandConversationsTabProps) 
     return acc;
   }, {});
 
-  const handlePostComment = () => {
-    if (!newComment.trim() || createCommentMutation.isPending) return;
-    createCommentMutation.mutate(
-      { demandId: demand.id, content: newComment.trim() },
-      { onSuccess: () => setNewComment("") }
-    );
+  const handlePostComment = ({
+    content,
+    mentionedUserIds,
+  }: { content: string; mentionedUserIds: string[] }) => {
+    if (createCommentMutation.isPending) return;
+    createCommentMutation.mutate({ demandId: demand.id, content, mentionedUserIds });
   };
 
   return (
