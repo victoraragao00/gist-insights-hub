@@ -44,6 +44,8 @@ export function UserPermissionsSheet({ user, open, onClose }: Props) {
   const { user: currentUser } = useAuth();
   const updateAccess = useUpdateClientAccess();
   const removeAccess = useRemoveClientAccess();
+  const { data: bypassMap = {} } = useUsersBypass();
+  const updateBypass = useUpdateUserBypass();
 
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 300);
