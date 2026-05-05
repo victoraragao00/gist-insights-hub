@@ -42,6 +42,7 @@ import {
   useDemandCollaborators, useAddCollaborator, useRemoveCollaborator,
 } from "@/hooks/useDemandCollaborators";
 import { useBlockerTypes } from "@/hooks/useBlockerTypes";
+import { createDemandNotification } from "@/hooks/useDemandNotifications";
 import { useRfiByDemand, useCreateRfi, useRfiStatuses, useDeleteRfi } from "@/hooks/useRfis";
 import { RfiDetailSheet } from "@/components/rfis/RfiDetailSheet";
 import { DemandTimeTrackingSection } from "../DemandTimeTrackingSection";
