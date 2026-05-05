@@ -14,6 +14,8 @@ import { Loader2, Sparkles, MessageSquarePlus } from "lucide-react";
 import { useCreateDemand, useTicketColumns, useDemandTypes, type DemandPriority } from "@/hooks/useDemands";
 import { useDemandAreas } from "@/hooks/useDemandAreas";
 import { useClient } from "@/context/ClientContext";
+import { useAuth } from "@/context/AuthContext";
+import { useSquads } from "@/hooks/useSquads";
 import { useDemandAnalysis, useAnalyzeDemand } from "@/hooks/useDemandAnalysis";
 import { useCreateRfi, useUpdateRfi } from "@/hooks/useRfis";
 import { useAddLink } from "@/hooks/useDemandAttachments";
@@ -27,9 +29,10 @@ interface CreateDemandDialogProps {
   onOpenChange: (open: boolean) => void;
   defaultColumnId?: string;
   defaultClientId?: string;
+  workspace?: "cx" | "tech";
 }
 
-export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaultClientId }: CreateDemandDialogProps) {
+export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaultClientId, workspace = "cx" }: CreateDemandDialogProps) {
   const { clients } = useClient();
   const { data: columns = [] } = useTicketColumns();
   const { data: types = [] } = useDemandTypes();
