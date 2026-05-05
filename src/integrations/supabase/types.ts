@@ -2170,6 +2170,14 @@ export type Database = {
         }[]
       }
       get_project_stats: { Args: { p_project_id: string }; Returns: Json }
+      get_tech_dashboard_metrics: {
+        Args: {
+          p_area_id?: string
+          p_period_days?: number
+          p_project_id?: string
+        }
+        Returns: Json
+      }
       get_users_with_permissions: {
         Args: never
         Returns: {
