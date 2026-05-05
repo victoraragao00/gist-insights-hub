@@ -24,6 +24,7 @@ import ProjectDetailPage from "./pages/ProjectDetailPage";
 import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
 import PublicDemandsPage from "./pages/PublicDemandsPage";
+import TechDashboardPage from "./pages/TechDashboardPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
