@@ -77,7 +77,6 @@ export default function ProjectDetailPage() {
   const completed = stats?.completed ?? 0;
   const totalHours = stats?.total_hours ?? 0;
   const meetingHours = stats?.meeting_hours ?? 0;
-  const { data: projectAgendas = [] } = useProjectAgendas(id);
 
   const handleTitleSave = async () => {
     const t = titleEdit.trim();
