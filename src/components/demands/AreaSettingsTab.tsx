@@ -7,17 +7,25 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Plus, Trash2, RotateCcw, Loader2 } from "lucide-react";
+import { Plus, Trash2, RotateCcw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useAllDemandAreas, useManageAreas } from "@/hooks/useDemandAreas";
+import { useAllDemandAreas, useManageAreas, type AreaWorkspace } from "@/hooks/useDemandAreas";
 import { useQuery } from "@tanstack/react-query";
 
 const PRESET_COLORS = ["#6B7280", "#3B82F6", "#8B5CF6", "#F59E0B", "#EF4444", "#10B981"];
+const WORKSPACE_LABELS: Record<AreaWorkspace, string> = {
+  cx: "CX",
+  tech: "TECH",
+  both: "Ambos",
+};
 
 export function AreaSettingsTab() {
   const { data: allAreas = [] } = useAllDemandAreas();
