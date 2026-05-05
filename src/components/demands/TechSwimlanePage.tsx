@@ -231,9 +231,10 @@ interface CellProps {
   demands: DemandRow[];
   onCardClick: (d: DemandRow) => void;
   collapsed: boolean;
+  taskCounts?: Record<string, { total: number; done: number }>;
 }
 
-function SwimlaneCell({ areaId, columnId, demands, onCardClick, collapsed }: CellProps) {
+function SwimlaneCell({ areaId, columnId, demands, onCardClick, collapsed, taskCounts }: CellProps) {
   const id = `${areaId ?? NO_AREA}::${columnId}`;
   const { setNodeRef, isOver } = useDroppable({ id, disabled: collapsed });
 
@@ -250,7 +251,12 @@ function SwimlaneCell({ areaId, columnId, demands, onCardClick, collapsed }: Cel
       )}
     >
       {demands.map((d) => (
-        <SwimlaneDemandCard key={d.id} demand={d} onClick={() => onCardClick(d)} />
+        <SwimlaneDemandCard
+          key={d.id}
+          demand={d}
+          onClick={() => onCardClick(d)}
+          taskCount={taskCounts?.[d.id]}
+        />
       ))}
       {demands.length === 0 && <div className="h-12" aria-hidden />}
     </div>
@@ -260,9 +266,10 @@ function SwimlaneCell({ areaId, columnId, demands, onCardClick, collapsed }: Cel
 interface CardProps {
   demand: DemandRow;
   onClick: () => void;
+  taskCount?: { total: number; done: number };
 }
 
-function SwimlaneDemandCard({ demand, onClick }: CardProps) {
+function SwimlaneDemandCard({ demand, onClick, taskCount }: CardProps) {
   const [pressed, setPressed] = useState(false);
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: demand.id,
