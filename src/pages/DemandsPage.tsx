@@ -99,6 +99,7 @@ const DemandsPage = () => {
   const exportCSVMutation = useExportDemandsCSV();
   const { data: slaDemands = [] } = useSlaDemandsBoard();
   const slaVencidos = slaDemands.filter((d) => d.sla_status === "vencido").length;
+  const { user } = useAuth();
 
   // View toggle
   const [view, setView] = useState<"kanban" | "sla">("kanban");
@@ -110,6 +111,9 @@ const DemandsPage = () => {
   const [filterType, setFilterType] = useState<string>("");
   const [filterPriority, setFilterPriority] = useState<string>("");
   const [filterArea, setFilterArea] = useState<string>("");
+  const [myTasksOnly, setMyTasksOnly] = useState(false);
+
+  const { data: myCollabIds = [] } = useMyCollaboratorDemandIds(myTasksOnly);
 
   // Reset area filter when workspace changes (selected area may not exist in new workspace)
   useEffect(() => {
@@ -123,13 +127,22 @@ const DemandsPage = () => {
     priority: (filterPriority as DemandPriority) || undefined,
     area_id: filterArea || undefined,
     workspace: activeWorkspace,
-  }), [debouncedSearch, filterClient, filterType, filterPriority, filterArea, activeWorkspace]);
+    mine_user_id: myTasksOnly && user?.id ? user.id : undefined,
+    mine_collab_ids: myTasksOnly ? myCollabIds : undefined,
+  }), [debouncedSearch, filterClient, filterType, filterPriority, filterArea, activeWorkspace, myTasksOnly, user?.id, myCollabIds]);
 
   const { data: demands = [], isLoading: demandsLoading } = useDemands(filters);
   const moveMutation = useMoveDemand();
 
   const demandIds = useMemo(() => demands.map((d) => d.id), [demands]);
   const { data: taskCounts = {} } = useDemandTaskCounts(demandIds);
+  const { data: collaboratorsByDemand = {} } = useDemandCollaboratorsBatch(demandIds);
+  const { data: blockerTypes = [] } = useBlockerTypes();
+  const blockerTypesById = useMemo(() => {
+    const map: Record<string, BlockerType> = {};
+    for (const bt of blockerTypes) map[bt.id] = bt;
+    return map;
+  }, [blockerTypes]);
 
   const navigate = useNavigate();
 
