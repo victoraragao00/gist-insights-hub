@@ -1,31 +1,19 @@
-## Plano: Base de dados para múltiplos colaboradores e tipos de bloqueio
+# Remover scroll interno das colunas Kanban
 
-Executar 3 migrations isoladas no Supabase, sem alterações de frontend nesta sessão.
+Cards devem empilhar livremente; scroll vertical fica no container principal do Kanban (não na página inteira, pois o app shell é `h-screen overflow-hidden`). Apenas UMA barra horizontal na base e UMA vertical no kanban quando necessário.
 
-### Migration 1 — `demand_collaborators`
-- Tabela com `demand_id` (FK demands, CASCADE), `user_id` (FK user_profiles, CASCADE), `added_by` (FK user_profiles, SET NULL), `added_at`.
-- UNIQUE `(demand_id, user_id)`.
-- Índices em `demand_id` e `user_id`.
-- RLS habilitada com policies SELECT/INSERT/DELETE via `user_accessible_client_ids(auth.uid())` usando `IN (SELECT ...)`.
-- COMMENT explicando que owner principal continua em `demands.assignee_id` e que subdemandas (`demand_tasks`) não têm colaboradores.
+## Alterações
 
-### Migration 2 — `blocker_types`
-- Tabela com `name`, `color` (default `#E24B4A`), `icon` (default `🔒`), `active`, `position`, `created_at`.
-- Índice `(active, position)`.
-- RLS: SELECT para qualquer autenticado; INSERT/UPDATE/DELETE apenas para `global_role = 'admin'`.
-- Seed (ON CONFLICT DO NOTHING) com 5 categorias padrão: Aguardando cliente, Dependência técnica, Infra/Ambiente, Aguardando decisão, Dependência externa.
+### 1. `src/components/demands/KanbanColumn.tsx`
+- Coluna: trocar `flex flex-col w-[280px] shrink-0 h-full` por `flex flex-col w-[280px] shrink-0` (sem `h-full`).
+- Container de cards: remover `flex-1 min-h-0 overflow-y-auto` → manter só `space-y-2 rounded-lg p-2 mt-2 transition-colors` + estados `isOver`.
 
-### Migration 3 — `demands.blocker_type_id`
-- Adiciona coluna nullable `blocker_type_id UUID REFERENCES blocker_types(id) ON DELETE SET NULL`.
-- Índice parcial `WHERE blocker_type_id IS NOT NULL`.
-- COMMENT esclarecendo coexistência com `blocker_reason` (texto livre).
+### 2. `src/components/demands/TechSwimlanePage.tsx`
+- `SwimlaneCell`: já não tem `overflow-y-auto` nem `max-h`, mas remover wrapper `max-w-[280px]` desnecessário se não pedido — manter (escopo é só scroll). Confirmar que célula não tem `max-h-*` (não tem). Sem mudanças necessárias além de garantir.
+- Container externo: trocar `h-full overflow-auto px-6 py-4` por `h-full overflow-auto px-6 py-4` (mantém — scroll é da página do kanban como um todo, ok).
 
-### Decisões preservadas
-- `demands.assignee_id` permanece intocado (owner principal).
-- Nenhuma migração de dados de assignee atual para `demand_collaborators` será feita — o prompt menciona migrar como 'owner', mas a tabela `demand_collaborators` definida no SQL não possui coluna `role`. Manter apenas o que está no SQL literal (sem coluna role, sem backfill), já que o owner continua representado por `demands.assignee_id`. **Confirmação necessária**: seguir estritamente o SQL fornecido (sem backfill de colaboradores) — o texto "OBRIGATÓRIO migrar como owner" é incompatível com o schema definido.
+### 3. `src/pages/DemandsPage.tsx`
+- Container CX kanban (linha 322): trocar `h-full overflow-x-auto overflow-y-hidden` por `h-full overflow-auto` e o inner `flex gap-4 h-full px-6 py-4 min-w-max` por `flex gap-4 px-6 py-4 min-w-max items-start` (remove `h-full`, adiciona `items-start`).
 
-### Verificação pós-deploy
-Executar as 4 queries de verificação fornecidas: RLS habilitada nas duas novas tabelas, 5 linhas em `blocker_types`, coluna `blocker_type_id` presente em `demands`, e os 4 índices criados.
-
-### Arquivos
-- Apenas migrations SQL via migration tool. Nenhum arquivo de código alterado.
+## Verificação m11
+Nenhum import deixa de ser usado após as edições.
