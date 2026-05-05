@@ -3,6 +3,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { Badge } from "@/components/ui/badge";
 import { Lock, Headphones, Bug, TrendingUp, Sparkles, Briefcase, Search, Clock } from "lucide-react";
 import { formatHours } from "@/lib/formatHours";
+import { getAgingDays, getAgingStyle } from "@/lib/getAgingStyle";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import type { DemandRow, DemandPriority } from "@/hooks/useDemands";
@@ -55,6 +56,8 @@ export function DemandCard({ demand, onClick }: DemandCardProps) {
   const TypeIcon = demand.demand_types?.icon
     ? ICON_MAP[demand.demand_types.icon] ?? null
     : null;
+
+  const aging = getAgingStyle(getAgingDays(demand));
 
   return (
     <div
@@ -117,6 +120,12 @@ export function DemandCard({ demand, onClick }: DemandCardProps) {
         {demand.total_hours != null && demand.total_hours > 0 && (
           <Badge variant="outline" className="text-xs gap-1">
             <Clock className="h-3 w-3" /> {formatHours(demand.total_hours)}
+          </Badge>
+        )}
+
+        {aging && (
+          <Badge variant="outline" className={cn("text-[10px] px-1.5 py-0 h-4", aging.className)}>
+            {aging.label}
           </Badge>
         )}
       </div>
