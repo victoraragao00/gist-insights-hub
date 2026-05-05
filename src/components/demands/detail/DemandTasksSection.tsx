@@ -388,7 +388,108 @@ function DemandTaskItem({ task, demandId, userProfiles, onUpdate, onDelete }: De
           </button>
         </div>
       </div>
+
+      {/* Timer block */}
+      <div
+        className={cn(
+          "mt-2 pt-2 border-t border-border/40 transition-opacity",
+          isRunning ? "opacity-100" : "opacity-60 group-hover:opacity-100",
+        )}
+      >
+        {isRunning ? (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-destructive animate-pulse" />
+              <TaskTimer startedAt={activeTimer.started_at!} />
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-6 text-xs gap-1"
+              onClick={() => stopTimer.mutate({ entryId: activeTimer.id })}
+              disabled={stopTimer.isPending}
+            >
+              {stopTimer.isPending ? (
+                <Loader2 className="h-2.5 w-2.5 animate-spin" />
+              ) : (
+                <Square className="h-2.5 w-2.5 fill-current" />
+              )}
+              Pausar
+            </Button>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <span className="text-xs text-muted-foreground">
+              {taskHours > 0 ? `⏱ ${formatHours(taskHours)} registradas` : "Sem horas registradas"}
+            </span>
+            <div className="flex items-center gap-1.5">
+              <input
+                type="number"
+                step="0.25"
+                min="0"
+                placeholder="0h"
+                value={manualValue}
+                onChange={(e) => setManualValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    submitManual();
+                  }
+                }}
+                className="w-14 h-6 text-xs border border-border rounded px-1.5 bg-background"
+              />
+              <span className="text-xs text-muted-foreground">manual</span>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-6 text-xs gap-1"
+                        disabled={isBlockedByOther || startTimer.isPending}
+                        onClick={() =>
+                          startTimer.mutate({ demandId, taskId: task.id })
+                        }
+                      >
+                        {startTimer.isPending ? (
+                          <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                        ) : (
+                          <Play className="h-2.5 w-2.5 fill-current" />
+                        )}
+                        Timer
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  {isBlockedByOther && (
+                    <TooltipContent>{blockedReason}</TooltipContent>
+                  )}
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
+  );
+}
+
+function TaskTimer({ startedAt }: { startedAt: string }) {
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    const start = new Date(startedAt).getTime();
+    const tick = () => setElapsed(Math.floor((Date.now() - start) / 1000));
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [startedAt]);
+  const h = Math.floor(elapsed / 3600);
+  const m = Math.floor((elapsed % 3600) / 60);
+  const s = elapsed % 60;
+  return (
+    <span className="font-mono text-xs text-destructive font-medium tabular-nums">
+      {String(h).padStart(2, "0")}:{String(m).padStart(2, "0")}:{String(s).padStart(2, "0")}
+    </span>
   );
 }
 
