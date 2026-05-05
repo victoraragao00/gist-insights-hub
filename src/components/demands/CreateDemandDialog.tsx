@@ -34,9 +34,11 @@ interface CreateDemandDialogProps {
 
 export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaultClientId, workspace = "cx" }: CreateDemandDialogProps) {
   const { clients } = useClient();
+  const { user } = useAuth();
   const { data: columns = [] } = useTicketColumns();
   const { data: types = [] } = useDemandTypes();
   const { data: areas = [] } = useDemandAreas();
+  const { data: squads = [] } = useSquads();
   const { data: userProfiles = [] } = useQuery({
     queryKey: ["user_profiles_active"],
     staleTime: 300_000,
@@ -69,6 +71,16 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaul
   const [externalLink, setExternalLink] = useState("");
   const [createdDemandId, setCreatedDemandId] = useState<string | null>(null);
   const [showLinkDialog, setShowLinkDialog] = useState(false);
+  const [squadId, setSquadId] = useState<string>("none");
+
+  // Pre-fill squad if user belongs to exactly 1 squad (TECH workspace)
+  useEffect(() => {
+    if (workspace !== "tech" || !user?.id || squads.length === 0 || squadId !== "none") return;
+    const userSquads = squads.filter((s) =>
+      s.squad_members?.some((m) => m.user_id === user.id),
+    );
+    if (userSquads.length === 1) setSquadId(userSquads[0].id);
+  }, [workspace, user?.id, squads, squadId]);
 
   const { data: analysis } = useDemandAnalysis(createdDemandId ?? undefined);
   const analyzeMutation = useAnalyzeDemand();
