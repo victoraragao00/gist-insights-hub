@@ -301,6 +301,8 @@ const DemandsPage = () => {
             <div className="text-center py-16 text-muted-foreground">
               Nenhuma demanda encontrada com os filtros selecionados
             </div>
+          ) : activeWorkspace === "tech" ? (
+            <TechSwimlanePage columns={columns} demands={demands} />
           ) : (
             <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
               <div className="flex gap-4 overflow-x-auto pb-4">
@@ -324,6 +326,7 @@ const DemandsPage = () => {
         open={createOpen}
         onOpenChange={setCreateOpen}
         defaultColumnId={createColumnId}
+        workspace={activeWorkspace}
       />
     </div>
   );
