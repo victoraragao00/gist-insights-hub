@@ -34,6 +34,12 @@ import { useDemandWatchers, useToggleWatcher } from "@/hooks/useDemandWatchers";
 import { useRfiByDemand, useCreateRfi, useRfiStatuses, useDeleteRfi } from "@/hooks/useRfis";
 import { RfiDetailSheet } from "@/components/rfis/RfiDetailSheet";
 import { DemandTimeTrackingSection } from "../DemandTimeTrackingSection";
+import { useDemandTaskStats } from "@/hooks/useDemandTasks";
+import {
+  useDemandTotalHours,
+  useAddManualEntry,
+} from "@/hooks/useDemandTimeEntries";
+import { formatHours } from "@/lib/formatHours";
 import { AssigneeDisplay } from "./AssigneeDisplay";
 import { ProjectSelect } from "@/components/projects/ProjectSelect";
 import {
@@ -379,7 +385,7 @@ export function DemandSidebar({ demand, onActivityTabSelect, onClose }: DemandSi
 
       {/* Time tracking */}
       <section className="rounded-lg border border-border bg-card p-4">
-        <DemandTimeTrackingSection demandId={demand.id} />
+        <TimeTrackingWidget demandId={demand.id} />
       </section>
 
       {/* Bloqueio */}
@@ -581,5 +587,63 @@ export function DemandSidebar({ demand, onActivityTabSelect, onClose }: DemandSi
         />
       )}
     </aside>
+  );
+}
+
+function TimeTrackingWidget({ demandId }: { demandId: string }) {
+  const { data: taskStats } = useDemandTaskStats(demandId);
+  const { data: totalHours = 0 } = useDemandTotalHours(demandId);
+  const addManual = useAddManualEntry();
+  const [manualHours, setManualHours] = useState("");
+  const hasTasks = (taskStats?.total ?? 0) > 0;
+
+  if (!hasTasks) {
+    return <DemandTimeTrackingSection demandId={demandId} />;
+  }
+
+  const submitManual = () => {
+    const v = parseFloat(manualHours.replace(",", "."));
+    if (!Number.isFinite(v) || v <= 0) return;
+    addManual.mutate(
+      { demandId, taskId: null, hours: v },
+      { onSuccess: () => setManualHours("") },
+    );
+  };
+
+  return (
+    <div className="space-y-3">
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        Tempo total
+      </p>
+      <div className="flex items-center justify-between">
+        <span className="text-xs text-muted-foreground">Total registrado</span>
+        <span className="text-sm font-semibold text-foreground">
+          {formatHours(totalHours)}
+        </span>
+      </div>
+      <div className="pt-2 border-t border-border/50 space-y-2">
+        <p className="text-xs text-muted-foreground">Adicionar horas à demanda</p>
+        <div className="flex gap-2">
+          <Input
+            type="number"
+            step="0.25"
+            min="0"
+            placeholder="Horas"
+            value={manualHours}
+            onChange={(e) => setManualHours(e.target.value)}
+            className="h-8 flex-1 text-xs"
+          />
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8 text-xs"
+            onClick={submitManual}
+            disabled={!manualHours || addManual.isPending}
+          >
+            {addManual.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Adicionar"}
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 }

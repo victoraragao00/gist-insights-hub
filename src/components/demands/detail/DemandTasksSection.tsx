@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { AlignLeft, Clock, Plus, Trash2, Check } from "lucide-react";
+import { AlignLeft, Clock, Plus, Trash2, Check, Play, Square, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -14,6 +14,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { supabase } from "@/integrations/supabase/client";
 import { formatHours } from "@/lib/formatHours";
 import {
@@ -25,6 +26,14 @@ import {
   type DemandTaskRow,
   type DemandTaskStatus,
 } from "@/hooks/useDemandTasks";
+import {
+  useActiveTimerEntry,
+  useUserActiveTimer,
+  useStartTimer,
+  useStopTimer,
+  useAddManualEntry,
+  useTaskTotalHours,
+} from "@/hooks/useDemandTimeEntries";
 
 interface UserProfileMini {
   id: string;
@@ -152,6 +161,7 @@ export function DemandTasksSection({ demandId }: DemandTasksSectionProps) {
           <DemandTaskItem
             key={task.id}
             task={task}
+            demandId={demandId}
             userProfiles={userProfiles}
             onUpdate={(fields) =>
               updateMutation.mutate({ id: task.id, demand_id: demandId, ...fields })
@@ -203,6 +213,7 @@ export function DemandTasksSection({ demandId }: DemandTasksSectionProps) {
 
 interface DemandTaskItemProps {
   task: DemandTaskRow;
+  demandId: string;
   userProfiles: UserProfileMini[];
   onUpdate: (fields: Partial<{
     title: string;
@@ -215,7 +226,7 @@ interface DemandTaskItemProps {
   onDelete: () => void;
 }
 
-function DemandTaskItem({ task, userProfiles, onUpdate, onDelete }: DemandTaskItemProps) {
+function DemandTaskItem({ task, demandId, userProfiles, onUpdate, onDelete }: DemandTaskItemProps) {
   const [expanded, setExpanded] = useState(!!task.description);
   const status = (task.status ?? "open") as DemandTaskStatus;
   const cfg = STATUS_CONFIG[status];
@@ -223,6 +234,31 @@ function DemandTaskItem({ task, userProfiles, onUpdate, onDelete }: DemandTaskIt
   const assignee = userProfiles.find((u) => u.id === task.assignee_id);
   const assigneeLabel =
     assignee?.full_name ?? assignee?.email ?? null;
+
+  const { data: activeTimer } = useActiveTimerEntry({ demandId, taskId: task.id });
+  const { data: userActiveTimer } = useUserActiveTimer();
+  const { data: taskHours = 0 } = useTaskTotalHours(task.id);
+  const startTimer = useStartTimer();
+  const stopTimer = useStopTimer();
+  const addManual = useAddManualEntry();
+  const [manualValue, setManualValue] = useState("");
+
+  const isRunning = !!activeTimer;
+  const isBlockedByOther = !isRunning && !!userActiveTimer;
+  const blockedReason = userActiveTimer?.task_title
+    ? `Timer ativo na subdemanda "${userActiveTimer.task_title}"`
+    : userActiveTimer?.demand_title
+      ? `Timer ativo na demanda "${userActiveTimer.demand_title}"`
+      : "Timer ativo em outra demanda";
+
+  const submitManual = () => {
+    const v = parseFloat(manualValue.replace(",", "."));
+    if (!Number.isFinite(v) || v <= 0) return;
+    addManual.mutate(
+      { demandId, taskId: task.id, hours: v },
+      { onSuccess: () => setManualValue("") },
+    );
+  };
 
   return (
     <div
@@ -352,7 +388,108 @@ function DemandTaskItem({ task, userProfiles, onUpdate, onDelete }: DemandTaskIt
           </button>
         </div>
       </div>
+
+      {/* Timer block */}
+      <div
+        className={cn(
+          "mt-2 pt-2 border-t border-border/40 transition-opacity",
+          isRunning ? "opacity-100" : "opacity-60 group-hover:opacity-100",
+        )}
+      >
+        {isRunning ? (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-destructive animate-pulse" />
+              <TaskTimer startedAt={activeTimer.started_at!} />
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-6 text-xs gap-1"
+              onClick={() => stopTimer.mutate({ entryId: activeTimer.id })}
+              disabled={stopTimer.isPending}
+            >
+              {stopTimer.isPending ? (
+                <Loader2 className="h-2.5 w-2.5 animate-spin" />
+              ) : (
+                <Square className="h-2.5 w-2.5 fill-current" />
+              )}
+              Pausar
+            </Button>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <span className="text-xs text-muted-foreground">
+              {taskHours > 0 ? `⏱ ${formatHours(taskHours)} registradas` : "Sem horas registradas"}
+            </span>
+            <div className="flex items-center gap-1.5">
+              <input
+                type="number"
+                step="0.25"
+                min="0"
+                placeholder="0h"
+                value={manualValue}
+                onChange={(e) => setManualValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    submitManual();
+                  }
+                }}
+                className="w-14 h-6 text-xs border border-border rounded px-1.5 bg-background"
+              />
+              <span className="text-xs text-muted-foreground">manual</span>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-6 text-xs gap-1"
+                        disabled={isBlockedByOther || startTimer.isPending}
+                        onClick={() =>
+                          startTimer.mutate({ demandId, taskId: task.id })
+                        }
+                      >
+                        {startTimer.isPending ? (
+                          <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                        ) : (
+                          <Play className="h-2.5 w-2.5 fill-current" />
+                        )}
+                        Timer
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  {isBlockedByOther && (
+                    <TooltipContent>{blockedReason}</TooltipContent>
+                  )}
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
+  );
+}
+
+function TaskTimer({ startedAt }: { startedAt: string }) {
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    const start = new Date(startedAt).getTime();
+    const tick = () => setElapsed(Math.floor((Date.now() - start) / 1000));
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [startedAt]);
+  const h = Math.floor(elapsed / 3600);
+  const m = Math.floor((elapsed % 3600) / 60);
+  const s = elapsed % 60;
+  return (
+    <span className="font-mono text-xs text-destructive font-medium tabular-nums">
+      {String(h).padStart(2, "0")}:{String(m).padStart(2, "0")}:{String(s).padStart(2, "0")}
+    </span>
   );
 }
 

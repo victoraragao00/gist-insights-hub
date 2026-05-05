@@ -23,14 +23,15 @@ import { formatHours, formatStopwatch } from "@/lib/formatHours";
 
 interface Props {
   demandId: string;
+  taskId?: string | null;
 }
 
-export function DemandTimeTrackingSection({ demandId }: Props) {
+export function DemandTimeTrackingSection({ demandId, taskId = null }: Props) {
   const { user } = useAuth();
   const navigate = useNavigate();
 
   const { data: entries = [] } = useDemandTimeEntries(demandId);
-  const { data: activeEntry } = useActiveTimerEntry(demandId);
+  const { data: activeEntry } = useActiveTimerEntry({ demandId, taskId });
   const { data: userActiveTimer } = useUserActiveTimer();
   const { data: totalHours = 0 } = useDemandTotalHours(demandId);
 
@@ -56,14 +57,13 @@ export function DemandTimeTrackingSection({ demandId }: Props) {
     return Math.floor((now - new Date(activeEntry.started_at).getTime()) / 1000);
   }, [activeEntry?.started_at, now]);
 
-  const otherTimerActive =
-    !!userActiveTimer && userActiveTimer.demand_id !== demandId && !activeEntry;
+  const otherTimerActive = !!userActiveTimer && !activeEntry;
 
   const handleAddManual = () => {
     const hours = Number(manualHours.replace(",", "."));
     if (!hours || hours <= 0) return;
     addManualMutation.mutate(
-      { demandId, hours, description: manualDescription },
+      { demandId, taskId, hours, description: manualDescription },
       {
         onSuccess: () => {
           setManualHours("");
@@ -122,13 +122,19 @@ export function DemandTimeTrackingSection({ demandId }: Props) {
                     </span>
                   </TooltipTrigger>
                   <TooltipContent>
-                    Você já tem um timer ativo em outra demanda. Finalize antes de iniciar.
+                    Você já tem um timer ativo
+                    {userActiveTimer?.task_title
+                      ? ` na subdemanda "${userActiveTimer.task_title}"`
+                      : userActiveTimer?.demand_title
+                        ? ` na demanda "${userActiveTimer.demand_title}"`
+                        : ""}
+                    . Finalize antes de iniciar.
                   </TooltipContent>
                 </Tooltip>
               ) : (
                 <Button
                   size="sm"
-                  onClick={() => startMutation.mutate({ demandId })}
+                  onClick={() => startMutation.mutate({ demandId, taskId })}
                   disabled={startMutation.isPending}
                 >
                   {startMutation.isPending ? (

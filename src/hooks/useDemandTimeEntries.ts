@@ -11,7 +11,9 @@ export interface DemandTimeEntry extends Tables<"demand_time_entries"> {
 export interface UserActiveTimer {
   id: string;
   demand_id: string;
+  task_id: string | null;
   demand_title: string | null;
+  task_title: string | null;
   started_at: string;
 }
 
@@ -34,21 +36,31 @@ export function useDemandTimeEntries(demandId: string | undefined) {
   });
 }
 
-export function useActiveTimerEntry(demandId: string | undefined) {
+interface ActiveTimerArgs {
+  demandId: string | undefined;
+  taskId?: string | null;
+}
+
+export function useActiveTimerEntry(args: ActiveTimerArgs) {
   const { user } = useAuth();
+  const { demandId, taskId = null } = args;
   return useQuery<DemandTimeEntry | null>({
-    queryKey: ["demand-active-timer", user?.id, demandId],
-    enabled: !!demandId && !!user?.id,
+    queryKey: ["demand-active-timer", user?.id, demandId, taskId],
+    enabled: !!user?.id && (!!taskId || !!demandId),
     staleTime: 30_000,
     queryFn: async () => {
-      const { data, error } = await supabase
+      let q = supabase
         .from("demand_time_entries")
         .select("*")
-        .eq("demand_id", demandId!)
         .eq("user_id", user!.id)
         .is("ended_at", null)
-        .not("started_at", "is", null)
-        .maybeSingle();
+        .not("started_at", "is", null);
+      if (taskId) {
+        q = q.eq("task_id", taskId);
+      } else {
+        q = q.eq("demand_id", demandId!).is("task_id", null);
+      }
+      const { data, error } = await q.maybeSingle();
       if (error) throw error;
       return (data ?? null) as DemandTimeEntry | null;
     },
@@ -64,7 +76,7 @@ export function useUserActiveTimer() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("demand_time_entries")
-        .select("id, demand_id, started_at, demands(title)")
+        .select("id, demand_id, task_id, started_at, demands(title), demand_tasks(title)")
         .eq("user_id", user!.id)
         .is("ended_at", null)
         .not("started_at", "is", null)
@@ -72,10 +84,13 @@ export function useUserActiveTimer() {
       if (error) throw error;
       if (!data) return null;
       const demands = data.demands as unknown as { title: string | null } | null;
+      const taskRel = data.demand_tasks as unknown as { title: string | null } | null;
       return {
         id: data.id,
         demand_id: data.demand_id,
+        task_id: data.task_id ?? null,
         demand_title: demands?.title ?? null,
+        task_title: taskRel?.title ?? null,
         started_at: data.started_at as string,
       };
     },
@@ -95,11 +110,35 @@ export function useDemandTotalHours(demandId: string | undefined) {
   });
 }
 
+export function useTaskTotalHours(taskId: string | undefined) {
+  return useQuery<number>({
+    queryKey: ["task-total-hours", taskId],
+    enabled: !!taskId,
+    staleTime: 30_000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("demand_time_entries")
+        .select("hours_manual, started_at, ended_at")
+        .eq("task_id", taskId!);
+      if (error) throw error;
+      return (data ?? []).reduce((sum, e) => {
+        if (e.hours_manual != null) return sum + Number(e.hours_manual);
+        if (e.started_at && e.ended_at) {
+          return sum + (new Date(e.ended_at).getTime() - new Date(e.started_at).getTime()) / 3_600_000;
+        }
+        return sum;
+      }, 0);
+    },
+  });
+}
+
 function invalidateAll(qc: ReturnType<typeof useQueryClient>) {
   qc.invalidateQueries({ queryKey: ["demand-time-entries"] });
   qc.invalidateQueries({ queryKey: ["demand-active-timer"] });
   qc.invalidateQueries({ queryKey: ["user-active-timer"] });
   qc.invalidateQueries({ queryKey: ["demand-total-hours"] });
+  qc.invalidateQueries({ queryKey: ["task-total-hours"] });
+  qc.invalidateQueries({ queryKey: ["demand-task-stats"] });
   qc.invalidateQueries({ queryKey: ["demands"] });
   qc.invalidateQueries({ queryKey: ["demand"] });
 }
@@ -108,22 +147,26 @@ export function useStartTimer() {
   const { user } = useAuth();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ demandId }: { demandId: string }) => {
+    mutationFn: async ({ demandId, taskId }: { demandId: string; taskId?: string | null }) => {
       if (!user?.id) throw new Error("Não autenticado");
 
-      // Global guard: block if any active timer exists for this user
+      // Global guard: block if any active timer exists for this user (demand or task)
       const { data: existing, error: checkErr } = await supabase
         .from("demand_time_entries")
-        .select("id, demand_id, demands(title)")
+        .select("id, demand_id, task_id, demands(title), demand_tasks(title)")
         .eq("user_id", user.id)
         .is("ended_at", null)
         .not("started_at", "is", null)
         .maybeSingle();
       if (checkErr) throw checkErr;
       if (existing) {
-        const demands = existing.demands as unknown as { title: string | null } | null;
+        const demandRel = existing.demands as unknown as { title: string | null } | null;
+        const taskRel = existing.demand_tasks as unknown as { title: string | null } | null;
+        const where = existing.task_id
+          ? `na subdemanda "${taskRel?.title ?? "outra task"}"`
+          : `na demanda "${demandRel?.title ?? "outra demanda"}"`;
         throw new Error(
-          `Você já tem um timer ativo em "${demands?.title ?? "outra demanda"}". Finalize antes de iniciar um novo.`
+          `Você já tem um timer ativo ${where}. Finalize antes de iniciar um novo.`
         );
       }
 
@@ -131,6 +174,7 @@ export function useStartTimer() {
         .from("demand_time_entries")
         .insert({
           demand_id: demandId,
+          task_id: taskId ?? null,
           user_id: user.id,
           started_at: new Date().toISOString(),
         })
@@ -138,7 +182,7 @@ export function useStartTimer() {
         .single();
       if (error) {
         if (error.code === "23505") {
-          throw new Error("Você já tem um timer ativo em outra demanda.");
+          throw new Error("Você já tem um timer ativo.");
         }
         throw error;
       }
@@ -176,10 +220,12 @@ export function useAddManualEntry() {
   return useMutation({
     mutationFn: async ({
       demandId,
+      taskId,
       hours,
       description,
     }: {
       demandId: string;
+      taskId?: string | null;
       hours: number;
       description?: string;
     }) => {
@@ -187,6 +233,7 @@ export function useAddManualEntry() {
       if (!hours || hours <= 0) throw new Error("Informe um número de horas válido");
       const { error } = await supabase.from("demand_time_entries").insert({
         demand_id: demandId,
+        task_id: taskId ?? null,
         user_id: user.id,
         hours_manual: hours,
         description: description?.trim() || null,
