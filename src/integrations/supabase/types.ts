@@ -604,6 +604,68 @@ export type Database = {
           },
         ]
       }
+      demand_block_history: {
+        Row: {
+          blocked_at: string
+          blocked_by: string | null
+          blocker_reason: string | null
+          blocker_type_id: string | null
+          demand_id: string
+          id: string
+          unblocked_at: string | null
+          unblocked_by: string | null
+        }
+        Insert: {
+          blocked_at?: string
+          blocked_by?: string | null
+          blocker_reason?: string | null
+          blocker_type_id?: string | null
+          demand_id: string
+          id?: string
+          unblocked_at?: string | null
+          unblocked_by?: string | null
+        }
+        Update: {
+          blocked_at?: string
+          blocked_by?: string | null
+          blocker_reason?: string | null
+          blocker_type_id?: string | null
+          demand_id?: string
+          id?: string
+          unblocked_at?: string | null
+          unblocked_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "demand_block_history_blocked_by_fkey"
+            columns: ["blocked_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "demand_block_history_blocker_type_id_fkey"
+            columns: ["blocker_type_id"]
+            isOneToOne: false
+            referencedRelation: "blocker_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "demand_block_history_demand_id_fkey"
+            columns: ["demand_id"]
+            isOneToOne: false
+            referencedRelation: "demands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "demand_block_history_unblocked_by_fkey"
+            columns: ["unblocked_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       demand_client_tokens: {
         Row: {
           active: boolean | null
@@ -1319,6 +1381,7 @@ export type Database = {
           meeting_date: string
           next_steps: string | null
           objective: string | null
+          project_id: string | null
           satisfaction_score: number | null
           title: string
           transcription: string | null
@@ -1339,6 +1402,7 @@ export type Database = {
           meeting_date: string
           next_steps?: string | null
           objective?: string | null
+          project_id?: string | null
           satisfaction_score?: number | null
           title: string
           transcription?: string | null
@@ -1359,6 +1423,7 @@ export type Database = {
           meeting_date?: string
           next_steps?: string | null
           objective?: string | null
+          project_id?: string | null
           satisfaction_score?: number | null
           title?: string
           transcription?: string | null
@@ -1370,6 +1435,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meeting_agendas_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
         ]
@@ -1909,6 +1981,7 @@ export type Database = {
       user_profiles: {
         Row: {
           active: boolean | null
+          bypass_client_access: boolean
           created_at: string | null
           default_workspace: string
           email: string | null
@@ -1919,6 +1992,7 @@ export type Database = {
         }
         Insert: {
           active?: boolean | null
+          bypass_client_access?: boolean
           created_at?: string | null
           default_workspace?: string
           email?: string | null
@@ -1929,6 +2003,7 @@ export type Database = {
         }
         Update: {
           active?: boolean | null
+          bypass_client_access?: boolean
           created_at?: string | null
           default_workspace?: string
           email?: string | null
@@ -2069,6 +2144,7 @@ export type Database = {
         Args: { p_client_id?: string; p_days?: number }
         Returns: Json
       }
+      get_demand_block_metrics: { Args: { p_demand_id: string }; Returns: Json }
       get_demand_task_stats: { Args: { p_demand_id: string }; Returns: Json }
       get_demand_total_hours: { Args: { p_demand_id: string }; Returns: number }
       get_demands_with_sla: {
@@ -2145,7 +2221,7 @@ export type Database = {
         }[]
       }
       user_accessible_client_ids: {
-        Args: { _user_id: string }
+        Args: { _user_id?: string }
         Returns: string[]
       }
     }
