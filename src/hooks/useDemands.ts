@@ -27,6 +27,8 @@ export interface DemandFilters {
   demand_type_id?: string;
   area_id?: string;
   search?: string;
+  workspace?: "cx" | "tech";
+  squad_id?: string;
 }
 
 // ── Queries ──
