@@ -6,7 +6,7 @@ import {
   type DragEndEvent,
 } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, CheckSquare } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { getAgingDays, getAgingStyle } from "@/lib/getAgingStyle";
@@ -32,9 +32,10 @@ const NO_AREA = "no-area";
 interface Props {
   columns: Tables<"ticket_columns">[];
   demands: DemandRow[];
+  taskCounts?: Record<string, { total: number; done: number }>;
 }
 
-export function TechSwimlanePage({ columns, demands }: Props) {
+export function TechSwimlanePage({ columns, demands, taskCounts }: Props) {
   const { data: areas = [] } = useAreasByWorkspace("tech");
   const moveMutation = useMoveDemand();
   const updateMutation = useUpdateDemand();
@@ -159,6 +160,7 @@ export function TechSwimlanePage({ columns, demands }: Props) {
               )}
               onCardClick={(d) => navigate(`/demands/${d.id}`)}
               isCollapsed={isCollapsed}
+              taskCounts={taskCounts}
             />
           ))}
         </div>
@@ -174,9 +176,10 @@ interface LaneProps {
   demands: DemandRow[];
   onCardClick: (d: DemandRow) => void;
   isCollapsed: (id: string) => boolean;
+  taskCounts?: Record<string, { total: number; done: number }>;
 }
 
-function SwimlaneLane({ area, columns, gridTemplate, demands, onCardClick, isCollapsed }: LaneProps) {
+function SwimlaneLane({ area, columns, gridTemplate, demands, onCardClick, isCollapsed, taskCounts }: LaneProps) {
   return (
     <div
       className="grid gap-2 rounded-lg border border-border bg-card/40 p-2"
@@ -215,6 +218,7 @@ function SwimlaneLane({ area, columns, gridTemplate, demands, onCardClick, isCol
           demands={demands.filter((d) => d.column_id === col.id)}
           onCardClick={onCardClick}
           collapsed={isCollapsed(col.id)}
+          taskCounts={taskCounts}
         />
       ))}
     </div>
@@ -227,9 +231,10 @@ interface CellProps {
   demands: DemandRow[];
   onCardClick: (d: DemandRow) => void;
   collapsed: boolean;
+  taskCounts?: Record<string, { total: number; done: number }>;
 }
 
-function SwimlaneCell({ areaId, columnId, demands, onCardClick, collapsed }: CellProps) {
+function SwimlaneCell({ areaId, columnId, demands, onCardClick, collapsed, taskCounts }: CellProps) {
   const id = `${areaId ?? NO_AREA}::${columnId}`;
   const { setNodeRef, isOver } = useDroppable({ id, disabled: collapsed });
 
@@ -246,7 +251,12 @@ function SwimlaneCell({ areaId, columnId, demands, onCardClick, collapsed }: Cel
       )}
     >
       {demands.map((d) => (
-        <SwimlaneDemandCard key={d.id} demand={d} onClick={() => onCardClick(d)} />
+        <SwimlaneDemandCard
+          key={d.id}
+          demand={d}
+          onClick={() => onCardClick(d)}
+          taskCount={taskCounts?.[d.id]}
+        />
       ))}
       {demands.length === 0 && <div className="h-12" aria-hidden />}
     </div>
@@ -256,9 +266,10 @@ function SwimlaneCell({ areaId, columnId, demands, onCardClick, collapsed }: Cel
 interface CardProps {
   demand: DemandRow;
   onClick: () => void;
+  taskCount?: { total: number; done: number };
 }
 
-function SwimlaneDemandCard({ demand, onClick }: CardProps) {
+function SwimlaneDemandCard({ demand, onClick, taskCount }: CardProps) {
   const [pressed, setPressed] = useState(false);
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: demand.id,
@@ -301,6 +312,20 @@ function SwimlaneDemandCard({ demand, onClick }: CardProps) {
         {assigneeFirst && (
           <span className="text-[10px] text-muted-foreground truncate max-w-[80px]">
             {assigneeFirst}
+          </span>
+        )}
+        {taskCount && taskCount.total > 0 && (
+          <span
+            className={cn(
+              "inline-flex items-center gap-0.5 text-[10px] font-medium px-1 py-0 h-4 rounded",
+              taskCount.done === taskCount.total
+                ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+                : "bg-muted text-muted-foreground",
+            )}
+            title={`${taskCount.done} de ${taskCount.total} subdemandas`}
+          >
+            <CheckSquare className="h-3 w-3" />
+            {taskCount.done}/{taskCount.total}
           </span>
         )}
         {aging && (

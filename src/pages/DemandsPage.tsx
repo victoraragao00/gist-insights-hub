@@ -20,6 +20,7 @@ import {
 } from "@/hooks/useDemands";
 import { useAreasByWorkspace } from "@/hooks/useDemandAreas";
 import { useCollapsedColumns } from "@/hooks/useCollapsedColumns";
+import { useDemandTaskCounts } from "@/hooks/useDemandTasks";
 import { KanbanColumn } from "@/components/demands/KanbanColumn";
 import { TechSwimlanePage } from "@/components/demands/TechSwimlanePage";
 // DemandDetailSheet still used elsewhere; navigation now opens dedicated page
@@ -120,6 +121,9 @@ const DemandsPage = () => {
 
   const { data: demands = [], isLoading: demandsLoading } = useDemands(filters);
   const moveMutation = useMoveDemand();
+
+  const demandIds = useMemo(() => demands.map((d) => d.id), [demands]);
+  const { data: taskCounts = {} } = useDemandTaskCounts(demandIds);
 
   const navigate = useNavigate();
 
@@ -310,7 +314,7 @@ const DemandsPage = () => {
               Nenhuma demanda encontrada com os filtros selecionados
             </div>
           ) : activeWorkspace === "tech" ? (
-            <TechSwimlanePage columns={columns} demands={demands} />
+            <TechSwimlanePage columns={columns} demands={demands} taskCounts={taskCounts} />
           ) : (
             <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
               <div className="flex gap-4 overflow-x-auto pb-4">
@@ -323,6 +327,7 @@ const DemandsPage = () => {
                     onAddClick={handleAddClick}
                     isCollapsed={isCollapsed(col.id)}
                     onToggleCollapse={toggleCollapse}
+                    taskCounts={taskCounts}
                   />
                 ))}
               </div>

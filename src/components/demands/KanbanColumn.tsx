@@ -14,6 +14,7 @@ interface KanbanColumnProps {
   onAddClick: (columnId: string) => void;
   isCollapsed: boolean;
   onToggleCollapse: (columnId: string) => void;
+  taskCounts?: Record<string, { total: number; done: number }>;
 }
 
 export function KanbanColumn({
@@ -23,6 +24,7 @@ export function KanbanColumn({
   onAddClick,
   isCollapsed,
   onToggleCollapse,
+  taskCounts,
 }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: column.id });
 
@@ -98,6 +100,7 @@ export function KanbanColumn({
               key={demand.id}
               demand={demand}
               onClick={() => onCardClick(demand)}
+              taskCount={taskCounts?.[demand.id]}
             />
           ))}
         </SortableContext>

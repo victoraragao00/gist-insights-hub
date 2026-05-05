@@ -1,7 +1,7 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Badge } from "@/components/ui/badge";
-import { Lock, Headphones, Bug, TrendingUp, Sparkles, Briefcase, Search, Clock } from "lucide-react";
+import { Lock, Headphones, Bug, TrendingUp, Sparkles, Briefcase, Search, Clock, CheckSquare } from "lucide-react";
 import { formatHours } from "@/lib/formatHours";
 import { getAgingDays, getAgingStyle } from "@/lib/getAgingStyle";
 import { formatDistanceToNow } from "date-fns";
@@ -35,9 +35,10 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
 interface DemandCardProps {
   demand: DemandRow;
   onClick: () => void;
+  taskCount?: { total: number; done: number };
 }
 
-export function DemandCard({ demand, onClick }: DemandCardProps) {
+export function DemandCard({ demand, onClick, taskCount }: DemandCardProps) {
   const {
     attributes,
     listeners,
@@ -127,6 +128,21 @@ export function DemandCard({ demand, onClick }: DemandCardProps) {
           <Badge variant="outline" className={cn("text-[10px] px-1.5 py-0 h-4", aging.className)}>
             {aging.label}
           </Badge>
+        )}
+
+        {taskCount && taskCount.total > 0 && (
+          <span
+            className={cn(
+              "inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded",
+              taskCount.done === taskCount.total
+                ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+                : "bg-muted text-muted-foreground",
+            )}
+            title={`${taskCount.done} de ${taskCount.total} subdemandas concluídas`}
+          >
+            <CheckSquare className="h-3 w-3" />
+            {taskCount.done}/{taskCount.total}
+          </span>
         )}
       </div>
 

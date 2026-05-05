@@ -23,6 +23,7 @@ import {
 import { useDemandAnalysis, useAnalyzeDemand } from "@/hooks/useDemandAnalysis";
 import { useAutoResize } from "@/hooks/useAutoResize";
 import { AttachmentThumbnail } from "./AttachmentThumbnail";
+import { DemandTasksSection } from "./DemandTasksSection";
 
 const ACCEPTED_FILE_TYPES = "image/*,application/pdf,.doc,.docx,.xls,.xlsx,.csv";
 
@@ -109,6 +110,8 @@ export function DemandContentTab({ demand }: DemandContentTabProps) {
           className="resize-none overflow-hidden min-h-[80px]"
         />
       </div>
+
+      <DemandTasksSection demandId={demand.id} />
 
       <div className="space-y-1.5">
         <Label className="text-xs text-muted-foreground">Notas internas</Label>

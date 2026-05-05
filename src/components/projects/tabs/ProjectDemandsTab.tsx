@@ -23,6 +23,7 @@ import {
   priorityLabel,
 } from "@/components/demands/detail/priorityBadgeStyles";
 import type { DemandPriority } from "@/hooks/useDemands";
+import { useDemandTaskCounts } from "@/hooks/useDemandTasks";
 
 interface ProjectDemandsTabProps {
   projectId: string;
@@ -31,6 +32,8 @@ interface ProjectDemandsTabProps {
 export function ProjectDemandsTab({ projectId }: ProjectDemandsTabProps) {
   const navigate = useNavigate();
   const { data: demands = [] } = useProjectDemands(projectId);
+  const demandIds = demands.map((d) => d.id);
+  const { data: taskCounts = {} } = useDemandTaskCounts(demandIds);
   const unlink = useUnlinkDemandFromProject();
   const [showLink, setShowLink] = useState(false);
   const [unlinkId, setUnlinkId] = useState<string | null>(null);
@@ -89,6 +92,19 @@ export function ProjectDemandsTab({ projectId }: ProjectDemandsTabProps) {
                     </span>
                   )}
                 </div>
+                {taskCounts[d.id] && taskCounts[d.id].total > 0 && (
+                  <div className="flex items-center gap-2 mt-1">
+                    <div className="flex-1 h-1 rounded-full bg-muted overflow-hidden">
+                      <div
+                        className="h-full bg-primary/60 rounded-full transition-all"
+                        style={{ width: `${taskCounts[d.id].completion_pct}%` }}
+                      />
+                    </div>
+                    <span className="text-[10px] text-muted-foreground">
+                      {taskCounts[d.id].done}/{taskCounts[d.id].total}
+                    </span>
+                  </div>
+                )}
               </div>
               <span
                 className={cn(
