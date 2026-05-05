@@ -32,6 +32,7 @@ import {
   useUpdateProject,
   useCancelProject,
 } from "@/hooks/useProjects";
+import { useProjectAgendas } from "@/hooks/useMeetingAgendas";
 import { StatusBadge } from "@/components/projects/StatusBadge";
 import { ProjectDemandsTab } from "@/components/projects/tabs/ProjectDemandsTab";
 import { ProjectSquadTab } from "@/components/projects/tabs/ProjectSquadTab";
