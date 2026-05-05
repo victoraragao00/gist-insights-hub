@@ -46,6 +46,7 @@ export default function ProjectDetailPage() {
   const { data: stats } = useProjectStats(id);
   const updateProject = useUpdateProject();
   const cancelProject = useCancelProject();
+  const { data: projectAgendas = [] } = useProjectAgendas(id);
 
   const [titleEdit, setTitleEdit] = useState("");
   const [editing, setEditing] = useState(false);
@@ -76,7 +77,6 @@ export default function ProjectDetailPage() {
   const completed = stats?.completed ?? 0;
   const totalHours = stats?.total_hours ?? 0;
   const meetingHours = stats?.meeting_hours ?? 0;
-  const { data: projectAgendas = [] } = useProjectAgendas(id);
 
   const handleTitleSave = async () => {
     const t = titleEdit.trim();
