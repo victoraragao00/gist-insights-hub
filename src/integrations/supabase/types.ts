@@ -1989,6 +1989,10 @@ export type Database = {
         }[]
       }
       is_admin: { Args: never; Returns: boolean }
+      is_project_accessible: {
+        Args: { p_project_id: string }
+        Returns: boolean
+      }
       search_interactions: {
         Args: {
           p_client_id?: string
