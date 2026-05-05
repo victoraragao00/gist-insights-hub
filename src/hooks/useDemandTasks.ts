@@ -266,6 +266,7 @@ export function useUpdateDemandTask() {
       queryClient.invalidateQueries({ queryKey: ["demand-task-counts"] });
       queryClient.invalidateQueries({ queryKey: ["demand", vars.demand_id] });
       queryClient.invalidateQueries({ queryKey: ["demands"] });
+      queryClient.invalidateQueries({ queryKey: ["task", vars.id] });
     },
     onError: (err) =>
       toast.error(err instanceof Error ? err.message : "Erro ao atualizar subdemanda"),
