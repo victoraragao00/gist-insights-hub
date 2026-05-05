@@ -23,6 +23,7 @@ import {
   priorityLabel,
 } from "@/components/demands/detail/priorityBadgeStyles";
 import type { DemandPriority } from "@/hooks/useDemands";
+import { useDemandTaskCounts } from "@/hooks/useDemandTasks";
 
 interface ProjectDemandsTabProps {
   projectId: string;
