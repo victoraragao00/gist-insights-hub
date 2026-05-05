@@ -1,9 +1,56 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
 import type { UserRole } from "@/hooks/useUserRole";
 import type { UserWithPermissions } from "@/hooks/useUsers";
+
+// ── useUsersBypass ────────────────────────────────────────────────────────────
+
+export function useUsersBypass() {
+  const { user } = useAuth();
+  return useQuery<Record<string, boolean>>({
+    queryKey: ["users_bypass", user?.id],
+    enabled: !!user?.id,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("user_profiles")
+        .select("id, bypass_client_access");
+      if (error) throw error;
+      const map: Record<string, boolean> = {};
+      (data ?? []).forEach((row) => {
+        map[row.id] = !!row.bypass_client_access;
+      });
+      return map;
+    },
+  });
+}
+
+// ── useUpdateUserBypass ───────────────────────────────────────────────────────
+
+export function useUpdateUserBypass() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ userId, bypass }: { userId: string; bypass: boolean }) => {
+      const { error } = await supabase
+        .from("user_profiles")
+        .update({ bypass_client_access: bypass, updated_at: new Date().toISOString() })
+        .eq("id", userId);
+      if (error) throw error;
+    },
+    onSuccess: (_, { bypass }) => {
+      queryClient.invalidateQueries({ queryKey: ["users_bypass"] });
+      queryClient.invalidateQueries({ queryKey: ["users_with_permissions"] });
+      toast.success(
+        bypass ? "Acesso TECH completo ativado" : "Acesso TECH completo desativado"
+      );
+    },
+    onError: (err) => {
+      toast.error(err instanceof Error ? err.message : "Erro ao atualizar acesso TECH");
+    },
+  });
+}
 
 // ── useUpdateUserRole ─────────────────────────────────────────────────────────
 
