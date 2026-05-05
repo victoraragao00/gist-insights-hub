@@ -314,7 +314,7 @@ const DemandsPage = () => {
               Nenhuma demanda encontrada com os filtros selecionados
             </div>
           ) : activeWorkspace === "tech" ? (
-            <TechSwimlanePage columns={columns} demands={demands} />
+            <TechSwimlanePage columns={columns} demands={demands} taskCounts={taskCounts} />
           ) : (
             <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
               <div className="flex gap-4 overflow-x-auto pb-4">
@@ -327,6 +327,7 @@ const DemandsPage = () => {
                     onAddClick={handleAddClick}
                     isCollapsed={isCollapsed(col.id)}
                     onToggleCollapse={toggleCollapse}
+                    taskCounts={taskCounts}
                   />
                 ))}
               </div>
