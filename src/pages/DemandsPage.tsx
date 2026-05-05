@@ -122,6 +122,9 @@ const DemandsPage = () => {
   const { data: demands = [], isLoading: demandsLoading } = useDemands(filters);
   const moveMutation = useMoveDemand();
 
+  const demandIds = useMemo(() => demands.map((d) => d.id), [demands]);
+  const { data: taskCounts = {} } = useDemandTaskCounts(demandIds);
+
   const navigate = useNavigate();
 
   const { isCollapsed, toggle: toggleCollapse } = useCollapsedColumns(columns);
