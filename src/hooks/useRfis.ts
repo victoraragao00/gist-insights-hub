@@ -3,6 +3,38 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
 
+// ── All RFIs (global list) ──
+export interface AllRfisFilters {
+  statusId?: string;
+  clientId?: string;
+  search?: string;
+}
+
+export function useAllRfis(filters: AllRfisFilters) {
+  const { user } = useAuth();
+  const { statusId, clientId, search } = filters;
+  return useQuery({
+    queryKey: ["all-rfis", user?.id, statusId ?? "all", clientId ?? "all", search ?? ""],
+    enabled: !!user?.id,
+    staleTime: 30_000,
+    queryFn: async () => {
+      let query = supabase
+        .from("rfis")
+        .select(
+          "*, rfi_statuses(name, color), user_profiles!assignee_id(full_name, email), demands!inner(id, title, workspace, client_id, clients(id, name))",
+        )
+        .order("created_at", { ascending: false })
+        .limit(500);
+      if (statusId) query = query.eq("status_id", statusId);
+      if (clientId) query = query.eq("demands.client_id", clientId);
+      if (search && search.trim()) query = query.ilike("rfi_number", `%${search.trim()}%`);
+      const { data, error } = await query;
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+}
+
 // ── Queries ──
 
 export function useRfiByDemand(demandId: string) {
