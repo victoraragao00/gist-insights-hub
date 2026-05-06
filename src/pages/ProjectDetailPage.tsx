@@ -126,7 +126,12 @@ export default function ProjectDetailPage() {
 
         <div className="flex items-center gap-2 flex-wrap text-sm">
           <StatusBadge status={status} />
-          {project.clients && (
+          {!project.client_id && project.workspace === "tech" && (
+            <span className="text-[11px] px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-950 dark:text-purple-300 dark:border-purple-900 font-medium">
+              Interno
+            </span>
+          )}
+          {project.clients && project.client_id && (
             <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
               <Building2 className="h-3 w-3" />
               {project.clients.name}
