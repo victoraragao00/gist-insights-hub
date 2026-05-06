@@ -25,6 +25,7 @@ import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
 import PublicDemandsPage from "./pages/PublicDemandsPage";
 import TechDashboardPage from "./pages/TechDashboardPage";
+import RFIsPage from "./pages/RFIsPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
