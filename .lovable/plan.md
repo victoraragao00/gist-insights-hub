@@ -1,43 +1,73 @@
-## Diagnóstico
+## Plano — Sidebar unificado, RFIs page, Projetos compartilhados
 
-A função `get_tech_dashboard_metrics` está retornando erro 42803 (`aggregate function calls cannot be nested`), por isso `/tech/dashboard` mostra "Não foi possível carregar o Dashboard TECH". O SQL v2 sugerido pelo usuário corrige a estrutura usando CTEs isolados, mas precisa de **3 ajustes obrigatórios** para compilar contra o schema real:
+### Escopo confirmado (4 features)
 
-| Problema no SQL fornecido | Realidade no banco | Correção |
-|---|---|---|
-| `d.updated_at` (várias vezes) | Coluna não existe em `demands` | Usar `d.last_updated` |
-| `da.action_type = 'column_changed'` | Coluna se chama `event_type`; valor correto é `'moved'` | Usar `event_type = 'moved'` com `LEAD()` (como na v1) |
-| `da.action_type = 'reopened'` | Enum `demand_event_type` não tem `'reopened'` (`created, moved, assigned, blocked, unblocked, edited, cancelled, linked_interaction, commented`) | Manter `reopen_count = 0` com TODO |
+**F1. Sidebar unificado (`src/components/AppSidebar.tsx`)**
+- Itens exclusivos por workspace:
+  - TECH: Dashboard (`/tech/dashboard`), Kanban (`/demands`)
+  - CX: Dashboard (`/`), Demandas (`/demands`), Analytics (`/demands/dashboard`)
+- Divisor + grupo "Geral" (igual nos dois workspaces): Projetos · Clientes · Pautas · RFIs
+- Path de Pautas dinâmico: TECH → `/agendas?type=internal`, CX → `/agendas?type=client`
+- Manter Busca/Auditorias do CX dentro do grupo do workspace (não estavam no prompt; manter como itens CX-only para não regredir)
+- Configurações + Sair no `SidebarFooter` (já existe)
 
-Há também uma mudança de **shape** no JSON: a v2 transforma `throughput` de array em objeto (`{ weekly, total_done, total_created, delivery_rate }`). O frontend (`useTechDashboard.ts` e `ThroughputChart.tsx`) precisa ser atualizado para o novo shape.
+**F2. AgendasPage com filtro por workspace (`src/pages/AgendasPage.tsx`)**
+- Ler `?type=` da URL e workspace ativo; default = `internal` em TECH, `client` em CX
+- Adicionar toggle pill "Externas / Internas / Todas" no topo dos filtros
+- Sincronizar mudança do toggle com `setSearchParams` para deep-linking
+- Passar `agendaType` ao hook `useMeetingAgendas` (campo `agenda_type` já existe na tabela)
+- Verificar se `useMeetingAgendas` aceita filtro por tipo; se não, estender o hook (apenas leitura, m4 staleTime mantido)
 
-## O que vou fazer
+**F3. RFIsPage nova (`/rfis`)**
+- Nova rota em `src/App.tsx` (dentro do `ProtectedRoute` + `ClientProvider` + `ErrorBoundary`)
+- Hook `useAllRfis(filters)` em `src/hooks/useRfis.ts` (`staleTime: 30_000`, queryKey inclui `user?.id` + filtros conforme regra de cache)
+- Tabela com colunas: Código (`rfi_number`), Demanda, Cliente, Status, Responsável, Criado
+- Filtros: busca por `rfi_number`, status (via `rfi_statuses`), cliente
+- Click na linha → `navigate('/demands/:demand_id')`
+- Item "RFIs" adicionado ao grupo Geral do sidebar
 
-### 1. Migration: substituir `get_tech_dashboard_metrics` (DROP + CREATE)
+**F4. Projetos compartilhados + flag "Interno"**
+- `useProjects`: remover `.eq('workspace', ...)` para projetos aparecerem em ambos workspaces
+- `ProjectsPage` acessível sem amarração de workspace (rota já é `/projects`)
+- `CreateProjectDialog`: substituir Select de cliente por `Switch` "Projeto interno (uMode)" + `ClientSelect` condicional; badge roxo "Interno" quando ativo
+- `ProjectCard` + `ProjectDetailPage`: badge roxo "Interno" no header; ocultar nome do cliente quando interno
 
-Aplica a v2 do usuário com as 3 correções acima:
-- `last_updated` no lugar de `updated_at`
-- Tempo por coluna usando `event_type = 'moved'` + `LEAD()` (mantém comportamento útil; a fórmula original `COALESCE(da.created_at, now()) - da.created_at` retornaria sempre 0)
-- `reopen_count = 0` com TODO no comentário
+### ⚠️ Bloqueio detectado — confirmar antes de codar
 
-Mantém: CTEs isolados, percentis com `GREATEST(..., 1)` para evitar divisão por zero, bypass admin, filtros `p_area_id` / `p_project_id`, `SECURITY DEFINER`, `search_path = public`.
+O prompt diz "Dependências: Banco PROJECTS_RFI_SHARED concluído", mas inspeção do schema atual mostra que **a migration ainda NÃO foi aplicada**:
 
-### 2. Frontend: alinhar tipos ao novo JSON
+- Tabela `projects` **não tem coluna `is_internal`** (colunas atuais: id, title, description, owner_id, due_date, cancelled_at, cancelled_by, workspace, client_id, created_at, updated_at)
+- Tabela `rfis` **não tem coluna `status` (string)** — usa `status_id` (FK para `rfi_statuses`)
+- Tabela `rfis` **não tem coluna `code`** — código da RFI é `rfi_number`
 
-- `src/hooks/useTechDashboard.ts`: trocar `throughput: Array<...>` por `throughput: { weekly: Array<...>; total_done; total_created; delivery_rate }`. Ajustar `DeliveredByArea` (sem `area_id`, agora só `area_name`).
-- `src/components/tech-dashboard/ThroughputChart.tsx`: ler `data.weekly` (em vez de iterar `data` direto). Usar `data.delivery_rate` direto, removendo o cálculo manual.
-- `src/components/tech-dashboard/AlertCards.tsx`: já usa `area_name` — sem mudança funcional.
+Como o prompt proíbe migration nesta sessão, propõe-se:
 
-### 3. Validação pós-deploy
+1. **F4 — Badge "Interno":** ao salvar `is_internal`, gravar em `clients = null` e usar **`is_internal = (client_id === null && workspace === 'tech')`** como derivação visual até a coluna existir. UI fica pronta, basta a migration depois para persistir explicitamente.
+2. **F3 — RFIs:** usar `rfi_number` em vez de `code`; filtro de status por `status_id` com join em `rfi_statuses(name, color)` (já existe pattern em `useRfisByClient`).
 
-```sql
-SELECT (get_tech_dashboard_metrics())::json->>'is_admin';
-SELECT ((get_tech_dashboard_metrics())::json->'alerts'->'blocked'->>'count')::int;
-SELECT ((get_tech_dashboard_metrics())::json->'forecast'->>'backlog_count')::int;
-```
+### Arquivos a alterar/criar
 
-E recarregar `/tech/dashboard` no preview para confirmar render sem erro.
+- `src/components/AppSidebar.tsx` — reorganizar grupos
+- `src/pages/AgendasPage.tsx` — toggle + searchParams + filtro
+- `src/hooks/useMeetingAgendas.ts` — aceitar `agendaType` no filter (verificar se já existe)
+- `src/hooks/useRfis.ts` — adicionar `useAllRfis`
+- `src/pages/RFIsPage.tsx` — novo
+- `src/App.tsx` — adicionar rota `/rfis`
+- `src/hooks/useProjects.ts` — remover filtro de workspace na listagem (manter no insert)
+- `src/components/projects/CreateProjectDialog.tsx` — Switch + condicional
+- `src/components/projects/ProjectCard.tsx` — badge "Interno"
+- `src/pages/ProjectDetailPage.tsx` — badge "Interno" no header
 
-## Fora de escopo
+### Conformidade Checklist CTO
+- m4: todas queries com `staleTime` (30s para listas dinâmicas, 5min para projetos)
+- m5: `queryKey` inclui `user?.id` + filtros
+- m8: `{ data, error }` destructurado
+- m11: zero imports não usados
+- Toasts via `sonner` (já é o padrão)
 
-- Repensar a métrica de `column_time` com `from_value`/`to_value` adequados — fica para depois; mantemos o comportamento funcional da v1.
-- Definir evento de reabertura (precisa adicionar `'reopened'` ao enum `demand_event_type` em outra sprint).
+### Pergunta para o usuário (antes de implementar)
+
+Como tratar `is_internal` sem a coluna no banco?
+- **(a) Implementar UI completa, persistir como `client_id = null`** e detectar "interno" como `client_id === null && workspace === 'tech'` (recomendado — entrega 100% do visual hoje, migration depois marca explicitamente)
+- **(b) Pausar F4 até criar a migration** (`ALTER TABLE projects ADD COLUMN is_internal boolean DEFAULT false`) em sessão separada
+- **(c) Criar a migration nesta sessão mesmo** (viola "Não criar migration nesta sessão" do prompt)

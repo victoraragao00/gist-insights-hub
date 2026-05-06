@@ -36,10 +36,17 @@ export function ProjectCard({ project }: ProjectCardProps) {
         <h3 className="font-medium text-sm leading-snug line-clamp-2">
           {project.title}
         </h3>
-        <StatusBadge status={status} />
+        <div className="flex items-center gap-1.5 shrink-0">
+          {!project.client_id && project.workspace === "tech" && (
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-950 dark:text-purple-300 dark:border-purple-900 font-medium">
+              Interno
+            </span>
+          )}
+          <StatusBadge status={status} />
+        </div>
       </div>
 
-      {project.clients && (
+      {project.clients && project.client_id && (
         <p className="text-xs text-muted-foreground mb-3 flex items-center gap-1">
           <Building2 className="h-3 w-3" />
           {project.clients.name}

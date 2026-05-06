@@ -25,6 +25,7 @@ import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
 import PublicDemandsPage from "./pages/PublicDemandsPage";
 import TechDashboardPage from "./pages/TechDashboardPage";
+import RFIsPage from "./pages/RFIsPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -58,6 +59,7 @@ const App = () => (
                 <Route path="/projects" element={<ErrorBoundary><ProjectsPage /></ErrorBoundary>} />
                 <Route path="/projects/:id" element={<ErrorBoundary><ProjectDetailPage /></ErrorBoundary>} />
                 <Route path="/tech/dashboard" element={<ErrorBoundary><TechDashboardPage /></ErrorBoundary>} />
+                <Route path="/rfis" element={<ErrorBoundary><RFIsPage /></ErrorBoundary>} />
               </Route>
             </Route>
             <Route path="*" element={<NotFound />} />

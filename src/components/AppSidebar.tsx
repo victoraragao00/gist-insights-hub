@@ -1,13 +1,12 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
-import { LayoutDashboard, Search, ShieldAlert, Settings, Users, Kanban, BarChart2, ClipboardList, LogOut, Loader2, FolderKanban, Calendar } from "lucide-react";
+import { LayoutDashboard, Search, ShieldAlert, Settings, Users, Kanban, BarChart2, ClipboardList, LogOut, Loader2, FolderKanban, FileText } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { WorkspaceSwitcher } from "@/components/layout/WorkspaceSwitcher";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import umodeLogo from "@/assets/umode-logo-full.png";
 import umodeIcon from "@/assets/umode-icon.png";
-import { useLocation } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -26,15 +25,12 @@ import {
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
 const cxItems = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
-  { title: "Clientes", url: "/clients", icon: Users },
   { title: "Demandas", url: "/demands", icon: Kanban },
-  { title: "Analytics de Demandas", url: "/demands/dashboard", icon: BarChart2 },
-  { title: "Pautas", url: "/agendas", icon: ClipboardList },
+  { title: "Analytics", url: "/demands/dashboard", icon: BarChart2 },
   { title: "Busca", url: "/search", icon: Search },
   { title: "Auditorias", url: "/audits", icon: ShieldAlert },
 ];
@@ -42,8 +38,6 @@ const cxItems = [
 const techItems = [
   { title: "Dashboard", url: "/tech/dashboard", icon: BarChart2 },
   { title: "Kanban", url: "/demands", icon: Kanban },
-  { title: "Projetos", url: "/projects", icon: FolderKanban },
-  { title: "Pautas Internas", url: "/agendas?type=internal", icon: Calendar },
 ];
 
 const bottomItems = [
@@ -53,11 +47,21 @@ const bottomItems = [
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
-  const location = useLocation();
   const navigate = useNavigate();
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
   const { activeWorkspace, setWorkspace } = useWorkspace();
   const modules = activeWorkspace === "tech" ? techItems : cxItems;
+
+  const pautasPath = activeWorkspace === "tech"
+    ? "/agendas?type=internal"
+    : "/agendas?type=client";
+
+  const sharedItems = [
+    { title: "Projetos", url: "/projects", icon: FolderKanban },
+    { title: "Clientes", url: "/clients", icon: Users },
+    { title: "Pautas", url: pautasPath, icon: ClipboardList },
+    { title: "RFIs", url: "/rfis", icon: FileText },
+  ];
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
@@ -69,6 +73,22 @@ export function AppSidebar() {
       toast.error("Erro ao sair. Tente novamente.");
     },
   });
+
+  const renderItem = (item: { title: string; url: string; icon: typeof FolderKanban }) => (
+    <SidebarMenuItem key={item.title}>
+      <SidebarMenuButton asChild tooltip={collapsed ? item.title : undefined}>
+        <NavLink
+          to={item.url}
+          end={item.url === "/"}
+          className="hover:bg-accent/50"
+          activeClassName="bg-primary text-primary-foreground hover:bg-primary/90"
+        >
+          <item.icon className="h-4 w-4 shrink-0" />
+          {!collapsed && <span>{item.title}</span>}
+        </NavLink>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  );
 
   return (
     <>
@@ -96,28 +116,18 @@ export function AppSidebar() {
 
         <SidebarContent>
           <SidebarGroup>
-            <SidebarGroupLabel>{activeWorkspace === "tech" ? "TECH" : "Módulos"}</SidebarGroupLabel>
+            <SidebarGroupLabel>{activeWorkspace === "tech" ? "TECH" : "CX Hub"}</SidebarGroupLabel>
             <SidebarGroupContent>
-              <SidebarMenu>
-                {modules.map((item) => (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton
-                      asChild
-                      tooltip={collapsed ? item.title : undefined}
-                    >
-                      <NavLink
-                        to={item.url}
-                        end={item.url === "/"}
-                        className="hover:bg-accent/50"
-                        activeClassName="bg-primary text-primary-foreground hover:bg-primary/90"
-                      >
-                        <item.icon className="h-4 w-4 shrink-0" />
-                        {!collapsed && <span>{item.title}</span>}
-                      </NavLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
+              <SidebarMenu>{modules.map(renderItem)}</SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+
+          <div className="mx-4 my-2 border-t border-border/50" />
+
+          <SidebarGroup>
+            <SidebarGroupLabel>Geral</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>{sharedItems.map(renderItem)}</SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
         </SidebarContent>

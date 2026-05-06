@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -7,29 +7,57 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Plus, ClipboardList, Loader2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { useMeetingAgendas, type MeetingAgendaWithClient } from "@/hooks/useMeetingAgendas";
 import { useClient } from "@/context/ClientContext";
+import { useWorkspace } from "@/hooks/useWorkspace";
 import { CreateAgendaDialog } from "@/components/agendas/CreateAgendaDialog";
 
 import { SatisfactionDisplay } from "@/components/agendas/SatisfactionPicker";
 
+type AgendaType = "client" | "internal" | "all";
+
 const AgendasPage = () => {
   const { clients } = useClient();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { activeWorkspace } = useWorkspace();
+  const defaultType: AgendaType = activeWorkspace === "tech" ? "internal" : "client";
+  const urlType = searchParams.get("type");
+  const initialType: AgendaType =
+    urlType === "internal" || urlType === "client" || urlType === "all" ? urlType : defaultType;
+
+  const [agendaType, setAgendaType] = useState<AgendaType>(initialType);
   const [filterClientId, setFilterClientId] = useState<string>("");
   const [filterPeriod, setFilterPeriod] = useState<string>("");
   const [filterSatisfaction, setFilterSatisfaction] = useState<string>("");
   const [createOpen, setCreateOpen] = useState(false);
 
+  useEffect(() => {
+    const current = searchParams.get("type");
+    if (current !== agendaType) {
+      const next = new URLSearchParams(searchParams);
+      next.set("type", agendaType);
+      setSearchParams(next, { replace: true });
+    }
+  }, [agendaType, searchParams, setSearchParams]);
+
   const { data: agendas = [], isLoading } = useMeetingAgendas({
     clientId: filterClientId && filterClientId !== "all" ? filterClientId : undefined,
     periodDays: filterPeriod ? Number(filterPeriod) : undefined,
     satisfactionScore: filterSatisfaction ? Number(filterSatisfaction) : undefined,
+    agendaType,
   });
 
   const handleOpen = (agenda: MeetingAgendaWithClient) => {
     navigate(`/agendas/${agenda.id}`);
   };
+
+  const typeOptions: { value: AgendaType; label: string }[] = [
+    { value: "client", label: "Externas" },
+    { value: "internal", label: "Internas" },
+    { value: "all", label: "Todas" },
+  ];
 
   return (
     <div className="space-y-6">
@@ -43,7 +71,26 @@ const AgendasPage = () => {
         </Button>
       </div>
 
+      {/* Type toggle */}
+      <div className="flex gap-2">
+        {typeOptions.map((opt) => (
+          <button
+            key={opt.value}
+            onClick={() => setAgendaType(opt.value)}
+            className={cn(
+              "text-xs px-3 py-1.5 rounded-full border transition-all",
+              agendaType === opt.value
+                ? "bg-foreground text-background border-foreground"
+                : "border-border text-muted-foreground hover:border-foreground/40",
+            )}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+
       {/* Filters */}
+
       <div className="flex items-center gap-3 flex-wrap">
         <Select value={filterClientId} onValueChange={setFilterClientId}>
           <SelectTrigger className="w-48">
