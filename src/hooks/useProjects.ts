@@ -68,17 +68,16 @@ const PROJECT_SELECT = `
   clients(id, name)
 `;
 
-export function useProjects(workspace: string = "tech") {
+export function useProjects(_workspace?: string) {
   const { user } = useAuth();
   return useQuery<ProjectRow[]>({
-    queryKey: ["projects", user?.id, workspace],
+    queryKey: ["projects", user?.id, "all"],
     enabled: !!user?.id,
     staleTime: 300_000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("projects")
         .select(PROJECT_SELECT)
-        .eq("workspace", workspace)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return (data ?? []) as unknown as ProjectRow[];
