@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -7,11 +7,15 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Plus, ClipboardList, Loader2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { useMeetingAgendas, type MeetingAgendaWithClient } from "@/hooks/useMeetingAgendas";
 import { useClient } from "@/context/ClientContext";
+import { useWorkspace } from "@/hooks/useWorkspace";
 import { CreateAgendaDialog } from "@/components/agendas/CreateAgendaDialog";
 
 import { SatisfactionDisplay } from "@/components/agendas/SatisfactionPicker";
+
+type AgendaType = "client" | "internal" | "all";
 
 const AgendasPage = () => {
   const { clients } = useClient();
