@@ -31,6 +31,7 @@ export interface MeetingAgendasFilters {
   clientId?: string;
   periodDays?: number;
   satisfactionScore?: number;
+  agendaType?: "client" | "internal" | "all";
 }
 
 export function useMeetingAgendas(filters?: MeetingAgendasFilters) {
@@ -38,9 +39,10 @@ export function useMeetingAgendas(filters?: MeetingAgendasFilters) {
   const clientId = filters?.clientId;
   const periodDays = filters?.periodDays;
   const satisfactionScore = filters?.satisfactionScore;
+  const agendaType = filters?.agendaType ?? "all";
 
   return useQuery<MeetingAgendaWithClient[]>({
-    queryKey: ["meeting_agendas", user?.id, clientId ?? "all", periodDays ?? "all", satisfactionScore ?? "all"],
+    queryKey: ["meeting_agendas", user?.id, clientId ?? "all", periodDays ?? "all", satisfactionScore ?? "all", agendaType],
     enabled: !!user?.id,
     staleTime: 30 * 1000,
     queryFn: async () => {
@@ -59,6 +61,9 @@ export function useMeetingAgendas(filters?: MeetingAgendasFilters) {
       }
       if (satisfactionScore !== undefined) {
         query = query.eq("satisfaction_score", satisfactionScore);
+      }
+      if (agendaType !== "all") {
+        query = query.eq("agenda_type", agendaType);
       }
 
       const { data, error } = await query;
