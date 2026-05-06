@@ -47,11 +47,21 @@ const bottomItems = [
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
-  const location = useLocation();
   const navigate = useNavigate();
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
   const { activeWorkspace, setWorkspace } = useWorkspace();
   const modules = activeWorkspace === "tech" ? techItems : cxItems;
+
+  const pautasPath = activeWorkspace === "tech"
+    ? "/agendas?type=internal"
+    : "/agendas?type=client";
+
+  const sharedItems = [
+    { title: "Projetos", url: "/projects", icon: FolderKanban },
+    { title: "Clientes", url: "/clients", icon: Users },
+    { title: "Pautas", url: pautasPath, icon: ClipboardList },
+    { title: "RFIs", url: "/rfis", icon: FileText },
+  ];
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
@@ -63,6 +73,22 @@ export function AppSidebar() {
       toast.error("Erro ao sair. Tente novamente.");
     },
   });
+
+  const renderItem = (item: { title: string; url: string; icon: typeof FolderKanban }) => (
+    <SidebarMenuItem key={item.title}>
+      <SidebarMenuButton asChild tooltip={collapsed ? item.title : undefined}>
+        <NavLink
+          to={item.url}
+          end={item.url === "/"}
+          className="hover:bg-accent/50"
+          activeClassName="bg-primary text-primary-foreground hover:bg-primary/90"
+        >
+          <item.icon className="h-4 w-4 shrink-0" />
+          {!collapsed && <span>{item.title}</span>}
+        </NavLink>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  );
 
   return (
     <>
@@ -90,28 +116,18 @@ export function AppSidebar() {
 
         <SidebarContent>
           <SidebarGroup>
-            <SidebarGroupLabel>{activeWorkspace === "tech" ? "TECH" : "Módulos"}</SidebarGroupLabel>
+            <SidebarGroupLabel>{activeWorkspace === "tech" ? "TECH" : "CX Hub"}</SidebarGroupLabel>
             <SidebarGroupContent>
-              <SidebarMenu>
-                {modules.map((item) => (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton
-                      asChild
-                      tooltip={collapsed ? item.title : undefined}
-                    >
-                      <NavLink
-                        to={item.url}
-                        end={item.url === "/"}
-                        className="hover:bg-accent/50"
-                        activeClassName="bg-primary text-primary-foreground hover:bg-primary/90"
-                      >
-                        <item.icon className="h-4 w-4 shrink-0" />
-                        {!collapsed && <span>{item.title}</span>}
-                      </NavLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
+              <SidebarMenu>{modules.map(renderItem)}</SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+
+          <div className="mx-4 my-2 border-t border-border/50" />
+
+          <SidebarGroup>
+            <SidebarGroupLabel>Geral</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>{sharedItems.map(renderItem)}</SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
         </SidebarContent>
