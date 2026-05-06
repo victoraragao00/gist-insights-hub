@@ -1,13 +1,12 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
-import { LayoutDashboard, Search, ShieldAlert, Settings, Users, Kanban, BarChart2, ClipboardList, LogOut, Loader2, FolderKanban, Calendar } from "lucide-react";
+import { LayoutDashboard, Search, ShieldAlert, Settings, Users, Kanban, BarChart2, ClipboardList, LogOut, Loader2, FolderKanban, FileText } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { WorkspaceSwitcher } from "@/components/layout/WorkspaceSwitcher";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import umodeLogo from "@/assets/umode-logo-full.png";
 import umodeIcon from "@/assets/umode-icon.png";
-import { useLocation } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -26,15 +25,12 @@ import {
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
 const cxItems = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
-  { title: "Clientes", url: "/clients", icon: Users },
   { title: "Demandas", url: "/demands", icon: Kanban },
-  { title: "Analytics de Demandas", url: "/demands/dashboard", icon: BarChart2 },
-  { title: "Pautas", url: "/agendas", icon: ClipboardList },
+  { title: "Analytics", url: "/demands/dashboard", icon: BarChart2 },
   { title: "Busca", url: "/search", icon: Search },
   { title: "Auditorias", url: "/audits", icon: ShieldAlert },
 ];
@@ -42,8 +38,6 @@ const cxItems = [
 const techItems = [
   { title: "Dashboard", url: "/tech/dashboard", icon: BarChart2 },
   { title: "Kanban", url: "/demands", icon: Kanban },
-  { title: "Projetos", url: "/projects", icon: FolderKanban },
-  { title: "Pautas Internas", url: "/agendas?type=internal", icon: Calendar },
 ];
 
 const bottomItems = [
