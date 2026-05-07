@@ -49,16 +49,23 @@ export function ColumnTimeCard({ data }: Props) {
                     }}
                   />
                 </div>
-                <span
-                  className={cn(
-                    "w-10 text-right font-medium",
-                    isBottleneck
-                      ? "text-amber-700 dark:text-amber-300"
-                      : "text-muted-foreground",
+                <div className="flex flex-col items-end shrink-0 w-16">
+                  <span
+                    className={cn(
+                      "font-medium",
+                      isBottleneck
+                        ? "text-amber-700 dark:text-amber-300"
+                        : "text-muted-foreground",
+                    )}
+                  >
+                    {col.avg_days?.toFixed?.(1) ?? col.avg_days}d
+                  </span>
+                  {col.p85_days != null && col.p85_days !== col.avg_days && (
+                    <span className="text-[10px] text-muted-foreground/60">
+                      P85: {col.p85_days?.toFixed?.(1) ?? col.p85_days}d
+                    </span>
                   )}
-                >
-                  {col.avg_days?.toFixed?.(1) ?? col.avg_days}d
-                </span>
+                </div>
               </div>
             );
           })}
