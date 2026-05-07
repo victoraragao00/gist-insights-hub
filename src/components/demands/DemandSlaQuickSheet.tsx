@@ -24,7 +24,7 @@ interface QuickDemand {
   expected_result: string | null;
   notes: string | null;
   resolution: string | null;
-  priority: string;
+  priority: DemandPriority;
   clients: { name: string } | null;
   demand_types: { name: string; color: string | null } | null;
   demand_areas: { name: string; color: string | null } | null;
