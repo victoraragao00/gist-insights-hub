@@ -443,6 +443,64 @@ const DemandsDashboardPage = () => {
           )}
         </CardContent>
       </Card>
+      {/* ── Fluxo CX: Throughput / Cycle / Carga ── */}
+      <section className="space-y-2">
+        <h2 className="text-base font-semibold">Throughput Semanal</h2>
+        {loadingCx || !cxMetrics ? (
+          <Skeleton className="h-64 w-full animate-shimmer" />
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <ThroughputChart data={cxMetrics.throughput} />
+            <div className="rounded-xl border border-border bg-card p-4">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-3">Resumo</p>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Concluídas</span>
+                  <span className="font-medium">{cxMetrics.throughput.total_done ?? 0}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Criadas</span>
+                  <span className="font-medium">{cxMetrics.throughput.total_created ?? 0}</span>
+                </div>
+                <div className="flex justify-between pt-2 border-t border-border">
+                  <span className="text-muted-foreground">Taxa de entrega</span>
+                  <span
+                    className={cn(
+                      "font-semibold",
+                      (cxMetrics.throughput.delivery_rate ?? 0) >= 80
+                        ? "text-emerald-600 dark:text-emerald-400"
+                        : "text-amber-600 dark:text-amber-400"
+                    )}
+                  >
+                    {cxMetrics.throughput.delivery_rate ?? 0}%
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </section>
+
+      <section className="space-y-2">
+        <h2 className="text-base font-semibold">Tempo de Ciclo</h2>
+        {loadingCx || !cxMetrics ? (
+          <Skeleton className="h-64 w-full animate-shimmer" />
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <CycleTimeCard data={cxMetrics.cycle_time} />
+            <ColumnTimeCard data={cxMetrics.column_time} />
+          </div>
+        )}
+      </section>
+
+      <section className="space-y-2">
+        <h2 className="text-base font-semibold">Carga por Pessoa</h2>
+        {loadingCx || !cxMetrics ? (
+          <Skeleton className="h-48 w-full animate-shimmer" />
+        ) : (
+          <PeopleCard data={cxMetrics.people} isAdmin={true} />
+        )}
+      </section>
     </div>
   );
 };
