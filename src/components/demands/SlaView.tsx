@@ -224,8 +224,8 @@ export function SlaView() {
       {viewMode === "kanban" && <KanbanSlaView demands={demands} />}
 
       {/* Detail Sheet */}
-      <DemandDetailSheet
-        demand={selectedDemand}
+      <DemandSlaQuickSheet
+        demandId={selectedId}
         open={sheetOpen}
         onOpenChange={setSheetOpen}
       />
