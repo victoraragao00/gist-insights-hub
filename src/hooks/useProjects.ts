@@ -263,6 +263,39 @@ export function useUpdateProject() {
   });
 }
 
+export function useUpdateProjectDueDate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      projectId,
+      newDate,
+      currentDueDate,
+      originalDueDate,
+    }: {
+      projectId: string;
+      newDate: string | null;
+      currentDueDate: string | null;
+      originalDueDate: string | null;
+    }) => {
+      const updates: Record<string, unknown> = { due_date: newDate };
+      if (!originalDueDate && currentDueDate) {
+        updates.original_due_date = currentDueDate;
+      }
+      const { error } = await supabase
+        .from("projects")
+        .update(updates)
+        .eq("id", projectId);
+      if (error) throw error;
+    },
+    onSuccess: (_d, vars) => {
+      toast.success("Data de entrega atualizada");
+      qc.invalidateQueries({ queryKey: ["project", vars.projectId] });
+      qc.invalidateQueries({ queryKey: ["projects"] });
+    },
+    onError: (err: Error) => toast.error("Erro ao atualizar data: " + err.message),
+  });
+}
+
 export function useCancelProject() {
   const qc = useQueryClient();
   return useMutation({
