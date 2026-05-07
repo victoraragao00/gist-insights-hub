@@ -494,7 +494,8 @@ export function DemandSidebar({ demand, onActivityTabSelect, onClose }: DemandSi
         )}
       </section>
 
-      {/* Recent activity */}
+      {/* Dependências */}
+      <DemandDependenciesSection demandId={demand.id} />
       <section className="rounded-lg border border-border bg-card p-4 space-y-3">
         <div className="flex items-center justify-between">
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
