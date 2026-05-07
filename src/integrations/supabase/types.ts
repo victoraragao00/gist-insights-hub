@@ -2193,6 +2193,10 @@ export type Database = {
         }[]
       }
       get_client_public_demands: { Args: { p_token: string }; Returns: Json }
+      get_cx_analytics_metrics: {
+        Args: { p_client_id?: string; p_period_days?: number }
+        Returns: Json
+      }
       get_demand_analytics: {
         Args: { p_client_id?: string; p_days?: number }
         Returns: Json
