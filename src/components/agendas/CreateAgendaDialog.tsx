@@ -78,7 +78,7 @@ export function CreateAgendaDialog({ open, onOpenChange, defaultClientId }: Crea
         meeting_date: new Date(meetingDate).toISOString(),
         duration_minutes: durationMinutes,
         agenda_type: agendaType,
-        project_id: agendaType === "internal" ? projectId : null,
+        project_id: projectId,
         executive_summary: executiveSummary.trim() || undefined,
         location: location || undefined,
         objective: objective || undefined,
