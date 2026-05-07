@@ -25,6 +25,7 @@ export interface ProjectRow {
   cancelled_by: string | null;
   workspace: string;
   client_id: string | null;
+  is_internal: boolean;
   created_at: string;
   updated_at: string;
   user_profiles: UserMini | null;
