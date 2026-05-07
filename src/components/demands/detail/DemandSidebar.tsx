@@ -487,9 +487,8 @@ export function DemandSidebar({ demand, onActivityTabSelect, onClose }: DemandSi
               Mover demanda para o board {demand.workspace === "tech" ? "CX Hub" : "TECH"}?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              A demanda sai do board atual e vai para a primeira coluna do novo board.
-              A área será limpa, pois cada board tem áreas próprias — você poderá selecionar
-              a nova área depois.
+              A demanda muda apenas de board. Coluna, área, responsável e demais
+              informações são preservadas.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
