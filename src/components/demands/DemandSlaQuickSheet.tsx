@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
-import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -30,33 +30,35 @@ interface QuickDemand {
   demand_areas: { name: string; color: string | null } | null;
   ticket_columns: { name: string; color: string | null } | null;
   user_profiles: { full_name: string | null; email: string | null } | null;
-  rfis: { code: string }[] | null;
+  rfis: { rfi_number: string }[] | null;
 }
 
 export function DemandSlaQuickSheet({ demandId, open, onOpenChange }: DemandSlaQuickSheetProps) {
   const navigate = useNavigate();
 
-  const { data: demand, isLoading } = useQuery<QuickDemand | null>({
+  const { data: demand, isLoading, error } = useQuery<QuickDemand | null>({
     queryKey: ["demand_sla_quick", demandId],
     enabled: open && !!demandId,
     staleTime: 30_000,
     queryFn: async () => {
-      const { data, error } = await supabase
+      if (!demandId) return null;
+      const { data, error: qErr } = await supabase
         .from("demands")
         .select(
-          "id, title, description, expected_result, notes, resolution, priority, clients(name), demand_types(name, color), demand_areas(name, color), ticket_columns(name, color), user_profiles!assignee_id(full_name, email), rfis(code)",
+          "id, title, description, expected_result, notes, resolution, priority, clients(name), demand_types(name, color), demand_areas(name, color), ticket_columns(name, color), user_profiles!assignee_id(full_name, email), rfis(rfi_number)",
         )
-        .eq("id", demandId!)
+        .eq("id", demandId)
         .maybeSingle();
-      if (error) throw error;
+      if (qErr) throw qErr;
       return data as unknown as QuickDemand | null;
     },
   });
 
-  const goToFull = () => {
-    if (!demand) return;
+  const goToFull = (id?: string) => {
+    const targetId = id ?? demand?.id ?? demandId;
+    if (!targetId) return;
     onOpenChange(false);
-    navigate(`/demands/${demand.id}`);
+    navigate(`/demands/${targetId}`);
   };
 
   return (
@@ -65,26 +67,45 @@ export function DemandSlaQuickSheet({ demandId, open, onOpenChange }: DemandSlaQ
         side="right"
         className="w-full sm:max-w-[560px] flex flex-col p-0 overflow-hidden"
       >
-        {isLoading || !demand ? (
+        <SheetTitle className="sr-only">
+          {demand?.title ?? "Detalhes da demanda"}
+        </SheetTitle>
+        <SheetDescription className="sr-only">
+          Visualização rápida da demanda — somente leitura.
+        </SheetDescription>
+
+        {isLoading ? (
           <div className="p-6 space-y-4">
             <Skeleton className="h-6 w-3/4" />
             <Skeleton className="h-4 w-full" />
             <Skeleton className="h-24 w-full" />
             <Skeleton className="h-24 w-full" />
           </div>
+        ) : error || !demand ? (
+          <div className="flex-1 flex flex-col items-center justify-center gap-4 p-6 text-center">
+            <p className="text-sm text-muted-foreground">
+              Não foi possível carregar os dados da demanda.
+            </p>
+            {demandId && (
+              <Button onClick={() => goToFull(demandId)} className="gap-2">
+                <ExternalLink className="h-4 w-4" />
+                Abrir demanda completa
+              </Button>
+            )}
+          </div>
         ) : (
           <>
             {/* Header */}
             <div className="shrink-0 px-6 pt-5 pb-4 border-b border-border">
               <div className="flex items-start justify-between gap-3 mb-3">
-                <SheetTitle className="text-base font-semibold leading-snug flex-1">
+                <h2 className="text-base font-semibold leading-snug flex-1">
                   {demand.title}
-                </SheetTitle>
+                </h2>
                 <Button
                   size="sm"
                   variant="outline"
                   className="shrink-0 gap-1.5 text-xs mr-8"
-                  onClick={goToFull}
+                  onClick={() => goToFull()}
                 >
                   <ExternalLink className="h-3.5 w-3.5" />
                   Abrir completo
@@ -135,7 +156,7 @@ export function DemandSlaQuickSheet({ demandId, open, onOpenChange }: DemandSlaQ
                 {demand.rfis && demand.rfis.length > 0 && (
                   <div>
                     <p className="text-xs text-muted-foreground mb-1">RFI</p>
-                    <p className="font-medium font-mono text-xs">{demand.rfis[0].code}</p>
+                    <p className="font-medium font-mono text-xs">{demand.rfis[0].rfi_number}</p>
                   </div>
                 )}
               </div>
@@ -154,7 +175,7 @@ export function DemandSlaQuickSheet({ demandId, open, onOpenChange }: DemandSlaQ
 
             {/* Footer */}
             <div className="shrink-0 px-6 py-3 border-t border-border bg-muted/20">
-              <Button className="w-full gap-2" onClick={goToFull}>
+              <Button className="w-full gap-2" onClick={() => goToFull()}>
                 <ExternalLink className="h-4 w-4" />
                 Abrir demanda completa
               </Button>
