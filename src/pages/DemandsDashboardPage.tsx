@@ -502,6 +502,7 @@ const DemandsDashboardPage = () => {
           <PeopleCard data={cxMetrics.people} isAdmin={true} />
         )}
       </section>
+      </div>
     </div>
   );
 };
