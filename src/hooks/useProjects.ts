@@ -21,6 +21,7 @@ export interface ProjectRow {
   description: string | null;
   owner_id: string;
   due_date: string | null;
+  original_due_date: string | null;
   cancelled_at: string | null;
   cancelled_by: string | null;
   workspace: string;
