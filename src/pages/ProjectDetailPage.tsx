@@ -456,3 +456,57 @@ function ProjectDueDateField({ project }: { project: ProjectRow }) {
     </div>
   );
 }
+
+interface HoursEditFieldProps {
+  value: number | null;
+  onSave: (value: number | null) => void;
+}
+
+function HoursEditField({ value, onSave }: HoursEditFieldProps) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+
+  const commit = () => {
+    const parsed = parseFloat(draft);
+    onSave(Number.isFinite(parsed) && parsed > 0 ? parsed : null);
+    setEditing(false);
+  };
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-1">
+        <input
+          autoFocus
+          type="number"
+          step="0.5"
+          min="0"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+            if (e.key === "Escape") setEditing(false);
+          }}
+          className="w-16 h-6 text-xs border border-primary/40 rounded px-1.5 bg-background focus:outline-none focus:ring-1 focus:ring-primary/40"
+        />
+        <span className="text-xs text-muted-foreground">h</span>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        setDraft(value != null ? String(value) : "");
+        setEditing(true);
+      }}
+      className={cn(
+        "text-sm font-medium hover:text-primary transition-colors",
+        !value && "text-muted-foreground/60 italic text-xs",
+      )}
+    >
+      {value ? formatHours(value) : "Definir"}
+    </button>
+  );
+}
