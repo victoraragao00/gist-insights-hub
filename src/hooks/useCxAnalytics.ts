@@ -55,7 +55,7 @@ export function useCxAnalytics(periodDays: number, clientId?: string) {
       });
       if (error) throw error;
 
-      const raw = data as Omit<CxAnalyticsData, "people" | "cycle_time"> & {
+      const raw = data as unknown as Omit<CxAnalyticsData, "people" | "cycle_time"> & {
         people: RawPerson[];
         cycle_time: Omit<CxAnalyticsData["cycle_time"], "reopen_count">;
       };
