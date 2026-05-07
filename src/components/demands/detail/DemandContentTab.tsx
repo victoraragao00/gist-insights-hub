@@ -52,6 +52,8 @@ export function DemandContentTab({ demand }: DemandContentTabProps) {
 
   const descRef = useAutoResize(description);
   const resultRef = useAutoResize(expectedResult);
+  const notesRef = useAutoResize(notes);
+  const resolutionRef = useAutoResize(resolution);
 
   const hasResolution = !!resolution && resolution.trim() !== "";
 
