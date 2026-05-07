@@ -226,6 +226,36 @@ export function useLinkableDemands(
   });
 }
 
+export interface CompatibleProject {
+  id: string;
+  title: string;
+  is_internal: boolean;
+  clients: { name: string } | null;
+}
+
+export function useCompatibleProjects(
+  clientId?: string | null,
+  agendaType?: "client" | "internal" | null,
+) {
+  return useQuery<CompatibleProject[]>({
+    queryKey: ["compatible_projects", clientId ?? null, agendaType ?? "client"],
+    staleTime: 60_000,
+    queryFn: async () => {
+      let query = supabase
+        .from("projects")
+        .select("id, title, is_internal, clients(name)")
+        .is("cancelled_at", null)
+        .order("title");
+      if (agendaType !== "internal" && clientId) {
+        query = query.or(`client_id.eq.${clientId},is_internal.eq.true`);
+      }
+      const { data, error } = await query;
+      if (error) throw error;
+      return (data ?? []) as unknown as CompatibleProject[];
+    },
+  });
+}
+
 // ─── Mutations ────────────────────────────────────────────────────────
 
 interface CreateProjectInput {
