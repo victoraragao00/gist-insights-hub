@@ -8,6 +8,7 @@ export interface DemandArea {
   id: string;
   name: string;
   color: string | null;
+  background_color: string | null;
   active: boolean;
   position: number;
   created_at: string | null;
