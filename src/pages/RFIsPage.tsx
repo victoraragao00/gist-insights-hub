@@ -121,7 +121,7 @@ export default function RFIsPage() {
                   <tr
                     key={rfi.id}
                     className="border-b border-border/50 hover:bg-muted/30 cursor-pointer"
-                    onClick={() => demand && navigate(`/demands/${demand.id}`)}
+                    onClick={() => setSelectedRfiId(rfi.id)}
                   >
                     <td className="py-3 font-mono text-xs font-medium">{rfi.rfi_number}</td>
                     <td className="py-3 max-w-xs truncate">{demand?.title ?? "—"}</td>
