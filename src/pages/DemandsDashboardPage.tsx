@@ -66,6 +66,7 @@ const DemandsDashboardPage = () => {
 
   const clientId = selectedClientId === "all" ? null : selectedClientId;
   const { data, isLoading } = useDemandAnalytics(clientId, days);
+  const { data: cxMetrics, isLoading: loadingCx } = useCxAnalytics(days, clientId ?? undefined);
 
   // Drill-down query
   const { data: drillDemands = [], isLoading: loadingDrill } = useQuery<Array<{
