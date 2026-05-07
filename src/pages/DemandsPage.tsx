@@ -22,6 +22,7 @@ import { useAreasByWorkspace } from "@/hooks/useDemandAreas";
 import { useCollapsedColumns } from "@/hooks/useCollapsedColumns";
 import { useDemandTaskCounts } from "@/hooks/useDemandTasks";
 import { KanbanColumn } from "@/components/demands/KanbanColumn";
+import { CollapsedColumnStub } from "@/components/demands/CollapsedColumnStub";
 import { TechSwimlanePage } from "@/components/demands/TechSwimlanePage";
 // DemandDetailSheet still used elsewhere; navigation now opens dedicated page
 import { CreateDemandDialog } from "@/components/demands/CreateDemandDialog";
