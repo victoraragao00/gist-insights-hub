@@ -4,8 +4,10 @@ import { useQuery } from "@tanstack/react-query";
 import { useClient } from "@/context/ClientContext";
 import { useAuth } from "@/context/AuthContext";
 import { useDemandAnalytics } from "@/hooks/useDemandAnalytics";
+import { useCxAnalytics } from "@/hooks/useCxAnalytics";
 import { supabase } from "@/integrations/supabase/client";
 import { PRIORITY_CHART_COLORS as PRIORITY_COLORS, PRIORITY_LABELS } from "@/lib/colorPalette";
+import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +20,10 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line, CartesianGrid, Legend,
 } from "recharts";
+import { ThroughputChart } from "@/components/tech-dashboard/ThroughputChart";
+import { CycleTimeCard } from "@/components/tech-dashboard/CycleTimeCard";
+import { ColumnTimeCard } from "@/components/tech-dashboard/ColumnTimeCard";
+import { PeopleCard } from "@/components/tech-dashboard/PeopleCard";
 
 type DrillCategory = "open" | "completed" | "blocked" | "cancelled";
 
