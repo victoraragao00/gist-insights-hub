@@ -9,11 +9,18 @@ import {
   CalendarDays,
   Clock,
   User,
+  AlertTriangle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,7 +37,9 @@ import {
   useProject,
   useProjectStats,
   useUpdateProject,
+  useUpdateProjectDueDate,
   useCancelProject,
+  type ProjectRow,
 } from "@/hooks/useProjects";
 import { useProjectAgendas } from "@/hooks/useMeetingAgendas";
 import { StatusBadge } from "@/components/projects/StatusBadge";
