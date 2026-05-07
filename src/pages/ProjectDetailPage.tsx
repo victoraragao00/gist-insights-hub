@@ -246,6 +246,53 @@ export default function ProjectDetailPage() {
             </div>
           </section>
 
+          <section className="rounded-lg border border-border bg-card p-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-3">
+              Horas
+            </p>
+            <div className="flex items-center justify-between text-sm mb-1.5">
+              <span className="text-muted-foreground">Planejadas</span>
+              <HoursEditField
+                value={project.hours_estimated}
+                onSave={(val) =>
+                  updateProject.mutate({
+                    id: project.id,
+                    fields: { hours_estimated: val },
+                  })
+                }
+              />
+            </div>
+            <div className="flex items-center justify-between text-sm mb-3">
+              <span className="text-muted-foreground">Registradas</span>
+              <span className="font-semibold">{formatHours(totalHours)}</span>
+            </div>
+            {project.hours_estimated != null && project.hours_estimated > 0 && (
+              <>
+                <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                  <div
+                    className={cn(
+                      "h-full rounded-full transition-all",
+                      (stats?.hours_progress_pct ?? 0) > 100
+                        ? "bg-destructive"
+                        : "bg-primary",
+                    )}
+                    style={{
+                      width: `${Math.min(stats?.hours_progress_pct ?? 0, 100)}%`,
+                    }}
+                  />
+                </div>
+                <div className="flex justify-between text-[10px] text-muted-foreground mt-1">
+                  <span>{stats?.hours_progress_pct ?? 0}% utilizado</span>
+                  {(stats?.hours_progress_pct ?? 0) > 100 && (
+                    <span className="text-destructive font-medium">
+                      +{formatHours(totalHours - project.hours_estimated)} acima
+                    </span>
+                  )}
+                </div>
+              </>
+            )}
+          </section>
+
           {meetingHours > 0 && (
             <section className="rounded-lg border border-border bg-card p-4">
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-3">
