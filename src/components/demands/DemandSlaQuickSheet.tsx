@@ -54,10 +54,11 @@ export function DemandSlaQuickSheet({ demandId, open, onOpenChange }: DemandSlaQ
     },
   });
 
-  const goToFull = () => {
-    if (!demand) return;
+  const goToFull = (id?: string) => {
+    const targetId = id ?? demand?.id ?? demandId;
+    if (!targetId) return;
     onOpenChange(false);
-    navigate(`/demands/${demand.id}`);
+    navigate(`/demands/${targetId}`);
   };
 
   return (
@@ -66,26 +67,45 @@ export function DemandSlaQuickSheet({ demandId, open, onOpenChange }: DemandSlaQ
         side="right"
         className="w-full sm:max-w-[560px] flex flex-col p-0 overflow-hidden"
       >
-        {isLoading || !demand ? (
+        <SheetTitle className="sr-only">
+          {demand?.title ?? "Detalhes da demanda"}
+        </SheetTitle>
+        <SheetDescription className="sr-only">
+          Visualização rápida da demanda — somente leitura.
+        </SheetDescription>
+
+        {isLoading ? (
           <div className="p-6 space-y-4">
             <Skeleton className="h-6 w-3/4" />
             <Skeleton className="h-4 w-full" />
             <Skeleton className="h-24 w-full" />
             <Skeleton className="h-24 w-full" />
           </div>
+        ) : error || !demand ? (
+          <div className="flex-1 flex flex-col items-center justify-center gap-4 p-6 text-center">
+            <p className="text-sm text-muted-foreground">
+              Não foi possível carregar os dados da demanda.
+            </p>
+            {demandId && (
+              <Button onClick={() => goToFull(demandId)} className="gap-2">
+                <ExternalLink className="h-4 w-4" />
+                Abrir demanda completa
+              </Button>
+            )}
+          </div>
         ) : (
           <>
             {/* Header */}
             <div className="shrink-0 px-6 pt-5 pb-4 border-b border-border">
               <div className="flex items-start justify-between gap-3 mb-3">
-                <SheetTitle className="text-base font-semibold leading-snug flex-1">
+                <h2 className="text-base font-semibold leading-snug flex-1">
                   {demand.title}
-                </SheetTitle>
+                </h2>
                 <Button
                   size="sm"
                   variant="outline"
                   className="shrink-0 gap-1.5 text-xs mr-8"
-                  onClick={goToFull}
+                  onClick={() => goToFull()}
                 >
                   <ExternalLink className="h-3.5 w-3.5" />
                   Abrir completo
@@ -155,7 +175,7 @@ export function DemandSlaQuickSheet({ demandId, open, onOpenChange }: DemandSlaQ
 
             {/* Footer */}
             <div className="shrink-0 px-6 py-3 border-t border-border bg-muted/20">
-              <Button className="w-full gap-2" onClick={goToFull}>
+              <Button className="w-full gap-2" onClick={() => goToFull()}>
                 <ExternalLink className="h-4 w-4" />
                 Abrir demanda completa
               </Button>
