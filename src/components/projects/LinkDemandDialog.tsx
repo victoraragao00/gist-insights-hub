@@ -8,29 +8,30 @@ import {
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
 import {
-  useUnassignedDemands,
+  useLinkableDemands,
   useLinkDemandToProject,
+  type ProjectRow,
 } from "@/hooks/useProjects";
 import { useDebounce } from "@/hooks/useDebounce";
 
 interface LinkDemandDialogProps {
-  projectId: string;
+  project: Pick<ProjectRow, "id" | "client_id" | "is_internal">;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
 export function LinkDemandDialog({
-  projectId,
+  project,
   open,
   onOpenChange,
 }: LinkDemandDialogProps) {
   const [query, setQuery] = useState("");
   const debouncedQuery = useDebounce(query, 300);
-  const { data: demands = [], isLoading } = useUnassignedDemands(debouncedQuery);
+  const { data: demands = [], isLoading } = useLinkableDemands(project, debouncedQuery);
   const link = useLinkDemandToProject();
 
   const handleLink = async (demandId: string) => {
-    await link.mutateAsync({ demandId, projectId });
+    await link.mutateAsync({ demandId, projectId: project.id });
     onOpenChange(false);
   };
 
@@ -43,7 +44,11 @@ export function LinkDemandDialog({
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar demanda sem projeto..."
+            placeholder={
+              project.is_internal
+                ? "Buscar demanda TECH sem projeto..."
+                : "Buscar demanda do cliente sem projeto..."
+            }
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             className="pl-9"
