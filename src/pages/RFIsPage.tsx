@@ -23,7 +23,6 @@ const WORKSPACE_OPTIONS: { value: WorkspaceFilter; label: string }[] = [
 ];
 
 export default function RFIsPage() {
-  const navigate = useNavigate();
   const { clients } = useClient();
   const { data: statuses = [] } = useRfiStatuses();
 
@@ -31,6 +30,7 @@ export default function RFIsPage() {
   const [statusId, setStatusId] = useState<string>(ALL);
   const [clientId, setClientId] = useState<string>(ALL);
   const [workspace, setWorkspace] = useState<WorkspaceFilter>(undefined);
+  const [selectedRfiId, setSelectedRfiId] = useState<string | null>(null);
 
   const { data: rfis = [], isLoading } = useAllRfis({
     search: search || undefined,
