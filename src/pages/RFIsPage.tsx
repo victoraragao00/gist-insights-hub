@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Input } from "@/components/ui/input";
@@ -10,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { useAllRfis, useRfiStatuses } from "@/hooks/useRfis";
+import { RfiDetailSheet } from "@/components/rfis/RfiDetailSheet";
 import { useClient } from "@/context/ClientContext";
 
 const ALL = "__all__";
@@ -23,7 +23,6 @@ const WORKSPACE_OPTIONS: { value: WorkspaceFilter; label: string }[] = [
 ];
 
 export default function RFIsPage() {
-  const navigate = useNavigate();
   const { clients } = useClient();
   const { data: statuses = [] } = useRfiStatuses();
 
@@ -31,6 +30,7 @@ export default function RFIsPage() {
   const [statusId, setStatusId] = useState<string>(ALL);
   const [clientId, setClientId] = useState<string>(ALL);
   const [workspace, setWorkspace] = useState<WorkspaceFilter>(undefined);
+  const [selectedRfiId, setSelectedRfiId] = useState<string | null>(null);
 
   const { data: rfis = [], isLoading } = useAllRfis({
     search: search || undefined,
@@ -121,7 +121,7 @@ export default function RFIsPage() {
                   <tr
                     key={rfi.id}
                     className="border-b border-border/50 hover:bg-muted/30 cursor-pointer"
-                    onClick={() => demand && navigate(`/demands/${demand.id}`)}
+                    onClick={() => setSelectedRfiId(rfi.id)}
                   >
                     <td className="py-3 font-mono text-xs font-medium">{rfi.rfi_number}</td>
                     <td className="py-3 max-w-xs truncate">{demand?.title ?? "—"}</td>
@@ -159,6 +159,21 @@ export default function RFIsPage() {
           </table>
         )}
       </div>
+
+      {selectedRfiId && (() => {
+        const sel = rfis.find((r) => r.id === selectedRfiId);
+        if (!sel) return null;
+        const dem = sel.demands as { title?: string; clients?: { name?: string } | null } | null;
+        return (
+          <RfiDetailSheet
+            open={!!selectedRfiId}
+            onOpenChange={(o) => { if (!o) setSelectedRfiId(null); }}
+            rfi={sel as Parameters<typeof RfiDetailSheet>[0]["rfi"]}
+            demandTitle={dem?.title}
+            clientName={dem?.clients?.name}
+          />
+        );
+      })()}
     </div>
   );
 }

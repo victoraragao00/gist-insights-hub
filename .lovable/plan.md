@@ -1,60 +1,58 @@
-## Plan: horas planejadas, vínculos por cliente e aba Reuniões
+## Plan: RFI sheet, colunas colapsadas como tabs e fundo de raia
 
-### 1. Migration (`supabase/migrations/...`)
-- `ALTER TABLE projects ADD COLUMN IF NOT EXISTS hours_estimated NUMERIC(6,2)` + COMMENT.
-- Recriar `get_project_stats` para incluir no JSON de retorno:
-  - `hours_estimated` (do `projects`)
-  - `hours_progress_pct` = `ROUND(total_hours / hours_estimated * 100, 1)` ou `NULL` quando sem estimativa.
-- Manter assinatura/permissões existentes da função.
+### 1. RFI Detail Sheet na RFIsPage
+Reusar o `RfiDetailSheet` existente (`src/components/rfis/RfiDetailSheet.tsx`) — não criar novo componente.
+- Em `src/pages/RFIsPage.tsx`:
+  - Adicionar `useState<RfiRow | null>` para `selectedRfi`.
+  - Substituir `onClick={() => navigate(`/demands/${demand.id}`)}` por `onClick={() => setSelectedRfi(rfi)}`.
+  - Renderizar `<RfiDetailSheet open onOpenChange rfi demandTitle clientName />` no fim, passando `rfi.demands.title` e `rfi.demands.clients.name`.
+  - Remover `useNavigate` se ficar sem uso (m11).
+- O sheet existente já tem botão "Abrir demanda" que navega para `/demands/:id` — fechar o sheet em sequência.
 
-### 2. Types e hooks (`src/hooks/useProjects.ts`)
-- `ProjectRow`: adicionar `hours_estimated: number | null`.
-- `PROJECT_SELECT`: incluir `hours_estimated`.
-- `UpdateProjectInput.fields`: aceitar `hours_estimated: number | null`.
-- `ProjectStatsData` (`src/lib/projectStatus.ts`): adicionar `hours_estimated: number | null` e `hours_progress_pct: number | null`.
-- Novo `useUnassignedDemandsForProject(project)`:
-  - `queryKey: ["linkable_demands", project.id, project.client_id, project.is_internal, query]`.
-  - Se `is_internal` → `.eq("workspace","tech")`.
-  - Senão se `client_id` → `.eq("client_id", project.client_id)`.
-  - Continua filtrando `project_id IS NULL` + busca por título.
+### 2. Colunas colapsadas como tabs verticais (lateral direita)
 
-### 3. ProjectDetailPage — sidebar de horas
-- Novo card "Horas" (após "Tempo total"):
-  - Linha "Planejadas" com `HoursEditField` inline (input `type=number`, save-on-blur/Enter, Escape cancela) chamando `updateProject.mutate({ id, fields: { hours_estimated } })`.
-  - Linha "Registradas" com `formatHours(stats.total_hours)`.
-  - Barra de progresso quando `hours_estimated > 0`: cor `bg-primary`, vira `bg-destructive` se `>100%`; label `X% utilizado` e `+Yh acima` quando excedido.
-- Componente `HoursEditField` colocado no mesmo arquivo (igual ao `ProjectDueDateField`).
+#### KanbanBoard (CX) — `src/components/demands/KanbanColumn.tsx` ou board pai
+Localizar o componente que renderiza a lista de colunas (Kanban CX). Refatorar para:
+- Separar `expandedColumns` e `collapsedColumns` via `useCollapsedColumns`.
+- Wrapper raiz `flex h-full overflow-hidden` com:
+  - `<div className="flex-1 overflow-x-auto">` contendo apenas as colunas expandidas (sem stubs no grid).
+  - `<aside>` à direita renderizando uma tab vertical por coluna colapsada usando o `CollapsedColumnStub` existente (já está no formato vertical com dot+contador+nome). Manter aceitação de drop.
 
-### 4. Aba "Demandas" — filtro por cliente
-- `LinkDemandDialog` recebe `project` (não só `projectId`) e usa `useUnassignedDemandsForProject` em vez de `useUnassignedDemands`.
-- Atualizar chamada em `ProjectDemandsTab` para passar o objeto `project`.
-- Em `ProjectDemandsTab` (lista de demandas vinculadas), exibir badge "Cliente diferente" quando `demand.client_id !== project.client_id` e o projeto não é interno.
+#### TechSwimlanePage — `src/components/demands/TechSwimlanePage.tsx`
+- Calcular `expandedCols` e `collapsedCols`.
+- `gridTemplate` baseado apenas em `expandedCols` (`180px ${...300px}`).
+- Headers e cells (lanes) iteram só em `expandedCols`.
+- Adicionar `<aside>` lateral à direita com tabs verticais (`CollapsedColumnStub`) — clicando, expande de volta.
+- Cells colapsados não existem mais no grid (remover branch `if (collapsed)` do `SwimlaneCell`).
 
-### 5. Aba "Reuniões"
-- Novo `TabsTrigger value="meetings"` entre Demandas e Squad em `ProjectDetailPage`.
-- Novo `src/components/projects/tabs/ProjectMeetingsTab.tsx`:
-  - Usa `useProjectAgendas(projectId)` (já existe em `useMeetingAgendas`).
-  - Cabeçalho com contagem + soma de horas (sum `duration_minutes/60`).
-  - Lista de pautas com data (`dd/MM/yyyy`), duração (`formatHours`), badge `Interna`/`Cliente`, navega para `/agendas/:id`.
-  - Empty state amigável.
+### 3. Background por área no Swimlane TECH
 
-### 6. CreateAgendaDialog — projetos compatíveis com o cliente
-- Substituir o uso atual (`useProjects("tech") + useProjects("cx")`) por novo `useCompatibleProjects(clientId)`:
-  - `queryKey: ["compatible_projects", clientId]`.
-  - `select id, title, is_internal, clients(name)` + `.is("cancelled_at", null)`.
-  - Quando `clientId`: `.or("client_id.eq.<id>,is_internal.eq.true")`.
-- Limpar `projectId` quando o `clientId` muda para evitar seleção inválida.
-- Mostrar badge "Interno" e nome do cliente nas opções.
+#### Migration
+- `ALTER TABLE demand_areas ADD COLUMN IF NOT EXISTS background_color TEXT;` + COMMENT.
 
-### 7. Qualidade
-- Toda escrita via `useMutation` (já existente; `updateProject` cobre hours_estimated).
-- Remover imports não usados que sobrarem após o refactor (m11).
-- Apenas `sonner`; sem alterações em arquivos protegidos.
+#### Tipos e hook
+- `DemandArea` (`src/hooks/useDemandAreas.ts`): adicionar `background_color: string | null`.
+- `useManageAreas.updateArea` já aceita `fields` genéricos — usar para gravar `background_color`.
+
+#### AreaSettingsTab — color picker de fundo
+- Em `AreaRow`, ao lado da paleta de cores principal, adicionar input `type=color` (visualmente uma swatch quadrada com placeholder "BG" quando vazio) que dispara `onUpdate({ background_color: value })`.
+- Botão pequeno de "limpar" ao lado para voltar a `null` (clique direito ou ícone X) — opcional; se complicado, oferecer apenas o picker.
+
+#### Swimlane lane background
+- `useAreasByWorkspace("tech")` já traz `background_color`. Em `SwimlaneLane`:
+  - Helper `hexToRgba(hex, alpha)` no mesmo arquivo.
+  - `bgStyle = area?.background_color ? { backgroundColor: hexToRgba(area.background_color, 0.12) } : {}`.
+  - Aplicar `style={bgStyle}` no container da lane (`<div className="grid ... bg-card/40 ...">` substituir/compor com `bgStyle`).
+  - Repassar `bgStyle` para `SwimlaneCell` para que cada célula mantenha o fundo da raia (compõe com `isOver` ainda visível usando `ring`/sobreposição leve).
+
+### 4. Qualidade
+- `useMutation` para toda escrita (já é o padrão; `useManageAreas` cobre `background_color`).
+- Remover imports não usados (m11) — especialmente `useNavigate` no `RFIsPage` e quaisquer imports residuais nas alterações de Kanban/Swimlane.
+- Apenas `sonner`. Sem alterações em arquivos protegidos.
 
 ### Verificação
-1. Editar horas planejadas → toast "Projeto atualizado", barra aparece.
-2. Excedendo planejado → barra vermelha + "+Xh acima".
-3. Link de demandas em projeto de cliente → só demandas do cliente; em projeto interno → todas TECH.
-4. Demanda legada de outro cliente → badge "Cliente diferente".
-5. Aba Reuniões lista pautas vinculadas e navega para `/agendas/:id`.
-6. CreateAgendaDialog filtra projetos pelo cliente da pauta.
+1. Clicar em linha da RFIsPage abre o sheet (sem navegar). Botão na seção da demanda navega e fecha.
+2. Colapsar uma coluna no Kanban CX → vira tab vertical na lateral direita; expandir clicando.
+3. Mesmo comportamento no Swimlane TECH — grid encolhe ao remover a coluna.
+4. Settings → Áreas → segundo color picker grava `background_color`.
+5. Swimlane TECH renderiza fundo com 12% de opacidade na raia e células da área; áreas sem cor permanecem neutras; drop zone visível.

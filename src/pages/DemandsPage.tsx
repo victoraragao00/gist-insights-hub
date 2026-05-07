@@ -22,6 +22,7 @@ import { useAreasByWorkspace } from "@/hooks/useDemandAreas";
 import { useCollapsedColumns } from "@/hooks/useCollapsedColumns";
 import { useDemandTaskCounts } from "@/hooks/useDemandTasks";
 import { KanbanColumn } from "@/components/demands/KanbanColumn";
+import { CollapsedColumnStub } from "@/components/demands/CollapsedColumnStub";
 import { TechSwimlanePage } from "@/components/demands/TechSwimlanePage";
 // DemandDetailSheet still used elsewhere; navigation now opens dedicated page
 import { CreateDemandDialog } from "@/components/demands/CreateDemandDialog";
@@ -379,23 +380,37 @@ const DemandsPage = () => {
           />
         ) : (
           <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
-            <div className="h-full overflow-x-auto">
-              <div className="flex gap-4 px-6 py-4 min-w-max items-start">
-                {columns.map((col) => (
-                  <KanbanColumn
-                    key={col.id}
-                    column={col}
-                    demands={demandsByColumn.get(col.id) ?? []}
-                    onCardClick={handleCardClick}
-                    onAddClick={handleAddClick}
-                    isCollapsed={isCollapsed(col.id)}
-                    onToggleCollapse={toggleCollapse}
-                    taskCounts={taskCounts}
-                    collaboratorsByDemand={collaboratorsByDemand}
-                    blockerTypesById={blockerTypesById}
-                  />
-                ))}
+            <div className="flex h-full overflow-hidden">
+              <div className="flex-1 overflow-x-auto">
+                <div className="flex gap-4 px-6 py-4 min-w-max items-start">
+                  {columns.filter((c) => !isCollapsed(c.id)).map((col) => (
+                    <KanbanColumn
+                      key={col.id}
+                      column={col}
+                      demands={demandsByColumn.get(col.id) ?? []}
+                      onCardClick={handleCardClick}
+                      onAddClick={handleAddClick}
+                      isCollapsed={false}
+                      onToggleCollapse={toggleCollapse}
+                      taskCounts={taskCounts}
+                      collaboratorsByDemand={collaboratorsByDemand}
+                      blockerTypesById={blockerTypesById}
+                    />
+                  ))}
+                </div>
               </div>
+              {columns.some((c) => isCollapsed(c.id)) && (
+                <aside className="shrink-0 flex flex-col gap-2 py-4 pr-4 pl-2 border-l border-border/50">
+                  {columns.filter((c) => isCollapsed(c.id)).map((col) => (
+                    <CollapsedColumnStub
+                      key={col.id}
+                      column={col}
+                      count={(demandsByColumn.get(col.id) ?? []).length}
+                      onClick={() => toggleCollapse(col.id)}
+                    />
+                  ))}
+                </aside>
+              )}
             </div>
           </DndContext>
         )}

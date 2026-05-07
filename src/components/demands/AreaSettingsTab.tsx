@@ -171,7 +171,7 @@ export function AreaSettingsTab() {
 }
 
 interface AreaRowProps {
-  area: { id: string; name: string; color: string | null; position: number; workspace: AreaWorkspace };
+  area: { id: string; name: string; color: string | null; background_color: string | null; position: number; workspace: AreaWorkspace };
   count: number;
   onUpdate: (fields: Record<string, unknown>) => void;
   onDeactivate: () => void;
@@ -186,19 +186,47 @@ function AreaRow({ area, count, onUpdate, onDeactivate, onDelete }: AreaRowProps
   return (
     <TableRow>
       <TableCell>
-        <div className="flex gap-1">
-          {PRESET_COLORS.map((c) => (
-            <button
-              key={c}
-              type="button"
-              onClick={() => {
-                setColor(c);
-                onUpdate({ color: c });
-              }}
-              className="w-5 h-5 rounded-full border-2 transition-all"
-              style={{ backgroundColor: c, borderColor: color === c ? "hsl(var(--foreground))" : "transparent" }}
+        <div className="flex items-center gap-2">
+          <div className="flex gap-1">
+            {PRESET_COLORS.map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => {
+                  setColor(c);
+                  onUpdate({ color: c });
+                }}
+                className="w-5 h-5 rounded-full border-2 transition-all"
+                style={{ backgroundColor: c, borderColor: color === c ? "hsl(var(--foreground))" : "transparent" }}
+              />
+            ))}
+          </div>
+          <div className="relative w-6 h-6" title="Cor de fundo da raia (Swimlane TECH)">
+            <input
+              type="color"
+              value={area.background_color ?? "#ffffff"}
+              onChange={(e) => onUpdate({ background_color: e.target.value })}
+              className="absolute inset-0 w-6 h-6 opacity-0 cursor-pointer"
             />
-          ))}
+            <div
+              className="w-6 h-6 rounded border border-border flex items-center justify-center pointer-events-none"
+              style={{ backgroundColor: area.background_color ?? "transparent" }}
+            >
+              {!area.background_color && (
+                <span className="text-[8px] text-muted-foreground">BG</span>
+              )}
+            </div>
+            {area.background_color && (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onUpdate({ background_color: null }); }}
+                className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-muted text-muted-foreground text-[8px] leading-none flex items-center justify-center hover:bg-destructive hover:text-destructive-foreground"
+                title="Remover cor de fundo"
+              >
+                ×
+              </button>
+            )}
+          </div>
         </div>
       </TableCell>
       <TableCell>
