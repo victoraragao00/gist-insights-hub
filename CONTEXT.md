@@ -1,9 +1,11 @@
-# CONTEXT.md — Estado do Projeto (v29 — 2026-04-09)
+# CONTEXT.md — Estado do Projeto (v30 — 2026-05-07)
 
 > Mantido pelo Claude Code ao final de cada sessao. Lido por todos os agentes para manter contexto.
 >
-> last_updated: 2026-04-09
-> last_updated_by: Lovable
+> last_updated: 2026-05-07
+> last_updated_by: Claude Code (auditoria do burst 2026-04-09 → 2026-05-07)
+
+> ⚠️ **Atencao:** auditoria desta sessao identificou **3 criticos abertos** (CTX1, CTX2, CTX3) e **3 altos abertos** em violacoes de RLS / SECURITY DEFINER nas Fases 7.7-7.10 abaixo. Detalhes em `auditorias/AUDITORIA_20260507.md` e `auditorias/PENDENTES.md`. Os criticos sao exploraveis por qualquer authenticated user — precisam ser priorizados antes de novas features.
 
 ---
 
@@ -27,8 +29,12 @@
 | 7.4 | Gestao de Usuarios e Permissionamento | Concluido — Sprint S4 (Issue #70): user_profiles, role global (admin/analyst/viewer), user_accessible_client_ids atualizada, aba Usuarios em Settings |
 | 7.5 | Unificacao Assignees | Concluido — Issue #71: assignee_id → user_profiles, aba Responsaveis removida, dropdowns listam usuarios reais |
 | 7.6 | Conversas IA + Docs/Rules + Contadores + Acesso | Concluido — Resumo IA, abas Documentos/Regras, fix contadores, KPIs clicaveis, onboarding restrito, FK fixes |
-| 9 | Modulo de Pautas de Reuniao | Concluido — SA-1 (tabelas) + SA-2 (CRUD) + SA-3 (IA + homework→tickets) + SA-4 (settings) + pagina dedicada /agendas/:id + markdown + prompt enriquecido |
+| 7.7 | Classifier Prompt Config dinamico | Concluido — Tabela `classification_prompt_config` + UI de edicao + Edge `test-classify` (2026-04-14) |
+| 7.8 | Limpeza historica + SLA fix posicional | Concluido — DELETE interactions <2026-01-01 (CTX4) + `mark_sla_first_response` por position (2026-04-20 / 05-04) |
+| 7.9 | Time Tracking | Concluido — `demand_time_entries` com timer ativo unico + `get_demand_total_hours` (2026-05-04) |
+| 7.10 | Workspaces + Projetos + Demand Tasks + Block History + Tech Dashboard + CX Analytics + Demand Relationships | Concluido com 6 violacoes abertas — vide secao "Burst 2026-05" e auditoria |
 | 8 | Insights IA avancados | Placeholder |
+| 9 | Modulo de Pautas de Reuniao | Concluido — SA-1 (tabelas) + SA-2 (CRUD) + SA-3 (IA + homework→tickets) + SA-4 (settings) + pagina dedicada /agendas/:id + markdown + prompt enriquecido |
 
 ---
 
@@ -270,6 +276,191 @@ UPDATE user_profiles SET global_role = 'admin' WHERE email = '<email_do_operador
 
 ---
 
+## Fase 7.7 — Classifier Prompt Config dinamico (2026-04-14 — Concluido)
+
+### Tabela `classification_prompt_config`
+- Colunas: `version`, `name`, `system_prompt`, `valid_themes jsonb`, `active`, `created_by`, `notes`
+- **Partial unique index** `WHERE active = true` — apenas 1 prompt ativo a qualquer momento
+- RLS: SELECT autenticado, INSERT/UPDATE/DELETE admin via `is_admin()`
+
+### Edge Function: `test-classify` (nova)
+- JWT real via `auth.getUser()` + admin check
+- Limit de 20 conversas por teste (anti-abuse)
+- 3 fontes de prompt: `draft_prompt` direto, `prompt_version_id` da tabela, ou prompt ativo
+- Gemini primary + Claude fallback
+- JSON parse com recovery para arrays truncados
+
+### Frontend
+- UI em Settings para editar/versionar/ativar prompts
+- Botao "Testar prompt" chama `test-classify` antes de ativar
+- `process-jobs.handleClassifyBatch` agora le prompt ativo da tabela em vez de hardcoded
+
+### Pendencias auditadas
+- **CTX22 [BAIXO]:** `created_by` aponta `auth.users(id)` em vez de `user_profiles(id)`
+- **CTX27 [BAIXO]:** `valid_themes jsonb` sem CHECK de schema
+
+---
+
+## Fase 7.8 — Limpeza historica + SLA fix posicional (2026-04-20 / 2026-05-04 — Concluido)
+
+### DELETE definitivo de historico <2026-01-01
+- Decisao de produto: dados anteriores a 2026 nao tinham valor analitico ativo, e estavam reabastecendo a fila Gemini queimando creditos.
+- Migration `20260420211903`: `DELETE FROM interactions WHERE occurred_at < '2026-01-01'` + cancela `sync_jobs` de classify_batch ativos.
+- **Pendencia auditada — CTX4 [CRITICO/EXECUTADO]:** DELETE sem filtro `auto_created` — viola PRD §6. Lição: instituir convencao de comentar SQL em migracoes destrutivas, mesmo se o filtro retornar 0 linhas.
+
+### `mark_sla_first_response` reescrito por position
+- Trigger antigo disparava `sla_first_response_at` em qualquer mudanca de coluna.
+- Novo: dispara apenas quando `position(coluna_nova) >= position(coluna_marcada_sla_response_at)` — semantica correta de "passou da coluna SLA".
+- Backfill UPDATE em `demands` corrige tickets ja afetados.
+- **Pendencia auditada — CTX17 [MEDIO]:** `LIMIT 1` sem `ORDER BY` na busca da coluna SLA. Recomenda partial unique index em `ticket_columns(triggers_sla_response_at)`.
+
+---
+
+## Fase 7.9 — Time Tracking (2026-05-04 — Concluido)
+
+### Tabela `demand_time_entries`
+- 3 estados validos via CHECK constraint: timer ativo (started_at IS NOT NULL, ended_at IS NULL), timer fechado (started+ended), hora manual (hours_manual > 0).
+- **Partial unique index** `uq_time_entries_one_active_per_user WHERE ended_at IS NULL AND started_at IS NOT NULL` — garante 1 timer ativo por user globalmente (independente de demand/task).
+- Coluna `task_id` adicionada em 2026-05-05 — entrada pode ser direto na demand ou em uma `demand_task`.
+- RLS via `demand_id IN (SELECT demands WHERE client_id IN user_accessible_client_ids)`. INSERT/UPDATE/DELETE so pelo proprio user.
+
+### DB function `get_demand_total_hours(p_demand_id)`
+- SECURITY DEFINER, soma horas de entradas direto na demand + entradas vinculadas a tasks da demand.
+- **Pendencia auditada — CTX19 [MEDIO]:** sem check de acesso à demand (vazamento de somatorio).
+
+### Hook `useDemandTimeEntries`
+- Mutations: start/stop timer, add manual entry, edit entry.
+- Realtime: timer ativo do user em todas as paginas.
+
+---
+
+## Fase 7.10 — Workspaces, Projetos, Demand Tasks, Block History, Tech Dashboard, CX Analytics, Demand Relationships (Burst 2026-05-05/07 — Concluido com 6 violacoes abertas)
+
+> ⚠️ Esta secao consolida 22+ migracoes feitas em 4 dias (2026-05-04 a 2026-05-07). Auditoria identificou drift de patterns e violacoes de RLS — vide PENDENTES.md `CTX1`-`CTX13`.
+
+### Workspaces (`cx` / `tech` / `both`)
+- `user_profiles.default_workspace` — preferencia do user (CHECK `('cx','tech','both')`)
+- `meeting_agendas.agenda_type` — `client` ou `internal`
+- `demands.workspace` — `cx` ou `tech` (default `cx`)
+- `demands.source_demand_id` — FK self-reference para task TECH originada de demand de cliente
+- `demand_areas.workspace` — qual workspace exibe a area como raia
+  - **Pendencia — CTX23:** Heuristica `LIKE '%opera%'` no backfill de areas
+
+### Modulo Projetos (`projects` + `project_members`)
+
+**Tabela `projects`:**
+- Colunas: `title`, `description`, `owner_id`, `due_date`, `original_due_date`, `hours_estimated`, `cancelled_at`, `cancelled_by`, `workspace`, `client_id`, `is_internal`, `created_at`, `updated_at`
+- CHECK: `is_internal=true` → `client_id` deve ser NULL
+- Trigger `update_projects_updated_at` BEFORE UPDATE
+
+**Tabela `project_members`:**
+- UNIQUE `(project_id, user_id)` — UPSERT-friendly
+- Roles: `owner` ou `member`
+
+**Funcoes:**
+- `is_project_accessible(p_project_id)` — SECURITY DEFINER **para evitar recursao infinita nas RLS de projects ↔ project_members** (corrigida na evolucao das policies)
+- `create_project(p_title, p_description, p_due_date, p_client_id, p_workspace)` RPC SECURITY DEFINER — cria project + insere owner como member em uma operacao
+- `cancel_project(p_project_id, p_reason)` RPC — cancela project + cascateia cancellation_reason em todas as demands ativas
+- `get_project_stats(p_project_id)` — KPIs do projeto (status, completion, overdue, total_hours, meeting_hours, hours_progress_pct, by_column)
+
+**RLS atual:**
+- `projects_select` USING `is_project_accessible(id)`
+- `projects_insert` WITH CHECK `auth.uid() = owner_id`
+- `projects_update` USING + WITH CHECK `owner_id = auth.uid()`
+- `projects_delete` USING `owner_id = auth.uid()`
+
+**Demands:** `project_id UUID REFERENCES projects(id) ON DELETE SET NULL` — uma demanda pertence a no maximo 1 projeto.
+
+**Squads — experimento abortado (2026-05-05):** Criado as 11:30 e DROP CASCADE as 11:47 do mesmo dia. `demands.squad_id` removido. Disciplina excelente.
+
+### Pendencias criticas/altas
+- **CTX5 [CRITICO/HISTORICO]:** Janela ~1h em 2026-05-05 com `projects_insert WITH CHECK (true)` — mitigada
+- **CTX12 [MEDIO]:** `useCreateProject` faz 2 queries (RPC + UPDATE is_internal) — race condition
+- **CTX13 [MEDIO]:** `projects_update` permite trocar `owner_id` — transferencia silenciosa
+- **CTX16 [MEDIO]:** `cancel_project` exclui admin global
+- **CTX7 [ALTO]:** Mudanca silenciosa de contrato de `projects.workspace` (de filtra → apenas informativo) em 2026-05-07
+- **CTX8 [ALTO]:** Backfill `is_internal=true WHERE client_id IS NULL` pode ter falsos positivos
+
+### Demand Tasks (sub-tarefas)
+
+**Tabela `demand_tasks`:**
+- Status: `open` / `in_progress` / `done`
+- `hours_estimated`, `hours_actual` (auto-calculado via time_entries.task_id)
+- `position INT` para ordenacao
+- Trigger `set_demand_task_dates` BEFORE UPDATE OF status — auto-preenche `started_at` e `finished_at`, limpa `finished_at` se reaberto
+- Trigger `check_demand_auto_complete` AFTER UPDATE OF status — quando todas as tasks da demand ficam `done`, move demand para coluna de conclusao automaticamente (com guards `cancellation_reason IS NULL AND finished_at IS NULL`)
+
+**Funcao `get_demand_task_stats(p_demand_id)`:** total/done/in_progress/open/completion_pct/hours_estimated_sum/hours_actual_sum (atualizada para somar via JOIN com `demand_time_entries`)
+
+### Demand Collaborators
+- Tabela `demand_collaborators` — colaboradores secundarios (owner principal continua em `demands.assignee_id`)
+- UNIQUE `(demand_id, user_id)`
+- Sem UPDATE policy (registros sao imutaveis)
+
+### Blocker Types + Block History
+
+**Tabela `blocker_types`** (catalogo configuravel):
+- 5 tipos seed: Aguardando cliente, Dependencia tecnica, Infra/Ambiente, Aguardando decisao, Dependencia externa
+- RLS admin-only para CRUD — **CTX20 [BAIXO]:** policy nao usa helper `is_admin()`
+- `demands.blocker_type_id` FK opcional
+
+**Tabela `demand_block_history`** (write-only via trigger):
+- Trigger `track_demand_block_history` AFTER UPDATE OF is_blocked — cria registro quando bloqueia, fecha (`unblocked_at`) quando desbloqueia
+- DB function `get_demand_block_metrics` — metricas agregadas por demand (total_blocks, active_block, total_time_blocked_hours, by_type)
+- **CTX15 [MEDIO]:** Sem UPDATE policy explicita — intencional mas nao documentado
+
+### Tech Dashboard
+
+**RPC `get_tech_dashboard_metrics(p_period_days, p_area_id, p_project_id)`** — query consolidada em 1 round-trip:
+- Alertas: blocked (>=3d), overloaded (WIP >3), forgotten (>=7d sem update), delivered (current vs previous)
+- Throughput semanal (done + created + delivery_rate)
+- Cycle time (p50, p85, avg, distribution buckets)
+- Tempo medio por coluna (avg + p85 dias)
+- Carga por pessoa (admin = todos; nao-admin = so si mesmo)
+- Forecast (backlog vs throughput percentile p25/p50/p75 — semanas otimista/provavel/conservador)
+- Horas (estimadas vs reais, por area)
+
+**Pagina `TechDashboardPage`** + componentes em `src/components/tech-dashboard/`.
+
+**🚨 Pendencia auditada — CTX2 [CRITICO]:** SECURITY DEFINER **sem filtro `user_accessible_client_ids`**. Defensavel apenas se documentado como decisao de produto ("Tech e workspace interno"). Atualmente nao documentado.
+
+**CTX24 [BAIXO]:** Funcao monolitica de 305 linhas — viola "Funcoes concisas" do Playbook.
+**CTX25 [BAIXO]:** `reopen_count` hardcoded = 0 (enum `demand_event_type` nao tem `'reopened'`).
+
+### CX Analytics
+
+**RPC `get_cx_analytics_metrics(p_period_days, p_client_id)`** — analitico para o CX Hub:
+- Throughput, cycle time, tempo por coluna, pessoas
+- `p_client_id NULL` = consolida todos os clientes acessiveis
+
+**🚨 Pendencia auditada — CTX1 [CRITICO]:** SECURITY DEFINER **sem filtro `user_accessible_client_ids`**. Quando `p_client_id IS NULL`, qualquer authenticated user ve analytics CX de **todos os clientes**, incluindo os que nao tem acesso. **Bloqueador para producao.**
+
+### Demand Relationships (depende-de / bloqueia)
+
+**Tabela `demand_relationships`:**
+- `relationship_type` CHECK in `('blocks', 'related', 'linked')`
+- CHECK `demand_id != related_demand_id` (no self-relation)
+- UNIQUE `(demand_id, related_demand_id, relationship_type)`
+
+**Triggers:**
+- `enforce_demand_block_relationship` AFTER INSERT — quando criar `blocks` cujo predecessor nao concluiu, bloqueia automaticamente o `related_demand_id` com `blocker_reason = 'Aguardando conclusao de: <titulo>'`
+- `auto_unblock_dependent_demands` AFTER UPDATE OF finished_at — quando predecessor termina, desbloqueia dependentes
+  - **CTX11 [MEDIO]:** Identifica blocos via `LIKE 'Aguardando conclusao de:%'` — fragil. Recomenda coluna `blocked_by_relationship_id`.
+
+**RPC `get_demand_relationships(p_demand_id)`** — retorna `{blocks_these, blocked_by, related}` em 1 query.
+
+### Funcao core de RLS — `user_accessible_client_ids` reescrita
+
+**Antes:** retornava client_ids onde user tem acesso. Admin via `global_role='admin'`.
+
+**Agora (2026-05-05):** Admin OR `bypass_client_access=true` (nova coluna `user_profiles.bypass_client_access`).
+
+**🚨 Pendencia auditada — CTX3 [CRITICO]:** Mudanca de semantica de funcao core sem trail de aprovacao no codigo nem documentacao. **Quem decidiu, quando, e por que?** Praticamente todas as RLS dependem deste helper. Auditar usuarios atuais com `bypass_client_access=true`.
+
+**CTX-Pattern [MEDIO]:** Novas RLS usam `client_id IN (SELECT user_accessible_client_ids(auth.uid()))` em vez de `IN (SELECT * FROM user_accessible_client_ids(...))`. Frágil — replicado em 7 tabelas (CTX9).
+
+---
+
 ## Fase 9 — Modulo de Pautas de Reuniao (SA-1 a SA-4 — Concluido)
 
 ### SA-1: Backend Schema (2026-03-26)
@@ -409,7 +600,20 @@ AUDIT_BATCH_SIZE=20
 
 ---
 
-## Auditoria Completa (Claude Code — 2026-03-24)
+## Auditoria do Burst 2026-04-09 → 2026-05-07 (Claude Code — 2026-05-07)
+
+Relatorio: `auditorias/AUDITORIA_20260507.md`
+Pendencias: `auditorias/PENDENTES.md` (atualizado)
+
+**Escopo:** 526 commits, 30 migracoes SQL, 6 paginas novas, 13 hooks novos, 14 edge functions modificadas + 1 nova.
+
+**Resultado:** 4 criticos (3 abertos: CTX1, CTX2, CTX3 — 1 executado/irreversivel: CTX4), 4 altos abertos, 11 medios, 18 baixos.
+
+**Bloqueadores para producao:** CTX1 (CX Analytics RLS), CTX6 (deactivate_stale_clients sem guard).
+
+---
+
+## Auditoria Completa (Claude Code — 2026-03-24 — historico)
 
 Relatorio: `auditorias/AUDITORIA_20260322_1500.md`
 Pendencias: `auditorias/PENDENTES.md`
@@ -618,20 +822,39 @@ gist-insights-hub/
 ├── scripts/
 ├── src/                                           # Frontend + UI (Lovable)
 │   ├── components/
-│   │   ├── demands/                               # Modulo de Tickets (8 componentes)
-│   │   └── clients/                               # ClientDocumentsTab, ClientRulesTab
+│   │   ├── demands/                               # Modulo de Tickets
+│   │   ├── clients/                               # ClientDocumentsTab, ClientRulesTab
+│   │   ├── projects/                              # ProjectCard, CreateProjectDialog (Fase 7.10)
+│   │   └── tech-dashboard/                        # AlertCards, ThroughputChart, etc. (Fase 7.10)
 │   ├── hooks/
 │   │   ├── useClientDocuments.ts                   # CRUD documentos + upload
 │   │   ├── useClientRules.ts                       # CRUD regras de negocio
-│   │   └── useDemandConversationSummaries.ts       # Resumo IA de conversas
+│   │   ├── useDemandConversationSummaries.ts       # Resumo IA de conversas
+│   │   ├── useProjects.ts                          # Projetos (Fase 7.10)
+│   │   ├── useDemandTasks.ts                       # Sub-tarefas (Fase 7.10)
+│   │   ├── useDemandTimeEntries.ts                 # Time tracking (Fase 7.9)
+│   │   ├── useDemandCollaborators.ts               # Colaboradores secundarios
+│   │   ├── useDemandRelationships.ts               # depende-de / bloqueia
+│   │   ├── useTechDashboard.ts                     # RPC consolidado Tech (Fase 7.10)
+│   │   ├── useCxAnalytics.ts                       # RPC analitico CX (Fase 7.10)
+│   │   ├── useBlockerTypes.ts                      # Catalogo de tipos de bloqueio
+│   │   ├── useBlockingStalledAlert.ts
+│   │   └── useWorkspace.ts                         # Switcher CX/TECH
 │   └── pages/
 │       ├── DemandsDashboardPage.tsx                # Dashboard analitico (KPIs clicaveis)
-│       └── PublicDemandsPage.tsx                   # One-Page publica (sem auth)
+│       ├── PublicDemandsPage.tsx                   # One-Page publica (sem auth)
+│       ├── DemandDetailPage.tsx                    # Pagina dedicada de demanda (Fase 7.10)
+│       ├── TaskDetailPage.tsx                      # Pagina dedicada de subtarefa (Fase 7.10)
+│       ├── ProjectsPage.tsx                        # Lista de projetos (Fase 7.10)
+│       ├── ProjectDetailPage.tsx                   # Detalhe de projeto (Fase 7.10)
+│       ├── TechDashboardPage.tsx                   # Dashboard TECH (Fase 7.10)
+│       └── RFIsPage.tsx                            # Lista de RFIs (Fase 7.10)
 └── supabase/                                      # Backend (Lovable) — migrations, edge functions
     └── functions/
         ├── bootstrap-user-access/                 # Onboarding (restrito para non-admins)
         ├── client-demands-public/                 # One-Page publica (sem auth)
-        └── summarize-conversation/                # Resumo IA via Lovable AI Gateway
+        ├── summarize-conversation/                # Resumo IA via Gemini direto
+        └── test-classify/                         # Sandbox de prompts (Fase 7.7, JWT+admin)
 ```
 
 ---
@@ -702,6 +925,17 @@ gist-insights-hub/
 42. **Concluido:** SLA — 4 marcadores configuráveis nas colunas: triggers_started_at (Início Dev), triggers_finished_at (Fim), triggers_sla_response_at (Fim SLA) — toggle exclusivo por tipo, tooltips explicativos, useUpdateColumnTriggers (2026-04-09)
 43. **Concluido:** UX — Badges sender_side na tabela de ocorrências + agrupamento por conversa + contact_name + aba Conversas colapsável na ClientDetailPage (2026-04-09)
 44. **Concluido:** Fix — useClientDemands select com joins completos (demand_types, ticket_columns, demand_areas, user_profiles, clients) (2026-04-09)
-45. **Pendente:** Lovable S6 — Edge function deliver-audit-alerts (baixa prioridade)
-46. **Pendente:** Testar notificacoes in-app com 2 usuarios simultaneos
-47. **Fase 8:** Insights IA avancados
+45. **Concluido:** Fase 7.7 — Classifier Prompt Config dinamico: tabela `classification_prompt_config` + UI de versionamento + Edge `test-classify` (JWT + admin + multi-source) (2026-04-14)
+46. **Concluido:** Fase 7.8 — Limpeza historica + SLA fix posicional: DELETE interactions <2026-01-01 (CTX4 — sem filtro `auto_created`, executado/irreversivel) + `mark_sla_first_response` por position (2026-04-20 / 05-04)
+47. **Concluido:** Fase 7.9 — Time Tracking: `demand_time_entries` com timer ativo unico globalmente (partial unique index), `task_id` opcional, `get_demand_total_hours` somando demand+tasks (2026-05-04)
+48. **Concluido:** Fase 7.10 — Burst 2026-05-05/07: Workspaces (cx/tech/both), Projetos com RPC `create_project`+`cancel_project`+`get_project_stats`, Demand Tasks com auto-complete, Demand Collaborators, Blocker Types, Block History, Tech Dashboard (`get_tech_dashboard_metrics`), CX Analytics (`get_cx_analytics_metrics`), Demand Relationships (depende/bloqueia)
+49. **Concluido:** Fase 7.10 — `user_accessible_client_ids` reescrito com `bypass_client_access` (CTX3 — sem trail de aprovacao)
+50. **Concluido:** 14 Edge Functions migradas para chamada direta a Gemini (sem Lovable AI Gateway) + ALLOWED_ORIGIN env (CTX18 — fallback `?? "*"` em todas)
+51. **Concluido:** Cleanup de clientes Gist: 97 clientes-lixo inativados, 1280 participantes em quarentena (auditoria `AUDITORIA_GIST_CLIENT_CLEANUP_20260504.md`)
+52. **🚨 BLOQUEADOR — CTX1:** `get_cx_analytics_metrics` SECURITY DEFINER **sem filtro RLS** — vazamento cross-cliente. Issue urgente para Lovable
+53. **🚨 BLOQUEADOR — CTX6:** `deactivate_stale_clients` SECURITY DEFINER **sem `is_admin()` guard** — qualquer authenticated user pode invocar
+54. **A decidir — CTX2:** `get_tech_dashboard_metrics` mesma falha; defensavel apenas se Tech for documentado como workspace interno do time uMode
+55. **A decidir — CTX3:** documentar quem/quando/por que do `bypass_client_access` introduzido em 2026-05-05; auditar usuarios atuais com a flag = true
+56. **Pendente:** Lovable S6 — Edge function deliver-audit-alerts (baixa prioridade)
+57. **Pendente:** Testar notificacoes in-app com 2 usuarios simultaneos
+58. **Fase 8:** Insights IA avancados
