@@ -110,6 +110,8 @@ export function DemandSidebar({ demand, onActivityTabSelect, onClose }: DemandSi
   const linkDemand = useLinkDemandToProject();
   const unlinkDemand = useUnlinkDemandFromProject();
   const [moveBoardOpen, setMoveBoardOpen] = useState(false);
+  const [pauseSlaOpen, setPauseSlaOpen] = useState(false);
+  const [pauseSlaReason, setPauseSlaReason] = useState("");
   
 
   const [rfiSheetOpen, setRfiSheetOpen] = useState(false);
