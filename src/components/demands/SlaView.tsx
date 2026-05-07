@@ -4,8 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { List, LayoutGrid } from "lucide-react";
 import { useSlaDemandsBoard, type DemandWithSla } from "@/hooks/useSla";
-import { DemandDetailSheet } from "@/components/demands/DemandDetailSheet";
-import { useDemands, type DemandRow } from "@/hooks/useDemands";
+import { DemandSlaQuickSheet } from "@/components/demands/DemandSlaQuickSheet";
 
 const SLA_STATUS_CONFIG = {
   ok: {
