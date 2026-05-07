@@ -506,6 +506,7 @@ export type Database = {
       demand_areas: {
         Row: {
           active: boolean | null
+          background_color: string | null
           color: string | null
           created_at: string | null
           id: string
@@ -515,6 +516,7 @@ export type Database = {
         }
         Insert: {
           active?: boolean | null
+          background_color?: string | null
           color?: string | null
           created_at?: string | null
           id?: string
@@ -524,6 +526,7 @@ export type Database = {
         }
         Update: {
           active?: boolean | null
+          background_color?: string | null
           color?: string | null
           created_at?: string | null
           id?: string
