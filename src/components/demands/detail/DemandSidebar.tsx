@@ -574,6 +574,13 @@ export function DemandSidebar({ demand, onActivityTabSelect, onClose }: DemandSi
               <Label className="text-xs">Motivo (opcional)</Label>
               <Textarea value={blockerReason} onChange={(e) => setBlockerReason(e.target.value)} rows={3} placeholder="Detalhes do bloqueio..." />
             </div>
+            {blockDialogOpen && (
+              <BlockerCauseSuggestions
+                demandId={demand.id}
+                currentReason={blockerReason}
+                onPick={(title) => setBlockerReason(`Aguardando: ${title}`)}
+              />
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setBlockDialogOpen(false)}>Cancelar</Button>
