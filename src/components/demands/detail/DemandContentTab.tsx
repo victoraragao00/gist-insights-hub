@@ -115,12 +115,14 @@ export function DemandContentTab({ demand }: DemandContentTabProps) {
       <div className="space-y-1.5">
         <Label className="text-xs text-muted-foreground">Notas internas</Label>
         <Textarea
+          ref={notesRef}
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           onBlur={() => {
             if (notes !== (demand.notes ?? "")) saveField("notes", notes, "Notas");
           }}
-          rows={3}
+          placeholder="Notas internas..."
+          className="resize-none overflow-hidden min-h-[80px]"
         />
       </div>
 
