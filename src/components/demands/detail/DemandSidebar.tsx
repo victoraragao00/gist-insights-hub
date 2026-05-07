@@ -103,9 +103,11 @@ export function DemandSidebar({ demand, onActivityTabSelect, onClose }: DemandSi
   const updateMutation = useUpdateDemand();
   const moveMutation = useMoveDemand();
   const deleteMutation = useDeleteDemand();
+  const changeWorkspaceMutation = useChangeDemandWorkspace();
 
   const linkDemand = useLinkDemandToProject();
   const unlinkDemand = useUnlinkDemandFromProject();
+  const [moveBoardOpen, setMoveBoardOpen] = useState(false);
   
 
   const [rfiSheetOpen, setRfiSheetOpen] = useState(false);
