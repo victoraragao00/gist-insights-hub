@@ -21,6 +21,7 @@ export interface ProjectRow {
   description: string | null;
   owner_id: string;
   due_date: string | null;
+  original_due_date: string | null;
   cancelled_at: string | null;
   cancelled_by: string | null;
   workspace: string;
@@ -63,7 +64,7 @@ export interface ProjectDemandRow {
 }
 
 const PROJECT_SELECT = `
-  id, title, description, owner_id, due_date, cancelled_at, cancelled_by,
+  id, title, description, owner_id, due_date, original_due_date, cancelled_at, cancelled_by,
   workspace, client_id, is_internal, created_at, updated_at,
   user_profiles!projects_owner_id_fkey(id, full_name, email),
   clients(id, name)
@@ -259,6 +260,39 @@ export function useUpdateProject() {
       qc.invalidateQueries({ queryKey: ["projects"] });
     },
     onError: (err: Error) => toast.error(`Erro: ${err.message}`),
+  });
+}
+
+export function useUpdateProjectDueDate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      projectId,
+      newDate,
+      currentDueDate,
+      originalDueDate,
+    }: {
+      projectId: string;
+      newDate: string | null;
+      currentDueDate: string | null;
+      originalDueDate: string | null;
+    }) => {
+      const updates: Record<string, unknown> = { due_date: newDate };
+      if (!originalDueDate && currentDueDate) {
+        updates.original_due_date = currentDueDate;
+      }
+      const { error } = await supabase
+        .from("projects")
+        .update(updates)
+        .eq("id", projectId);
+      if (error) throw error;
+    },
+    onSuccess: (_d, vars) => {
+      toast.success("Data de entrega atualizada");
+      qc.invalidateQueries({ queryKey: ["project", vars.projectId] });
+      qc.invalidateQueries({ queryKey: ["projects"] });
+    },
+    onError: (err: Error) => toast.error("Erro ao atualizar data: " + err.message),
   });
 }
 
