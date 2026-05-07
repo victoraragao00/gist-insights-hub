@@ -385,3 +385,61 @@ export function useDeleteDemand() {
     onError: (err) => toast.error(err instanceof Error ? err.message : "Erro ao excluir demanda"),
   });
 }
+
+export function usePauseSla() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: async (input: { demandId: string; reason?: string | null }) => {
+      const { error } = await supabase
+        .from("demands")
+        .update({
+          sla_paused_at: new Date().toISOString(),
+          sla_paused_by: user?.id ?? null,
+          sla_paused_reason: input.reason?.trim() || null,
+        })
+        .eq("id", input.demandId);
+      if (error) throw error;
+      await supabase.from("demand_activities").insert({
+        demand_id: input.demandId,
+        event_type: "edited",
+        description: `SLA encerrado manualmente${input.reason?.trim() ? ` — ${input.reason.trim()}` : ""}`,
+        created_by: user?.id ?? null,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["demands"] });
+      queryClient.invalidateQueries({ queryKey: ["demand"] });
+      queryClient.invalidateQueries({ queryKey: ["sla_demands"] });
+      toast.success("SLA encerrado");
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Erro ao encerrar SLA"),
+  });
+}
+
+export function useResumeSla() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: async (demandId: string) => {
+      const { error } = await supabase
+        .from("demands")
+        .update({ sla_paused_at: null, sla_paused_by: null, sla_paused_reason: null })
+        .eq("id", demandId);
+      if (error) throw error;
+      await supabase.from("demand_activities").insert({
+        demand_id: demandId,
+        event_type: "edited",
+        description: "SLA reativado",
+        created_by: user?.id ?? null,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["demands"] });
+      queryClient.invalidateQueries({ queryKey: ["demand"] });
+      queryClient.invalidateQueries({ queryKey: ["sla_demands"] });
+      toast.success("SLA reativado");
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Erro ao reativar SLA"),
+  });
+}
