@@ -58,6 +58,8 @@ import {
   useLinkDemandToProject,
   useUnlinkDemandFromProject,
 } from "@/hooks/useProjects";
+import { DemandDependenciesSection } from "./DemandDependenciesSection";
+import { useDemandRelationships } from "@/hooks/useDemandRelationships";
 
 
 interface DemandSidebarProps {
