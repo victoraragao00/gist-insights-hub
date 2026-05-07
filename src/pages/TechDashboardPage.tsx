@@ -31,6 +31,7 @@ export default function TechDashboardPage() {
   );
   const { data: areas } = useDemandAreas();
   const { data: projects } = useProjects();
+  const { data: blockingStalled } = useBlockingStalledAlert();
 
   useEffect(() => {
     if (error) toast.error("Não foi possível carregar o Dashboard TECH");
