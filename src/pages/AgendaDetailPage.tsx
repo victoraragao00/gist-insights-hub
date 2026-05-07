@@ -33,10 +33,13 @@ import {
 } from "@/components/ui/dialog";
 import {
   ChevronRight, ChevronDown, ChevronUp, Loader2, Sparkles,
-  Trash2, Plus, ArrowRight, ExternalLink, Check, Building2, Users, Pencil,
+  Trash2, Plus, ArrowRight, ExternalLink, Check, Building2, Users, Pencil, X,
 } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
-import { useMeetingAgenda, useUpdateAgenda, useDeleteAgenda } from "@/hooks/useMeetingAgendas";
+import { useMeetingAgenda, useUpdateAgenda, useDeleteAgenda, type MeetingAgendaWithClient } from "@/hooks/useMeetingAgendas";
 import { useMeetingHomework, useCreateHomeworkItem, useDeleteHomeworkItem, type HomeworkItem } from "@/hooks/useMeetingHomework";
 import { useMeetingParticipants } from "@/hooks/useMeetingParticipants";
 import { useProcessTranscription, useConvertHomeworkToTicket } from "@/hooks/useMeetingAI";
@@ -44,6 +47,90 @@ import { SatisfactionPicker } from "@/components/agendas/SatisfactionPicker";
 import { useClient } from "@/context/ClientContext";
 import { useCreateDemand, useTicketColumns, useDemandTypes } from "@/hooks/useDemands";
 import { useDemandAreas } from "@/hooks/useDemandAreas";
+import { useCompatibleProjects } from "@/hooks/useProjects";
+
+function AgendaProjectField({ agenda }: { agenda: MeetingAgendaWithClient }) {
+  const navigate = useNavigate();
+  const qc = useQueryClient();
+  const { data: compatibleProjects = [] } = useCompatibleProjects(
+    agenda.client_id,
+    agenda.agenda_type,
+  );
+
+  const updateProject = useMutation({
+    mutationFn: async (projectId: string | null) => {
+      const { error } = await supabase
+        .from("meeting_agendas")
+        .update({ project_id: projectId })
+        .eq("id", agenda.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["meeting_agenda"] });
+      qc.invalidateQueries({ queryKey: ["meeting_agendas"] });
+      toast.success("Projeto atualizado");
+    },
+    onError: (err: Error) => toast.error(`Erro: ${err.message}`),
+  });
+
+  if (agenda.project_id && agenda.projects) {
+    return (
+      <span className="inline-flex items-center gap-1.5">
+        <button
+          onClick={() => navigate(`/projects/${agenda.project_id}`)}
+          className="inline-flex items-center gap-1 hover:text-primary transition-colors"
+        >
+          {agenda.projects.is_internal && (
+            <span className="text-[10px] px-1.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-950 dark:text-purple-300 dark:border-purple-900">
+              Interno
+            </span>
+          )}
+          <span className="font-medium text-foreground">{agenda.projects.title}</span>
+          <ExternalLink className="h-3 w-3 text-muted-foreground" />
+        </button>
+        <button
+          onClick={() => updateProject.mutate(null)}
+          className="text-muted-foreground hover:text-destructive transition-colors"
+          title="Desvincular projeto"
+          disabled={updateProject.isPending}
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </span>
+    );
+  }
+
+  return (
+    <Select
+      value={agenda.project_id ?? "none"}
+      onValueChange={(v) => updateProject.mutate(v === "none" ? null : v)}
+    >
+      <SelectTrigger className="h-7 w-auto max-w-[200px] text-sm border-0 px-2 gap-1 focus:ring-0 bg-transparent text-muted-foreground hover:text-foreground">
+        <SelectValue placeholder="Vincular projeto..." />
+      </SelectTrigger>
+      <SelectContent align="end">
+        <SelectItem value="none">
+          <span className="text-muted-foreground italic">Nenhum projeto</span>
+        </SelectItem>
+        {compatibleProjects.map((p) => (
+          <SelectItem key={p.id} value={p.id}>
+            <span className="inline-flex items-center gap-2">
+              {p.is_internal && (
+                <span className="text-[10px] px-1.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-950 dark:text-purple-300 dark:border-purple-900">
+                  Interno
+                </span>
+              )}
+              <span>{p.title}</span>
+              {p.clients?.name && (
+                <span className="text-muted-foreground text-xs">· {p.clients.name}</span>
+              )}
+            </span>
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
 
 const AgendaDetailPage = () => {
   const { id } = useParams<{ id: string }>();
