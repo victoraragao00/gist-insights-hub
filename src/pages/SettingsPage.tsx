@@ -629,7 +629,9 @@ const SettingsPage = () => {
           <TabsTrigger value="integrations">Integrações</TabsTrigger>
           <TabsTrigger value="sync">Sincronização</TabsTrigger>
           <TabsTrigger value="uploads">Uploads</TabsTrigger>
+          {isAdmin && <TabsTrigger value="tiers">Tiers de Cliente</TabsTrigger>}
           {isAdmin && <TabsTrigger value="priorities">Prioridades</TabsTrigger>}
+          {isAdmin && <TabsTrigger value="types">Tipos</TabsTrigger>}
           {isAdmin && <TabsTrigger value="columns">Colunas</TabsTrigger>}
           {isAdmin && <TabsTrigger value="areas">Áreas</TabsTrigger>}
           {isAdmin && <TabsTrigger value="agendas">Pautas</TabsTrigger>}
@@ -640,8 +642,20 @@ const SettingsPage = () => {
         </TabsList>
 
         {isAdmin && (
-          <TabsContent value="priorities" className="mt-4">
+          <TabsContent value="tiers" className="mt-4">
             <SettingsPrioritiesTab />
+          </TabsContent>
+        )}
+
+        {isAdmin && (
+          <TabsContent value="priorities" className="mt-4">
+            <DemandPrioritiesSettingsTab />
+          </TabsContent>
+        )}
+
+        {isAdmin && (
+          <TabsContent value="types" className="mt-4">
+            <DemandTypesSettingsTab />
           </TabsContent>
         )}
 
