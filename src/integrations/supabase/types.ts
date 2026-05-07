@@ -1717,6 +1717,7 @@ export type Database = {
           due_date: string | null
           id: string
           is_internal: boolean
+          original_due_date: string | null
           owner_id: string
           title: string
           updated_at: string
@@ -1731,6 +1732,7 @@ export type Database = {
           due_date?: string | null
           id?: string
           is_internal?: boolean
+          original_due_date?: string | null
           owner_id: string
           title: string
           updated_at?: string
@@ -1745,6 +1747,7 @@ export type Database = {
           due_date?: string | null
           id?: string
           is_internal?: boolean
+          original_due_date?: string | null
           owner_id?: string
           title?: string
           updated_at?: string
@@ -2155,6 +2158,7 @@ export type Database = {
           due_date: string | null
           id: string
           is_internal: boolean
+          original_due_date: string | null
           owner_id: string
           title: string
           updated_at: string
