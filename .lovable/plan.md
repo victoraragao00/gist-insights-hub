@@ -1,48 +1,20 @@
-## Objetivo
+## Hotfix CTX1 — RLS em `get_cx_analytics_metrics`
 
-Vincular pautas a projetos no `CreateAgendaDialog` e tornar o vínculo editável na `AgendaDetailPage`, com regras de compatibilidade por cliente.
+Migration única que recria a função com o filtro `user_accessible_client_ids(auth.uid())` no CTE `base`, fechando o vazamento cross-cliente quando `p_client_id IS NULL`.
 
-## Mudanças
+### Mudanças
 
-### 1. `src/components/agendas/CreateAgendaDialog.tsx`
-- Remover restrição que só exibe o Select de Projeto quando `agendaType === "internal"`. Passar a exibir sempre.
-- Atualizar `useCompatibleProjects` para receber também o `agendaType`:
-  - `internal` → todos os projetos ativos (sem filtro de cliente).
-  - `client` → projetos do mesmo `client_id` OU `is_internal=true`.
-- `project_id` continua sendo enviado no insert (já existe).
+1. **Nova migration** em `supabase/migrations/` aplicando `CREATE OR REPLACE FUNCTION public.get_cx_analytics_metrics(...)` com o SQL exato fornecido no prompt.
+2. **`COMMENT ON FUNCTION`** documentando o filtro RLS e o comportamento de admins/`bypass_client_access`.
 
-### 2. `src/hooks/useMeetingAgendas.ts`
-- `useMeetingAgenda`: incluir join `projects:project_id(id, title, is_internal)` no select.
-- Estender `MeetingAgendaWithClient` com `project_id?: string | null` (já existe na tabela) e `projects?: { id; title; is_internal } | null`.
-- `agenda_type` tipado como `"client" | "internal"` no retorno (cast onde necessário).
+### Garantias
 
-### 3. `src/pages/AgendaDetailPage.tsx`
-- A página não tem sidebar; o vínculo de projeto será exibido na **meta row** do Header Card (ao lado de cliente/data/local/duração), seguindo o mesmo padrão visual editável inline.
-- Novo subcomponente `AgendaProjectField` (no mesmo arquivo) com:
-  - `useCompatibleProjects(agenda.client_id, agenda.agenda_type)` (hook compartilhado — ver passo 4).
-  - `useMutation` que faz `update meeting_agendas set project_id` e invalida `["meeting_agenda", id]` + `["meeting_agendas"]`.
-  - Quando vinculado: badge "Interno" (se aplicável) + título clicável navegando para `/projects/:id` com ícone `ExternalLink` + botão `X` para desvincular.
-  - Quando vazio: Select inline com placeholder "Vincular projeto...".
-  - Toasts via `sonner` ("Projeto atualizado" / erro).
+- Assinatura preservada: `(p_period_days INT DEFAULT 30, p_client_id UUID DEFAULT NULL) RETURNS JSON LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public`.
+- Shape do JSON inalterado (frontend `useCxAnalytics.ts` continua compatível, incluindo `reopen_count` adicionado client-side).
+- Apenas o `WHERE` do CTE `base` muda — adiciona `AND d.client_id IN (SELECT * FROM public.user_accessible_client_ids(auth.uid()))` e o guard `IF auth.uid() IS NULL THEN RAISE`.
+- Nenhuma outra função (`get_demand_analytics`, `get_tech_dashboard_metrics`, `user_accessible_client_ids`, `is_admin`) é tocada.
+- Nenhum arquivo de frontend, `src/integrations/supabase/types.ts` ou `supabase/config.toml` é alterado.
 
-### 4. Hook compartilhado `useCompatibleProjects`
-- Extrair `useCompatibleProjects` para `src/hooks/useProjects.ts` (já abriga hooks de projetos) e reutilizar tanto no `CreateAgendaDialog` quanto no `AgendaDetailPage`.
-- Assinatura: `useCompatibleProjects(clientId?: string | null, agendaType?: "client" | "internal")`.
+### Verificação pós-deploy
 
-## Padrões / Checklist
-
-- m9: toda escrita via `useMutation` (criar e atualizar).
-- m11: remover imports não usados após o refactor (ex.: `useQuery` solto no Dialog, se sair).
-- m8: destructurar `{ error }` em todas as queries/mutations.
-- m4/m5: `staleTime: 60_000`, `queryKey` inclui `clientId` + `agendaType`.
-- m3: apenas `sonner`.
-- Sem novas migrations — `project_id` já existe em `meeting_agendas`.
-- Não tocar em `src/integrations/supabase/*`, `supabase/migrations/*`, `.env`, `CONTEXT.md`, `AGENTS.md`, `CLAUDE.md`.
-
-## Verificação manual
-
-1. Criar pauta de cliente X → Select mostra apenas projetos de X + internos.
-2. Criar pauta interna → Select mostra todos os projetos ativos.
-3. Salvar pauta com projeto → vínculo persistido.
-4. AgendaDetailPage exibe campo Projeto editável; alterar dispara toast.
-5. Pauta com projeto: link navega para `/projects/:id`; botão `X` desvincula.
+Executar no SQL Editor as 5 queries da seção "Verificação" do prompt (smoke test, isolamento viewer, paridade admin, `p_client_id` específico acessível/não acessível, sanity check de funções vizinhas) e colar resultados na thread.
