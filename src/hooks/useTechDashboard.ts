@@ -42,7 +42,7 @@ export interface TechDashboardData {
     reopen_count: number;
     distribution?: Array<{ bucket: string; count: number }>;
   };
-  column_time: Array<{ column_id: string; column_name: string; avg_days: number }>;
+  column_time: Array<{ column_id: string; column_name: string; avg_days: number; p85_days?: number | null }>;
   people: Array<{
     user_id: string;
     name: string | null;

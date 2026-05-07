@@ -8,13 +8,14 @@ export interface AllRfisFilters {
   statusId?: string;
   clientId?: string;
   search?: string;
+  workspace?: string;
 }
 
 export function useAllRfis(filters: AllRfisFilters) {
   const { user } = useAuth();
-  const { statusId, clientId, search } = filters;
+  const { statusId, clientId, search, workspace } = filters;
   return useQuery({
-    queryKey: ["all-rfis", user?.id, statusId ?? "all", clientId ?? "all", search ?? ""],
+    queryKey: ["all-rfis", user?.id, statusId ?? "all", clientId ?? "all", search ?? "", workspace ?? "all"],
     enabled: !!user?.id,
     staleTime: 30_000,
     queryFn: async () => {
@@ -27,6 +28,7 @@ export function useAllRfis(filters: AllRfisFilters) {
         .limit(500);
       if (statusId) query = query.eq("status_id", statusId);
       if (clientId) query = query.eq("demands.client_id", clientId);
+      if (workspace) query = query.eq("demands.workspace", workspace);
       if (search && search.trim()) query = query.ilike("rfi_number", `%${search.trim()}%`);
       const { data, error } = await query;
       if (error) throw error;

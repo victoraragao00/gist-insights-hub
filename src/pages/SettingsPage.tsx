@@ -616,7 +616,7 @@ const SettingsPage = () => {
   const { syncing } = syncState;
 
   return (
-    <div className="space-y-6 max-w-5xl">
+    <div className="h-full overflow-y-auto p-6 space-y-6 max-w-5xl">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Configurações</h1>
         <p className="text-muted-foreground">Gerencie integrações globais e uploads de dados</p>
