@@ -14,6 +14,7 @@ import { PeopleCard } from "@/components/tech-dashboard/PeopleCard";
 import { ForecastCard } from "@/components/tech-dashboard/ForecastCard";
 import { ColumnTimeCard } from "@/components/tech-dashboard/ColumnTimeCard";
 import { HoursCard } from "@/components/tech-dashboard/HoursCard";
+import { useBlockingStalledAlert } from "@/hooks/useBlockingStalledAlert";
 
 const PERIODS: number[] = [7, 30, 90];
 
