@@ -86,11 +86,11 @@ export function useMeetingAgenda(agendaId: string | null) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("meeting_agendas")
-        .select("*, clients(name)")
+        .select("*, clients(name), projects:project_id(id, title, is_internal)")
         .eq("id", agendaId!)
         .maybeSingle();
       if (error) throw error;
-      return data as MeetingAgendaWithClient | null;
+      return data as unknown as MeetingAgendaWithClient | null;
     },
   });
 }
