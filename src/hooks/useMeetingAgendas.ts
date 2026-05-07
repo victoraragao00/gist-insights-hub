@@ -176,6 +176,7 @@ export interface ProjectAgendaRow {
   title: string;
   meeting_date: string;
   duration_minutes: number | null;
+  agenda_type: "client" | "internal";
 }
 
 export function useProjectAgendas(projectId: string | undefined) {
@@ -187,9 +188,8 @@ export function useProjectAgendas(projectId: string | undefined) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("meeting_agendas")
-        .select("id, title, meeting_date, duration_minutes")
+        .select("id, title, meeting_date, duration_minutes, agenda_type")
         .eq("project_id", projectId!)
-        .eq("agenda_type", "internal")
         .order("meeting_date", { ascending: false });
       if (error) throw error;
       return (data ?? []) as ProjectAgendaRow[];
