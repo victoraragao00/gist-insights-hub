@@ -196,6 +196,7 @@ interface CreateProjectInput {
   due_date?: string | null;
   client_id?: string | null;
   workspace?: string;
+  is_internal?: boolean;
 }
 
 export function useCreateProject() {
@@ -204,15 +205,22 @@ export function useCreateProject() {
   return useMutation({
     mutationFn: async (input: CreateProjectInput) => {
       if (!user?.id) throw new Error("Não autenticado");
-      const { data, error } = await supabase.rpc("create_project", {
+      const { data: newId, error } = await supabase.rpc("create_project", {
         p_title: input.title,
         p_description: input.description ?? null,
         p_due_date: input.due_date ?? null,
-        p_client_id: input.client_id ?? null,
+        p_client_id: input.is_internal ? null : (input.client_id ?? null),
         p_workspace: input.workspace ?? "tech",
       });
       if (error) throw error;
-      return data;
+      if (input.is_internal && newId) {
+        const { error: updErr } = await supabase
+          .from("projects")
+          .update({ is_internal: true })
+          .eq("id", newId as string);
+        if (updErr) throw updErr;
+      }
+      return newId;
     },
     onSuccess: () => {
       toast.success("Projeto criado");
