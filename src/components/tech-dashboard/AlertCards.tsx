@@ -75,9 +75,13 @@ interface Props {
   data: TechDashboardData["alerts"];
   period: number;
   onNavigate: (path: string) => void;
+  blockingStalled?: {
+    count: number;
+    items: { id: string; title: string; days_stalled: number; blocks_count: number }[];
+  };
 }
 
-export function AlertCards({ data, period, onNavigate }: Props) {
+export function AlertCards({ data, period, onNavigate, blockingStalled }: Props) {
   const delivered = data.delivered;
   const prev = delivered.count_previous ?? 0;
   const curr = delivered.count_current ?? 0;
@@ -138,6 +142,21 @@ export function AlertCards({ data, period, onNavigate }: Props) {
       onClick: () => onNavigate("/demands?workspace=tech&filter=delivered"),
     },
   ];
+
+  if (blockingStalled && blockingStalled.count > 0) {
+    cards.push({
+      key: "blocking_stalled",
+      label: "Bloqueantes paradas",
+      variant: "danger",
+      num: blockingStalled.count,
+      sub: "bloqueiam outras e estão paradas",
+      items: blockingStalled.items.slice(0, 2).map((i) => ({
+        primary: i.title,
+        right: `${i.days_stalled}d · bloqueia ${i.blocks_count}`,
+      })),
+      onClick: () => onNavigate("/demands?workspace=tech&filter=blocking_stalled"),
+    });
+  }
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
