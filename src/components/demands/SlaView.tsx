@@ -4,8 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { List, LayoutGrid } from "lucide-react";
 import { useSlaDemandsBoard, type DemandWithSla } from "@/hooks/useSla";
-import { DemandDetailSheet } from "@/components/demands/DemandDetailSheet";
-import { useDemands, type DemandRow } from "@/hooks/useDemands";
+import { DemandSlaQuickSheet } from "@/components/demands/DemandSlaQuickSheet";
 
 const SLA_STATUS_CONFIG = {
   ok: {
@@ -99,12 +98,6 @@ export function SlaView() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
 
-  // Fetch full demand data for DemandDetailSheet
-  const { data: allDemands = [] } = useDemands({});
-  const selectedDemand: DemandRow | null = useMemo(
-    () => (selectedId ? allDemands.find((d) => d.id === selectedId) ?? null : null),
-    [selectedId, allDemands],
-  );
 
   const vencidos = demands.filter((d) => d.sla_status === "vencido").length;
   const emRisco = demands.filter((d) => d.sla_status === "em_risco").length;
@@ -231,8 +224,8 @@ export function SlaView() {
       {viewMode === "kanban" && <KanbanSlaView demands={demands} />}
 
       {/* Detail Sheet */}
-      <DemandDetailSheet
-        demand={selectedDemand}
+      <DemandSlaQuickSheet
+        demandId={selectedId}
         open={sheetOpen}
         onOpenChange={setSheetOpen}
       />
