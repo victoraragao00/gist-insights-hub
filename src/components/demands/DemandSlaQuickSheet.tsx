@@ -136,7 +136,7 @@ export function DemandSlaQuickSheet({ demandId, open, onOpenChange }: DemandSlaQ
                 {demand.rfis && demand.rfis.length > 0 && (
                   <div>
                     <p className="text-xs text-muted-foreground mb-1">RFI</p>
-                    <p className="font-medium font-mono text-xs">{demand.rfis[0].code}</p>
+                    <p className="font-medium font-mono text-xs">{demand.rfis[0].rfi_number}</p>
                   </div>
                 )}
               </div>
