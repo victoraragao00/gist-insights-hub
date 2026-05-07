@@ -58,6 +58,8 @@ import {
   useLinkDemandToProject,
   useUnlinkDemandFromProject,
 } from "@/hooks/useProjects";
+import { DemandDependenciesSection } from "./DemandDependenciesSection";
+import { useDemandRelationships } from "@/hooks/useDemandRelationships";
 
 
 interface DemandSidebarProps {
@@ -492,7 +494,8 @@ export function DemandSidebar({ demand, onActivityTabSelect, onClose }: DemandSi
         )}
       </section>
 
-      {/* Recent activity */}
+      {/* Dependências */}
+      <DemandDependenciesSection demandId={demand.id} />
       <section className="rounded-lg border border-border bg-card p-4 space-y-3">
         <div className="flex items-center justify-between">
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -571,6 +574,13 @@ export function DemandSidebar({ demand, onActivityTabSelect, onClose }: DemandSi
               <Label className="text-xs">Motivo (opcional)</Label>
               <Textarea value={blockerReason} onChange={(e) => setBlockerReason(e.target.value)} rows={3} placeholder="Detalhes do bloqueio..." />
             </div>
+            {blockDialogOpen && (
+              <BlockerCauseSuggestions
+                demandId={demand.id}
+                currentReason={blockerReason}
+                onPick={(title) => setBlockerReason(`Aguardando: ${title}`)}
+              />
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setBlockDialogOpen(false)}>Cancelar</Button>
@@ -682,6 +692,52 @@ function TimeTrackingWidget({ demandId }: { demandId: string }) {
             {addManual.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Adicionar"}
           </Button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function BlockerCauseSuggestions({
+  demandId,
+  currentReason,
+  onPick,
+}: {
+  demandId: string;
+  currentReason: string;
+  onPick: (title: string) => void;
+}) {
+  const { data: rels } = useDemandRelationships(demandId);
+  const causes = [
+    ...(rels?.blocked_by ?? []),
+    ...(rels?.related ?? []),
+  ].filter((d) => !d.finished_at);
+
+  if (causes.length === 0) return null;
+
+  return (
+    <div className="space-y-1.5">
+      <p className="text-[11px] font-medium text-muted-foreground">
+        Demandas relacionadas que podem ser a causa:
+      </p>
+      <div className="space-y-1">
+        {causes.map((c) => {
+          const selected = currentReason.includes(c.title);
+          return (
+            <button
+              key={c.id}
+              type="button"
+              onClick={() => onPick(c.title)}
+              className={cn(
+                "w-full text-left text-xs px-3 py-2 rounded-md border transition-all",
+                selected
+                  ? "border-primary bg-primary/5"
+                  : "border-border hover:border-primary/40",
+              )}
+            >
+              <span className="font-medium">{c.title}</span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );

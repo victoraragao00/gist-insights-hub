@@ -130,6 +130,12 @@ export function DemandCard({
         </div>
       )}
 
+      {demand.is_blocked && demand.blocker_reason?.startsWith("Aguardando conclusão de:") && (
+        <p className="text-[10px] text-destructive/80 mb-2 line-clamp-1">
+          {demand.blocker_reason}
+        </p>
+      )}
+
       {/* Cliente + tempo */}
       <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
         <span className="truncate">{d.clientName ?? "—"}</span>

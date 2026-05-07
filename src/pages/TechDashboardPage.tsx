@@ -14,6 +14,7 @@ import { PeopleCard } from "@/components/tech-dashboard/PeopleCard";
 import { ForecastCard } from "@/components/tech-dashboard/ForecastCard";
 import { ColumnTimeCard } from "@/components/tech-dashboard/ColumnTimeCard";
 import { HoursCard } from "@/components/tech-dashboard/HoursCard";
+import { useBlockingStalledAlert } from "@/hooks/useBlockingStalledAlert";
 
 const PERIODS: number[] = [7, 30, 90];
 
@@ -30,6 +31,7 @@ export default function TechDashboardPage() {
   );
   const { data: areas } = useDemandAreas();
   const { data: projects } = useProjects();
+  const { data: blockingStalled } = useBlockingStalledAlert();
 
   useEffect(() => {
     if (error) toast.error("Não foi possível carregar o Dashboard TECH");
@@ -71,7 +73,12 @@ export default function TechDashboardPage() {
             onProjectChange={setProjectId}
           />
 
-          <AlertCards data={data.alerts} period={period} onNavigate={navigate} />
+          <AlertCards
+            data={data.alerts}
+            period={period}
+            onNavigate={navigate}
+            blockingStalled={blockingStalled}
+          />
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <ThroughputChart data={data.throughput} />
