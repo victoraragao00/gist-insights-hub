@@ -332,3 +332,74 @@ function SidebarRow({ label, value, icon: Icon }: SidebarRowProps) {
     </div>
   );
 }
+
+function ProjectDueDateField({ project }: { project: ProjectRow }) {
+  const updateDueDate = useUpdateProjectDueDate();
+  const [editing, setEditing] = useState(false);
+
+  const hasChanged = !!project.original_due_date;
+
+  return (
+    <div className="flex items-center justify-between py-1.5 text-sm border-b border-border/30">
+      <span className="text-muted-foreground text-xs">Data de entrega</span>
+
+      <div className="flex items-center gap-2">
+        {hasChanged && project.original_due_date && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900 cursor-default font-medium">
+                  <AlertTriangle className="h-2.5 w-2.5" />
+                  Data alterada
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="left" className="text-xs">
+                Data original:{" "}
+                {format(new Date(project.original_due_date), "dd/MM/yyyy", { locale: ptBR })}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
+
+        {editing ? (
+          <input
+            type="date"
+            defaultValue={project.due_date ?? ""}
+            autoFocus
+            className="text-xs border border-primary/40 rounded px-1.5 py-0.5 bg-background focus:outline-none focus:ring-1 focus:ring-primary/40"
+            onBlur={(e) => {
+              const newVal = e.target.value || null;
+              if (newVal !== project.due_date) {
+                updateDueDate.mutate({
+                  projectId: project.id,
+                  newDate: newVal,
+                  currentDueDate: project.due_date,
+                  originalDueDate: project.original_due_date,
+                });
+              }
+              setEditing(false);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") setEditing(false);
+              if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+            }}
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={() => setEditing(true)}
+            className={cn(
+              "text-xs font-medium hover:text-primary transition-colors",
+              !project.due_date && "text-muted-foreground/60 italic",
+            )}
+            title="Clique para editar"
+          >
+            {project.due_date
+              ? format(new Date(project.due_date), "dd/MM/yyyy", { locale: ptBR })
+              : "Sem prazo"}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
