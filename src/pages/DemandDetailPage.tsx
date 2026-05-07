@@ -89,14 +89,19 @@ const DemandDetailPage = () => {
               <DemandActivityTab demandId={demand.id} />
             </TabsContent>
           </Tabs>
-        </main>
-
-        <DemandSidebar
-          demand={demand}
-          onActivityTabSelect={() => setActiveTab("activity")}
-          onClose={() => navigate("/demands")}
-        />
+          </main>
+        </div>
       </div>
+
+      <aside className="hidden lg:block w-[300px] shrink-0 border-l border-border overflow-y-auto">
+        <div className="p-6">
+          <DemandSidebar
+            demand={demand}
+            onActivityTabSelect={() => setActiveTab("activity")}
+            onClose={() => navigate("/demands")}
+          />
+        </div>
+      </aside>
     </div>
   );
 };
