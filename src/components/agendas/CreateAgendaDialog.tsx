@@ -1,4 +1,5 @@
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
@@ -10,11 +11,40 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import { useCreateAgenda } from "@/hooks/useMeetingAgendas";
 import { useAgendaFieldConfig, type AgendaFieldConfig } from "@/hooks/useAgendaFieldConfig";
 import { useClient } from "@/context/ClientContext";
-import { useProjects } from "@/hooks/useProjects";
 import { SatisfactionPicker } from "./SatisfactionPicker";
+
+interface CompatibleProject {
+  id: string;
+  title: string;
+  is_internal: boolean;
+  clients: { name: string } | null;
+}
+
+function useCompatibleProjects(agendaClientId?: string | null) {
+  return useQuery<CompatibleProject[]>({
+    queryKey: ["compatible_projects", agendaClientId ?? null],
+    staleTime: 60_000,
+    queryFn: async () => {
+      let query = supabase
+        .from("projects")
+        .select("id, title, is_internal, clients(name)")
+        .is("cancelled_at", null)
+        .order("title");
+      if (agendaClientId) {
+        query = query.or(
+          `client_id.eq.${agendaClientId},is_internal.eq.true`,
+        );
+      }
+      const { data, error } = await query;
+      if (error) throw error;
+      return (data ?? []) as unknown as CompatibleProject[];
+    },
+  });
+}
 
 interface CreateAgendaDialogProps {
   open: boolean;
