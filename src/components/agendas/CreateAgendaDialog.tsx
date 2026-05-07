@@ -175,39 +175,37 @@ export function CreateAgendaDialog({ open, onOpenChange, defaultClientId }: Crea
             </div>
           </div>
 
-          {agendaType === "internal" && (
-            <div className="space-y-1.5">
-              <Label>
-                Projeto <span className="text-xs text-muted-foreground">(opcional)</span>
-              </Label>
-              <Select
-                value={projectId ?? "none"}
-                onValueChange={(v) => setProjectId(v === "none" ? null : v)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Vincular a um projeto..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Nenhum projeto</SelectItem>
-                  {projects.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      <span className="inline-flex items-center gap-2">
-                        {p.is_internal && (
-                          <span className="text-[10px] px-1.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-950 dark:text-purple-300 dark:border-purple-900">
-                            Interno
-                          </span>
-                        )}
-                        <span>{p.title}</span>
-                        {p.clients?.name && (
-                          <span className="text-muted-foreground text-xs">· {p.clients.name}</span>
-                        )}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
+          <div className="space-y-1.5">
+            <Label>
+              Projeto <span className="text-xs text-muted-foreground">(opcional)</span>
+            </Label>
+            <Select
+              value={projectId ?? "none"}
+              onValueChange={(v) => setProjectId(v === "none" ? null : v)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Vincular a um projeto..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Nenhum projeto</SelectItem>
+                {projects.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    <span className="inline-flex items-center gap-2">
+                      {p.is_internal && (
+                        <span className="text-[10px] px-1.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-950 dark:text-purple-300 dark:border-purple-900">
+                          Interno
+                        </span>
+                      )}
+                      <span>{p.title}</span>
+                      {p.clients?.name && (
+                        <span className="text-muted-foreground text-xs">· {p.clients.name}</span>
+                      )}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
           <div className="space-y-1.5">
             <Label>
