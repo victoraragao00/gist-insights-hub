@@ -159,6 +159,21 @@ export default function RFIsPage() {
           </table>
         )}
       </div>
+
+      {selectedRfiId && (() => {
+        const sel = rfis.find((r) => r.id === selectedRfiId);
+        if (!sel) return null;
+        const dem = sel.demands as { title?: string; clients?: { name?: string } | null } | null;
+        return (
+          <RfiDetailSheet
+            open={!!selectedRfiId}
+            onOpenChange={(o) => { if (!o) setSelectedRfiId(null); }}
+            rfi={sel as Parameters<typeof RfiDetailSheet>[0]["rfi"]}
+            demandTitle={dem?.title}
+            clientName={dem?.clients?.name}
+          />
+        );
+      })()}
     </div>
   );
 }
