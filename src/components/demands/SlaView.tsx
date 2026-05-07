@@ -98,12 +98,6 @@ export function SlaView() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
 
-  // Fetch full demand data for DemandDetailSheet
-  const { data: allDemands = [] } = useDemands({});
-  const selectedDemand: DemandRow | null = useMemo(
-    () => (selectedId ? allDemands.find((d) => d.id === selectedId) ?? null : null),
-    [selectedId, allDemands],
-  );
 
   const vencidos = demands.filter((d) => d.sla_status === "vencido").length;
   const emRisco = demands.filter((d) => d.sla_status === "em_risco").length;
