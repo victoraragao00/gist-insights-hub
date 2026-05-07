@@ -696,3 +696,49 @@ function TimeTrackingWidget({ demandId }: { demandId: string }) {
     </div>
   );
 }
+
+function BlockerCauseSuggestions({
+  demandId,
+  currentReason,
+  onPick,
+}: {
+  demandId: string;
+  currentReason: string;
+  onPick: (title: string) => void;
+}) {
+  const { data: rels } = useDemandRelationships(demandId);
+  const causes = [
+    ...(rels?.blocked_by ?? []),
+    ...(rels?.related ?? []),
+  ].filter((d) => !d.finished_at);
+
+  if (causes.length === 0) return null;
+
+  return (
+    <div className="space-y-1.5">
+      <p className="text-[11px] font-medium text-muted-foreground">
+        Demandas relacionadas que podem ser a causa:
+      </p>
+      <div className="space-y-1">
+        {causes.map((c) => {
+          const selected = currentReason.includes(c.title);
+          return (
+            <button
+              key={c.id}
+              type="button"
+              onClick={() => onPick(c.title)}
+              className={cn(
+                "w-full text-left text-xs px-3 py-2 rounded-md border transition-all",
+                selected
+                  ? "border-primary bg-primary/5"
+                  : "border-border hover:border-primary/40",
+              )}
+            >
+              <span className="font-medium">{c.title}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
