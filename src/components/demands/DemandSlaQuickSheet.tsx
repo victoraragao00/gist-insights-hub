@@ -30,7 +30,7 @@ interface QuickDemand {
   demand_areas: { name: string; color: string | null } | null;
   ticket_columns: { name: string; color: string | null } | null;
   user_profiles: { full_name: string | null; email: string | null } | null;
-  rfis: { code: string }[] | null;
+  rfis: { rfi_number: string }[] | null;
 }
 
 export function DemandSlaQuickSheet({ demandId, open, onOpenChange }: DemandSlaQuickSheetProps) {
