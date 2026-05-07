@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Link2, X } from "lucide-react";
+import { AlertTriangle, Link2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
@@ -16,6 +16,7 @@ import {
 import {
   useProjectDemands,
   useUnlinkDemandFromProject,
+  type ProjectRow,
 } from "@/hooks/useProjects";
 import { LinkDemandDialog } from "../LinkDemandDialog";
 import {
@@ -26,10 +27,11 @@ import type { DemandPriority } from "@/hooks/useDemands";
 import { useDemandTaskCounts } from "@/hooks/useDemandTasks";
 
 interface ProjectDemandsTabProps {
-  projectId: string;
+  project: ProjectRow;
 }
 
-export function ProjectDemandsTab({ projectId }: ProjectDemandsTabProps) {
+export function ProjectDemandsTab({ project }: ProjectDemandsTabProps) {
+  const projectId = project.id;
   const navigate = useNavigate();
   const { data: demands = [] } = useProjectDemands(projectId);
   const demandIds = demands.map((d) => d.id);
@@ -91,6 +93,15 @@ export function ProjectDemandsTab({ projectId }: ProjectDemandsTabProps) {
                       · {d.ticket_columns.name}
                     </span>
                   )}
+                  {!project.is_internal &&
+                    project.client_id &&
+                    d.client_id &&
+                    d.client_id !== project.client_id && (
+                      <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900 font-medium">
+                        <AlertTriangle className="h-2.5 w-2.5" />
+                        Cliente diferente
+                      </span>
+                    )}
                 </div>
                 {taskCounts[d.id] && taskCounts[d.id].total > 0 && (
                   <div className="flex items-center gap-2 mt-1">
@@ -127,7 +138,7 @@ export function ProjectDemandsTab({ projectId }: ProjectDemandsTabProps) {
       )}
 
       <LinkDemandDialog
-        projectId={projectId}
+        project={project}
         open={showLink}
         onOpenChange={setShowLink}
       />

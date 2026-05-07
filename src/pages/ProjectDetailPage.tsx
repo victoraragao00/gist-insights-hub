@@ -43,8 +43,10 @@ import {
 import { useProjectAgendas } from "@/hooks/useMeetingAgendas";
 import { StatusBadge } from "@/components/projects/StatusBadge";
 import { ProjectDemandsTab } from "@/components/projects/tabs/ProjectDemandsTab";
+import { ProjectMeetingsTab } from "@/components/projects/tabs/ProjectMeetingsTab";
 import { ProjectSquadTab } from "@/components/projects/tabs/ProjectSquadTab";
 import { ProjectActivityTab } from "@/components/projects/tabs/ProjectActivityTab";
+import { formatHours } from "@/lib/formatHours";
 
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -182,11 +184,15 @@ export default function ProjectDetailPage() {
           <Tabs defaultValue="demands">
             <TabsList>
               <TabsTrigger value="demands">Demandas</TabsTrigger>
+              <TabsTrigger value="meetings">Reuniões</TabsTrigger>
               <TabsTrigger value="squad">Squad</TabsTrigger>
               <TabsTrigger value="activity">Atividade</TabsTrigger>
             </TabsList>
             <TabsContent value="demands" className="mt-4">
-              <ProjectDemandsTab projectId={id} />
+              <ProjectDemandsTab project={project} />
+            </TabsContent>
+            <TabsContent value="meetings" className="mt-4">
+              <ProjectMeetingsTab projectId={id} />
             </TabsContent>
             <TabsContent value="squad" className="mt-4">
               <ProjectSquadTab
@@ -238,6 +244,53 @@ export default function ProjectDetailPage() {
                 {totalHours.toFixed(1)}h
               </span>
             </div>
+          </section>
+
+          <section className="rounded-lg border border-border bg-card p-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-3">
+              Horas
+            </p>
+            <div className="flex items-center justify-between text-sm mb-1.5">
+              <span className="text-muted-foreground">Planejadas</span>
+              <HoursEditField
+                value={project.hours_estimated}
+                onSave={(val) =>
+                  updateProject.mutate({
+                    id: project.id,
+                    fields: { hours_estimated: val },
+                  })
+                }
+              />
+            </div>
+            <div className="flex items-center justify-between text-sm mb-3">
+              <span className="text-muted-foreground">Registradas</span>
+              <span className="font-semibold">{formatHours(totalHours)}</span>
+            </div>
+            {project.hours_estimated != null && project.hours_estimated > 0 && (
+              <>
+                <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                  <div
+                    className={cn(
+                      "h-full rounded-full transition-all",
+                      (stats?.hours_progress_pct ?? 0) > 100
+                        ? "bg-destructive"
+                        : "bg-primary",
+                    )}
+                    style={{
+                      width: `${Math.min(stats?.hours_progress_pct ?? 0, 100)}%`,
+                    }}
+                  />
+                </div>
+                <div className="flex justify-between text-[10px] text-muted-foreground mt-1">
+                  <span>{stats?.hours_progress_pct ?? 0}% utilizado</span>
+                  {(stats?.hours_progress_pct ?? 0) > 100 && (
+                    <span className="text-destructive font-medium">
+                      +{formatHours(totalHours - project.hours_estimated)} acima
+                    </span>
+                  )}
+                </div>
+              </>
+            )}
           </section>
 
           {meetingHours > 0 && (
@@ -401,5 +454,59 @@ function ProjectDueDateField({ project }: { project: ProjectRow }) {
         )}
       </div>
     </div>
+  );
+}
+
+interface HoursEditFieldProps {
+  value: number | null;
+  onSave: (value: number | null) => void;
+}
+
+function HoursEditField({ value, onSave }: HoursEditFieldProps) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+
+  const commit = () => {
+    const parsed = parseFloat(draft);
+    onSave(Number.isFinite(parsed) && parsed > 0 ? parsed : null);
+    setEditing(false);
+  };
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-1">
+        <input
+          autoFocus
+          type="number"
+          step="0.5"
+          min="0"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+            if (e.key === "Escape") setEditing(false);
+          }}
+          className="w-16 h-6 text-xs border border-primary/40 rounded px-1.5 bg-background focus:outline-none focus:ring-1 focus:ring-primary/40"
+        />
+        <span className="text-xs text-muted-foreground">h</span>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        setDraft(value != null ? String(value) : "");
+        setEditing(true);
+      }}
+      className={cn(
+        "text-sm font-medium hover:text-primary transition-colors",
+        !value && "text-muted-foreground/60 italic text-xs",
+      )}
+    >
+      {value ? formatHours(value) : "Definir"}
+    </button>
   );
 }

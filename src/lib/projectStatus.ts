@@ -9,6 +9,8 @@ export interface ProjectStatsData {
   overdue_count: number;
   total_hours: number;
   meeting_hours?: number;
+  hours_estimated: number | null;
+  hours_progress_pct: number | null;
   by_column: Array<{ column_id: string; column_name: string; count: number }>;
 }
 

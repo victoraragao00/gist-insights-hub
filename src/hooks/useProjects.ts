@@ -22,6 +22,7 @@ export interface ProjectRow {
   owner_id: string;
   due_date: string | null;
   original_due_date: string | null;
+  hours_estimated: number | null;
   cancelled_at: string | null;
   cancelled_by: string | null;
   workspace: string;
@@ -64,8 +65,8 @@ export interface ProjectDemandRow {
 }
 
 const PROJECT_SELECT = `
-  id, title, description, owner_id, due_date, original_due_date, cancelled_at, cancelled_by,
-  workspace, client_id, is_internal, created_at, updated_at,
+  id, title, description, owner_id, due_date, original_due_date, hours_estimated,
+  cancelled_at, cancelled_by, workspace, client_id, is_internal, created_at, updated_at,
   user_profiles!projects_owner_id_fkey(id, full_name, email),
   clients(id, name)
 `;
@@ -189,6 +190,42 @@ export function useUnassignedDemands(query: string) {
   });
 }
 
+export function useLinkableDemands(
+  project: Pick<ProjectRow, "id" | "client_id" | "is_internal"> | undefined,
+  query: string,
+) {
+  const { user } = useAuth();
+  return useQuery<ProjectDemandRow[]>({
+    queryKey: [
+      "linkable_demands",
+      user?.id,
+      project?.id,
+      project?.client_id ?? null,
+      project?.is_internal ?? false,
+      query,
+    ],
+    enabled: !!user?.id && !!project?.id,
+    staleTime: 30_000,
+    queryFn: async () => {
+      let q = supabase
+        .from("demands")
+        .select(DEMAND_SELECT)
+        .is("project_id", null)
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (project!.is_internal) {
+        q = q.eq("workspace", "tech");
+      } else if (project!.client_id) {
+        q = q.eq("client_id", project!.client_id);
+      }
+      if (query.trim()) q = q.ilike("title", `%${query.trim()}%`);
+      const { data, error } = await q;
+      if (error) throw error;
+      return (data ?? []) as unknown as ProjectDemandRow[];
+    },
+  });
+}
+
 // ─── Mutations ────────────────────────────────────────────────────────
 
 interface CreateProjectInput {
@@ -241,6 +278,7 @@ interface UpdateProjectInput {
     description: string | null;
     due_date: string | null;
     client_id: string | null;
+    hours_estimated: number | null;
   }>;
 }
 

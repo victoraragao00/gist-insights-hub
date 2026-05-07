@@ -1715,6 +1715,7 @@ export type Database = {
           created_at: string
           description: string | null
           due_date: string | null
+          hours_estimated: number | null
           id: string
           is_internal: boolean
           original_due_date: string | null
@@ -1730,6 +1731,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           due_date?: string | null
+          hours_estimated?: number | null
           id?: string
           is_internal?: boolean
           original_due_date?: string | null
@@ -1745,6 +1747,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           due_date?: string | null
+          hours_estimated?: number | null
           id?: string
           is_internal?: boolean
           original_due_date?: string | null
@@ -2156,6 +2159,7 @@ export type Database = {
           created_at: string
           description: string | null
           due_date: string | null
+          hours_estimated: number | null
           id: string
           is_internal: boolean
           original_due_date: string | null
