@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { useAllRfis, useRfiStatuses } from "@/hooks/useRfis";
+import { RfiDetailSheet } from "@/components/rfis/RfiDetailSheet";
 import { useClient } from "@/context/ClientContext";
 
 const ALL = "__all__";
