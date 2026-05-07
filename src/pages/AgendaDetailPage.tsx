@@ -577,6 +577,8 @@ const AgendaDetailPage = () => {
           }}
         />
       )}
+        </div>
+      </div>
     </div>
   );
 };
