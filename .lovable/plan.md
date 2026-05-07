@@ -1,48 +1,60 @@
-## Diagnóstico
+## Contexto
 
-A rota `/demands/dashboard` renderiza `src/pages/DemandsDashboardPage.tsx`. O container raiz já tem `h-full overflow-y-auto`, mas:
+Hoje o painel SLA (`SlaView.tsx`) reaproveita o `DemandDetailSheet` — um sheet pesado de edição completa, sem scroll bem definido e sem botão para abrir a página completa. O prompt pede um sheet **somente leitura** e enxuto, específico para o SLA.
 
-- A classe `animate-fade-in-up` é aplicada ao próprio container de scroll (transform pode interferir em alguns navegadores e atrapalhar a percepção de scroll quando combinada com `space-y-6` + grid).
-- Não há header sticky — ao rolar, o título e os filtros somem, dando sensação de página travada.
-- O usuário reportou que conteúdo abaixo da dobra não aparece.
+## Decisão
 
-A página é a única afetada — `Index.tsx` (rota `/`) já usa o mesmo padrão e funciona.
+Não vou modificar o `DemandDetailSheet` (usado em vários outros lugares como editor completo). Em vez disso, vou:
 
-## FIX (apenas `src/pages/DemandsDashboardPage.tsx`)
+1. Criar um novo componente `src/components/demands/DemandSlaQuickSheet.tsx` — sheet read-only com scroll interno, header fixo, footer fixo e botão "Abrir demanda completa" → `/demands/:id`.
+2. Trocar o uso em `src/components/demands/SlaView.tsx` para o novo componente (remove o uso atual do `DemandDetailSheet` e do hook `useDemands` que era usado só para isso, já que o `DemandWithSla` retornado por `useSlaDemandsBoard` já tem os campos básicos — para o restante (descrição, notas, resolução, RFI) buscaremos com uma query leve).
 
-1. Trocar o root de:
-   ```tsx
-   <div className="h-full overflow-y-auto p-6 space-y-6 animate-fade-in-up">
-   ```
-   para o padrão do `TechDashboardPage`:
-   ```tsx
-   <div className="flex flex-col h-full overflow-y-auto animate-fade-in-up">
-     <div className="sticky top-0 z-10 bg-background border-b border-border px-6 py-4 shrink-0 flex items-center justify-between flex-wrap gap-3">
-       {/* h1 + selects (cliente, período) */}
-     </div>
-     <div className="px-6 py-4 space-y-6">
-       {/* KPI cards, dialog, gráficos, seções CX */}
-     </div>
-   </div>
-   ```
+## Arquivos
 
-2. Mover `h1 "Dashboard de Demandas"` + os 2 `<Select>` (cliente e dias) para dentro do header sticky.
+### Novo: `src/components/demands/DemandSlaQuickSheet.tsx`
 
-3. Mover todo o resto (KPIs, Dialog drill-down, charts existentes, seções "Throughput Semanal", "Tempo de Ciclo", "Carga por Pessoa", tabela de bloqueados) para dentro do wrapper de conteúdo `px-6 py-4 space-y-6`.
+- Props: `{ demandId: string | null; open: boolean; onOpenChange: (b: boolean) => void }`.
+- Dentro, faz uma query (`useQuery`, key `["demand_sla_quick", demandId]`, `staleTime: 30_000`, `enabled: open && !!demandId`) selecionando da tabela `demands` apenas o necessário:
+  ```
+  id, title, description, expected_result, notes, resolution, priority,
+  clients(name),
+  demand_types(name, color),
+  demand_areas(name, color),
+  ticket_columns(name, color),
+  user_profiles!assignee_id(full_name, email),
+  rfis(code)
+  ```
+- Layout:
+  - `<SheetContent side="right" className="w-full sm:max-w-[560px] flex flex-col p-0 overflow-hidden">`
+  - Header `shrink-0` com `<SheetTitle>` (título), botão "Abrir completo" (ícone `ExternalLink`) e linha de badges (tipo / área / prioridade / coluna). Badges com tokens semânticos (`variant="outline"` + `bg-muted`/`text-muted-foreground`) — sem cores hardcoded `bg-teal-50` etc., conforme design system.
+  - Body `flex-1 overflow-y-auto px-6 py-4 space-y-5` com:
+    - Grid 2 col: Responsável, Cliente, RFI (se houver).
+    - `ReadOnlyField` para Descrição, Resultado esperado, Resolução.
+    - `ExpandableField` para Notas internas (campo real é `notes`).
+  - Footer `shrink-0` com botão `w-full` "Abrir demanda completa".
+- Componentes auxiliares `ReadOnlyField` e `ExpandableField` definidos no mesmo arquivo, conforme spec do prompt (threshold ~80px, `useEffect` mede `scrollHeight`, toggle Ver mais/Ver menos com `ChevronDown/Up`).
+- Skeleton enquanto carrega.
+- `useNavigate` do `react-router-dom` para o botão; chama `onOpenChange(false)` antes de navegar.
 
-4. Conferir e remover qualquer import que sobre após a refatoração (m11). Espera-se que nenhum import seja removido — apenas reordenação de JSX.
+### Editado: `src/components/demands/SlaView.tsx`
 
-## Não tocar
+- Remover imports `DemandDetailSheet`, `useDemands`, `DemandRow` (m11).
+- Remover `useDemands({})` e `selectedDemand` (não precisa mais carregar a lista inteira só para abrir o detalhe).
+- Trocar o `<DemandDetailSheet ... />` por `<DemandSlaQuickSheet demandId={selectedId} open={sheetOpen} onOpenChange={setSheetOpen} />`.
 
-- Nenhuma outra página.
-- `src/components/DashboardLayout.tsx`, `App.tsx`, hooks, supabase, migrations, docs.
+## Checklist CTO aplicável
 
-## Verificação manual
+- m1: sem `any`.
+- m4/m5: queryKey inclui `demandId`, staleTime 30s.
+- m8: `{ data, error }` destructurado, `throw error`.
+- m11: imports não usados removidos do `SlaView.tsx`.
+- Design system: badges com tokens semânticos (`bg-muted`, `text-muted-foreground`, `border-border`), nada de `bg-teal-50` cru.
 
-1. `/demands/dashboard` → roda scroll vertical até o final ("Carga por Pessoa") e volta.
-2. Ao rolar, header com título + filtros permanece fixo no topo.
-3. Outras rotas (`/`, `/tech/dashboard`, `/demands`, `/agendas`) inalteradas.
+## Verificação
 
-## Arquivos editados
-
-- `src/pages/DemandsDashboardPage.tsx`
+1. Painel SLA → clicar numa demanda → sheet abre com header (título + badges + botão).
+2. Body do sheet rola; header e footer fixos.
+3. Descrição/Resultado/Resolução exibidos sem scrollbar interna; alturas crescem com conteúdo.
+4. Notas longas → truncadas + "Ver mais"; expandidas → "Ver menos".
+5. Botão "Abrir completo" (header) e "Abrir demanda completa" (footer) → navegam para `/demands/:id` e fecham o sheet.
+6. Largura ~560px no desktop; full-width no mobile.
