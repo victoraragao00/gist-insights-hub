@@ -190,6 +190,42 @@ export function useUnassignedDemands(query: string) {
   });
 }
 
+export function useLinkableDemands(
+  project: Pick<ProjectRow, "id" | "client_id" | "is_internal"> | undefined,
+  query: string,
+) {
+  const { user } = useAuth();
+  return useQuery<ProjectDemandRow[]>({
+    queryKey: [
+      "linkable_demands",
+      user?.id,
+      project?.id,
+      project?.client_id ?? null,
+      project?.is_internal ?? false,
+      query,
+    ],
+    enabled: !!user?.id && !!project?.id,
+    staleTime: 30_000,
+    queryFn: async () => {
+      let q = supabase
+        .from("demands")
+        .select(DEMAND_SELECT)
+        .is("project_id", null)
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (project!.is_internal) {
+        q = q.eq("workspace", "tech");
+      } else if (project!.client_id) {
+        q = q.eq("client_id", project!.client_id);
+      }
+      if (query.trim()) q = q.ilike("title", `%${query.trim()}%`);
+      const { data, error } = await q;
+      if (error) throw error;
+      return (data ?? []) as unknown as ProjectDemandRow[];
+    },
+  });
+}
+
 // ─── Mutations ────────────────────────────────────────────────────────
 
 interface CreateProjectInput {
