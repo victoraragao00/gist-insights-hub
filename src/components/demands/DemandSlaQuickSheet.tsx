@@ -36,19 +36,20 @@ interface QuickDemand {
 export function DemandSlaQuickSheet({ demandId, open, onOpenChange }: DemandSlaQuickSheetProps) {
   const navigate = useNavigate();
 
-  const { data: demand, isLoading } = useQuery<QuickDemand | null>({
+  const { data: demand, isLoading, error } = useQuery<QuickDemand | null>({
     queryKey: ["demand_sla_quick", demandId],
     enabled: open && !!demandId,
     staleTime: 30_000,
     queryFn: async () => {
-      const { data, error } = await supabase
+      if (!demandId) return null;
+      const { data, error: qErr } = await supabase
         .from("demands")
         .select(
-          "id, title, description, expected_result, notes, resolution, priority, clients(name), demand_types(name, color), demand_areas(name, color), ticket_columns(name, color), user_profiles!assignee_id(full_name, email), rfis(code)",
+          "id, title, description, expected_result, notes, resolution, priority, clients(name), demand_types(name, color), demand_areas(name, color), ticket_columns(name, color), user_profiles!assignee_id(full_name, email), rfis(rfi_number)",
         )
-        .eq("id", demandId!)
+        .eq("id", demandId)
         .maybeSingle();
-      if (error) throw error;
+      if (qErr) throw qErr;
       return data as unknown as QuickDemand | null;
     },
   });
