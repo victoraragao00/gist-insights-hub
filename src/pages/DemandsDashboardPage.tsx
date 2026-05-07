@@ -159,9 +159,9 @@ const DemandsDashboardPage = () => {
   }));
 
   return (
-    <div className="h-full overflow-y-auto p-6 space-y-6 animate-fade-in-up">
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
+    <div className="flex flex-col h-full overflow-y-auto animate-fade-in-up">
+      {/* Header sticky */}
+      <div className="sticky top-0 z-10 bg-background border-b border-border px-6 py-4 shrink-0 flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-2xl font-bold text-foreground">Dashboard de Demandas</h1>
 
         <div className="flex items-center gap-3">
@@ -190,6 +190,7 @@ const DemandsDashboardPage = () => {
         </div>
       </div>
 
+      <div className="px-6 py-4 space-y-6">
       {/* KPI Cards */}
       {isLoading ? (
         <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4">
@@ -501,6 +502,7 @@ const DemandsDashboardPage = () => {
           <PeopleCard data={cxMetrics.people} isAdmin={true} />
         )}
       </section>
+      </div>
     </div>
   );
 };
