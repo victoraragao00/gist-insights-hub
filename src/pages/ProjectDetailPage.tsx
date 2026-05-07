@@ -184,11 +184,15 @@ export default function ProjectDetailPage() {
           <Tabs defaultValue="demands">
             <TabsList>
               <TabsTrigger value="demands">Demandas</TabsTrigger>
+              <TabsTrigger value="meetings">Reuniões</TabsTrigger>
               <TabsTrigger value="squad">Squad</TabsTrigger>
               <TabsTrigger value="activity">Atividade</TabsTrigger>
             </TabsList>
             <TabsContent value="demands" className="mt-4">
-              <ProjectDemandsTab projectId={id} />
+              <ProjectDemandsTab project={project} />
+            </TabsContent>
+            <TabsContent value="meetings" className="mt-4">
+              <ProjectMeetingsTab projectId={id} />
             </TabsContent>
             <TabsContent value="squad" className="mt-4">
               <ProjectSquadTab
