@@ -34,7 +34,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
   useTicketColumns, useDemandTypes, useUpdateDemand, useMoveDemand, useDeleteDemand,
-  useChangeDemandWorkspace,
+  useChangeDemandWorkspace, usePauseSla, useResumeSla,
   useDemandActivities, type DemandRow,
 } from "@/hooks/useDemands";
 import { useDemandAreas } from "@/hooks/useDemandAreas";
