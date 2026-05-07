@@ -897,6 +897,55 @@ export type Database = {
           },
         ]
       }
+      demand_relationships: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          demand_id: string
+          id: string
+          related_demand_id: string
+          relationship_type: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          demand_id: string
+          id?: string
+          related_demand_id: string
+          relationship_type: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          demand_id?: string
+          id?: string
+          related_demand_id?: string
+          relationship_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "demand_relationships_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "demand_relationships_demand_id_fkey"
+            columns: ["demand_id"]
+            isOneToOne: false
+            referencedRelation: "demands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "demand_relationships_related_demand_id_fkey"
+            columns: ["related_demand_id"]
+            isOneToOne: false
+            referencedRelation: "demands"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       demand_tasks: {
         Row: {
           assignee_id: string | null
@@ -2149,6 +2198,7 @@ export type Database = {
         Returns: Json
       }
       get_demand_block_metrics: { Args: { p_demand_id: string }; Returns: Json }
+      get_demand_relationships: { Args: { p_demand_id: string }; Returns: Json }
       get_demand_task_stats: { Args: { p_demand_id: string }; Returns: Json }
       get_demand_total_hours: { Args: { p_demand_id: string }; Returns: number }
       get_demands_with_sla: {
