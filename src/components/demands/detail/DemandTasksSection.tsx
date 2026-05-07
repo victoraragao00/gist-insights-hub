@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Clock, Plus, Trash2, Check } from "lucide-react";
+import { Clock, Plus, Trash2, Check, Circle, CircleDot, CheckCircle2, ExternalLink } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,52 +25,6 @@ interface UserProfileMini {
   id: string;
   full_name: string | null;
   email: string | null;
-}
-
-const NEXT_STATUS: Record<DemandTaskStatus, DemandTaskStatus> = {
-  open: "in_progress",
-  in_progress: "done",
-  done: "open",
-};
-
-const STATUS_CHIP: Record<DemandTaskStatus, { label: string; chip: string }> = {
-  open: {
-    label: "Aberto",
-    chip: "bg-muted/60 text-muted-foreground border-border/60",
-  },
-  in_progress: {
-    label: "Em andamento",
-    chip: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900",
-  },
-  done: {
-    label: "Concluído",
-    chip: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900",
-  },
-};
-
-function getInitials(label?: string | null) {
-  if (!label) return "?";
-  return label.split(/\s+/).filter(Boolean).map((p) => p[0]).slice(0, 2).join("").toUpperCase();
-}
-
-function StatusIcon({ status }: { status: DemandTaskStatus }) {
-  if (status === "done") {
-    return (
-      <div className="w-[18px] h-[18px] rounded-full border-[1.5px] border-emerald-500 bg-emerald-500 flex items-center justify-center">
-        <Check className="h-2.5 w-2.5 text-white" strokeWidth={2.5} />
-      </div>
-    );
-  }
-  if (status === "in_progress") {
-    return (
-      <div className="w-[18px] h-[18px] rounded-full border-[1.5px] border-blue-400 bg-blue-50 dark:bg-blue-950 flex items-center justify-center">
-        <div className="w-2 h-2 rounded-full bg-blue-500" />
-      </div>
-    );
-  }
-  return (
-    <div className="w-[18px] h-[18px] rounded-full border-[1.5px] border-border hover:border-primary hover:bg-primary/10 transition-colors" />
-  );
 }
 
 interface Props {
@@ -274,135 +230,228 @@ interface DemandTaskItemProps {
   onDelete: () => void;
 }
 
+const STATUS_CONFIG: Record<DemandTaskStatus, {
+  label: string;
+  Icon: typeof Circle;
+  trigger: string;
+  dotColor: string;
+}> = {
+  open: {
+    label: "Aberto",
+    Icon: Circle,
+    trigger: "bg-muted/60 text-muted-foreground border-border",
+    dotColor: "#888780",
+  },
+  in_progress: {
+    label: "Em andamento",
+    Icon: CircleDot,
+    trigger: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900",
+    dotColor: "#378ADD",
+  },
+  done: {
+    label: "Concluído",
+    Icon: CheckCircle2,
+    trigger: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900",
+    dotColor: "#1D9E75",
+  },
+};
+
+const TASK_BG: Record<DemandTaskStatus, string> = {
+  open: "bg-card",
+  in_progress: "bg-blue-50/30 dark:bg-blue-950/10",
+  done: "bg-muted/20",
+};
+
+function TaskStatusSelect({
+  value,
+  onChange,
+}: {
+  value: DemandTaskStatus;
+  onChange: (v: DemandTaskStatus) => void;
+}) {
+  const current = STATUS_CONFIG[value];
+  const CurrentIcon = current.Icon;
+  return (
+    <Select value={value} onValueChange={(v) => onChange(v as DemandTaskStatus)}>
+      <SelectTrigger
+        className={cn(
+          "h-7 w-auto gap-1.5 text-xs font-medium border rounded-full px-2.5",
+          "focus:ring-0 focus:ring-offset-0 [&>svg:last-child]:hidden",
+          current.trigger,
+        )}
+      >
+        <CurrentIcon className="h-3.5 w-3.5" />
+        <span>{current.label}</span>
+      </SelectTrigger>
+      <SelectContent>
+        {(Object.entries(STATUS_CONFIG) as Array<[DemandTaskStatus, typeof STATUS_CONFIG[DemandTaskStatus]]>).map(
+          ([key, cfg]) => {
+            const Icon = cfg.Icon;
+            const selected = key === value;
+            return (
+              <SelectItem key={key} value={key}>
+                <div className={cn("flex items-center gap-2 rounded-md px-1 py-0.5", selected && cfg.trigger)}>
+                  <Icon className="h-3.5 w-3.5" style={{ color: cfg.dotColor }} />
+                  <span className="text-xs font-medium">{cfg.label}</span>
+                </div>
+              </SelectItem>
+            );
+          },
+        )}
+      </SelectContent>
+    </Select>
+  );
+}
+
+function HoursField({
+  label,
+  value,
+  onSave,
+  readOnly = false,
+}: {
+  label: "Planejado" | "Realizado";
+  value: number | null | undefined;
+  onSave: (val: number | null) => void;
+  readOnly?: boolean;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+
+  const formatted = value && value > 0 ? `${value}h` : null;
+
+  const commit = () => {
+    const parsed = draft === "" ? null : parseFloat(draft);
+    onSave(Number.isFinite(parsed as number) ? (parsed as number) : null);
+    setEditing(false);
+  };
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+        <span className="text-[10px] text-muted-foreground/60">{label}</span>
+        <input
+          autoFocus
+          type="number"
+          step="0.5"
+          min="0"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") commit();
+            if (e.key === "Escape") setEditing(false);
+          }}
+          className="w-12 h-5 text-xs border border-primary/40 rounded px-1 bg-background focus:outline-none"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        setDraft(value != null ? String(value) : "");
+        setEditing(true);
+      }}
+      disabled={readOnly}
+      className={cn(
+        "flex items-center gap-1 text-xs transition-colors",
+        formatted
+          ? label === "Planejado"
+            ? "text-muted-foreground"
+            : "text-foreground font-medium"
+          : "text-muted-foreground/40",
+        !readOnly && "hover:text-primary",
+      )}
+      title={`${label}: clique para editar`}
+    >
+      <span className="text-[10px] text-muted-foreground/50">{label}</span>
+      <span>{formatted ?? "—"}</span>
+    </button>
+  );
+}
+
 function DemandTaskItem({ task, userProfiles, onUpdate, onDelete }: DemandTaskItemProps) {
+  const navigate = useNavigate();
   const status = (task.status ?? "open") as DemandTaskStatus;
-  const cfg = STATUS_CHIP[status];
-  const assignee = userProfiles.find((u) => u.id === task.assignee_id);
-  const assigneeLabel = assignee?.full_name ?? assignee?.email ?? null;
+  const goToTask = () => navigate(`/tasks/${task.id}`);
 
   return (
     <div
       className={cn(
-        "group border border-border rounded-xl px-3 py-2.5 transition-all bg-card",
+        "group border border-border rounded-xl transition-all",
         "hover:border-primary/30 hover:shadow-sm",
-        status === "done" && "opacity-60 bg-muted/20",
+        TASK_BG[status],
       )}
     >
-      <div className="flex items-start gap-2.5">
-        {/* Status toggle */}
-        <button
-          type="button"
-          onClick={() => onUpdate({ status: NEXT_STATUS[status] })}
-          className="mt-0.5 shrink-0 transition-transform hover:scale-110"
-          title={`Marcar como ${STATUS_CHIP[NEXT_STATUS[status]].label}`}
-          aria-label={`Status: ${cfg.label}`}
-        >
-          <StatusIcon status={status} />
-        </button>
-
-        {/* Title + meta */}
-        <div className="flex-1 min-w-0">
-          <input
-            type="text"
-            defaultValue={task.title}
-            onBlur={(e) => {
-              const v = e.target.value.trim();
-              if (v && v !== task.title) onUpdate({ title: v });
-              else if (!v) e.target.value = task.title;
-            }}
-            className={cn(
-              "w-full bg-transparent text-sm font-medium border-0 p-0",
-              "focus:outline-none focus:ring-0",
-              status === "done" && "line-through text-muted-foreground",
-            )}
+      <div className="flex items-center gap-3 px-3 py-2.5">
+        <div onClick={(e) => e.stopPropagation()} className="shrink-0">
+          <TaskStatusSelect
+            value={status}
+            onChange={(v) => onUpdate({ status: v })}
           />
+        </div>
 
-          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-            {/* Assignee */}
-            <select
-              value={task.assignee_id ?? ""}
-              onChange={(e) => onUpdate({ assignee_id: e.target.value || null })}
-              className="text-[11px] px-2 py-0.5 rounded-full border border-border/60 bg-muted/40 text-muted-foreground focus:outline-none"
-            >
-              <option value="">Sem responsável</option>
-              {userProfiles.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.full_name || u.email}
-                </option>
-              ))}
-            </select>
+        <span
+          onClick={goToTask}
+          className={cn(
+            "flex-1 min-w-0 truncate text-sm font-medium cursor-pointer hover:text-primary transition-colors",
+            status === "done" && "line-through text-muted-foreground",
+          )}
+        >
+          {task.title}
+        </span>
 
-            {assigneeLabel && (
-              <div
-                className="w-5 h-5 rounded-full bg-primary/10 text-primary text-[9px] font-semibold flex items-center justify-center"
-                title={assigneeLabel}
-              >
-                {getInitials(assigneeLabel)}
-              </div>
-            )}
+        <div className="flex items-center gap-3 shrink-0 text-xs text-muted-foreground">
+          <select
+            value={task.assignee_id ?? ""}
+            onClick={(e) => e.stopPropagation()}
+            onChange={(e) => onUpdate({ assignee_id: e.target.value || null })}
+            className="text-[11px] px-2 py-0.5 rounded-full border border-border/60 bg-muted/40 text-muted-foreground focus:outline-none max-w-[140px]"
+          >
+            <option value="">Sem responsável</option>
+            {userProfiles.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.full_name || u.email}
+              </option>
+            ))}
+          </select>
 
-            {/* Hours est / real */}
-            <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-border/60 bg-muted/40 text-xs text-muted-foreground">
-              <Clock className="h-3 w-3" />
-              <input
-                type="number"
-                step="0.5"
-                min="0"
-                defaultValue={task.hours_estimated ?? ""}
-                onBlur={(e) => {
-                  const v = e.target.value === "" ? null : parseFloat(e.target.value);
-                  if (v !== Number(task.hours_estimated ?? null)) {
-                    onUpdate({ hours_estimated: Number.isFinite(v as number) ? v : null });
-                  }
-                }}
-                placeholder="0"
-                className="w-8 bg-transparent border-0 p-0 text-xs focus:outline-none"
-              />
-              <span className="text-muted-foreground/60">est</span>
-
-              {status !== "open" && (
-                <>
-                  <span className="text-muted-foreground/30 mx-0.5">/</span>
-                  <input
-                    type="number"
-                    step="0.5"
-                    min="0"
-                    defaultValue={task.hours_actual ?? ""}
-                    onBlur={(e) => {
-                      const v = e.target.value === "" ? null : parseFloat(e.target.value);
-                      if (v !== Number(task.hours_actual ?? null)) {
-                        onUpdate({ hours_actual: Number.isFinite(v as number) ? v : null });
-                      }
-                    }}
-                    placeholder="0"
-                    className="w-8 bg-transparent border-0 p-0 text-xs focus:outline-none"
-                  />
-                  <span className="text-muted-foreground/60">real</span>
-                </>
-              )}
-            </div>
-
-            {/* Status chip */}
-            <span
-              className={cn(
-                "text-[11px] px-2 py-0.5 rounded-full border font-medium",
-                cfg.chip,
-              )}
-            >
-              {cfg.label}
-            </span>
+          <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+            <HoursField
+              label="Planejado"
+              value={task.hours_estimated}
+              onSave={(val) => onUpdate({ hours_estimated: val })}
+            />
+            <span className="text-muted-foreground/30">/</span>
+            <HoursField
+              label="Realizado"
+              value={task.hours_actual}
+              onSave={(val) => onUpdate({ hours_actual: val })}
+            />
           </div>
         </div>
 
-        {/* Delete on hover */}
-        <button
-          type="button"
-          onClick={onDelete}
-          className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded shrink-0 hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
-          aria-label="Excluir subdemanda"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </button>
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); goToTask(); }}
+            className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
+            title="Abrir subdemanda"
+          >
+            <ExternalLink className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onDelete(); }}
+            className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
+            aria-label="Excluir subdemanda"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        </div>
       </div>
     </div>
   );

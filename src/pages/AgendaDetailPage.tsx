@@ -205,7 +205,9 @@ const AgendaDetailPage = () => {
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="flex flex-col h-full overflow-hidden">
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-4xl mx-auto px-6 py-6 space-y-6">
       {/* Breadcrumb */}
       <nav className="flex items-center gap-2 text-sm text-muted-foreground">
         <button onClick={() => navigate("/agendas")} className="hover:text-foreground transition-colors">
@@ -575,6 +577,8 @@ const AgendaDetailPage = () => {
           }}
         />
       )}
+        </div>
+      </div>
     </div>
   );
 };

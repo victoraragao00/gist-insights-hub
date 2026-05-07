@@ -46,11 +46,11 @@ const DemandDetailPage = () => {
   const allDone = total > 0 && done === total;
 
   return (
-    <div className="max-w-6xl mx-auto p-6 space-y-6">
-      <DemandHeader demand={demand} />
-
-      <div className="flex flex-col lg:flex-row gap-6">
-        <main className="flex-1 min-w-0">
+    <div className="flex h-full overflow-hidden">
+      <div className="flex-1 min-w-0 overflow-y-auto">
+        <div className="max-w-5xl mx-auto p-6 space-y-6">
+          <DemandHeader demand={demand} />
+          <main className="min-w-0">
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabValue)}>
             <TabsList className="mb-4">
               <TabsTrigger value="content">Conteúdo</TabsTrigger>
@@ -89,14 +89,19 @@ const DemandDetailPage = () => {
               <DemandActivityTab demandId={demand.id} />
             </TabsContent>
           </Tabs>
-        </main>
-
-        <DemandSidebar
-          demand={demand}
-          onActivityTabSelect={() => setActiveTab("activity")}
-          onClose={() => navigate("/demands")}
-        />
+          </main>
+        </div>
       </div>
+
+      <aside className="hidden lg:block w-[300px] shrink-0 border-l border-border overflow-y-auto">
+        <div className="p-6">
+          <DemandSidebar
+            demand={demand}
+            onActivityTabSelect={() => setActiveTab("activity")}
+            onClose={() => navigate("/demands")}
+          />
+        </div>
+      </aside>
     </div>
   );
 };
