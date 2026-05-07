@@ -388,6 +388,12 @@ const AgendaDetailPage = () => {
                 <Pencil className="inline-block h-3 w-3 ml-1" />
               </span>
             )}
+
+            {/* Project link - editable */}
+            <span className="inline-flex items-center gap-1.5">
+              <span className="text-muted-foreground">·</span>
+              <AgendaProjectField agenda={agenda} />
+            </span>
           </div>
 
           {/* Satisfaction */}
