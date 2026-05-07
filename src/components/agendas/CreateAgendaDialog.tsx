@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
@@ -11,40 +10,11 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { useCreateAgenda } from "@/hooks/useMeetingAgendas";
+import { useCompatibleProjects } from "@/hooks/useProjects";
 import { useAgendaFieldConfig, type AgendaFieldConfig } from "@/hooks/useAgendaFieldConfig";
 import { useClient } from "@/context/ClientContext";
 import { SatisfactionPicker } from "./SatisfactionPicker";
-
-interface CompatibleProject {
-  id: string;
-  title: string;
-  is_internal: boolean;
-  clients: { name: string } | null;
-}
-
-function useCompatibleProjects(agendaClientId?: string | null) {
-  return useQuery<CompatibleProject[]>({
-    queryKey: ["compatible_projects", agendaClientId ?? null],
-    staleTime: 60_000,
-    queryFn: async () => {
-      let query = supabase
-        .from("projects")
-        .select("id, title, is_internal, clients(name)")
-        .is("cancelled_at", null)
-        .order("title");
-      if (agendaClientId) {
-        query = query.or(
-          `client_id.eq.${agendaClientId},is_internal.eq.true`,
-        );
-      }
-      const { data, error } = await query;
-      if (error) throw error;
-      return (data ?? []) as unknown as CompatibleProject[];
-    },
-  });
-}
 
 interface CreateAgendaDialogProps {
   open: boolean;
@@ -72,7 +42,7 @@ export function CreateAgendaDialog({ open, onOpenChange, defaultClientId }: Crea
   const [satisfactionScore, setSatisfactionScore] = useState<number | null>(null);
   const [nextSteps, setNextSteps] = useState("");
 
-  const { data: compatibleProjects = [] } = useCompatibleProjects(clientId || null);
+  const { data: compatibleProjects = [] } = useCompatibleProjects(clientId || null, agendaType);
   const projects = useMemo(() => compatibleProjects, [compatibleProjects]);
 
   // Reset selected project if it no longer matches client
@@ -108,7 +78,7 @@ export function CreateAgendaDialog({ open, onOpenChange, defaultClientId }: Crea
         meeting_date: new Date(meetingDate).toISOString(),
         duration_minutes: durationMinutes,
         agenda_type: agendaType,
-        project_id: agendaType === "internal" ? projectId : null,
+        project_id: projectId,
         executive_summary: executiveSummary.trim() || undefined,
         location: location || undefined,
         objective: objective || undefined,
@@ -205,39 +175,37 @@ export function CreateAgendaDialog({ open, onOpenChange, defaultClientId }: Crea
             </div>
           </div>
 
-          {agendaType === "internal" && (
-            <div className="space-y-1.5">
-              <Label>
-                Projeto <span className="text-xs text-muted-foreground">(opcional)</span>
-              </Label>
-              <Select
-                value={projectId ?? "none"}
-                onValueChange={(v) => setProjectId(v === "none" ? null : v)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Vincular a um projeto..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Nenhum projeto</SelectItem>
-                  {projects.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      <span className="inline-flex items-center gap-2">
-                        {p.is_internal && (
-                          <span className="text-[10px] px-1.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-950 dark:text-purple-300 dark:border-purple-900">
-                            Interno
-                          </span>
-                        )}
-                        <span>{p.title}</span>
-                        {p.clients?.name && (
-                          <span className="text-muted-foreground text-xs">· {p.clients.name}</span>
-                        )}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
+          <div className="space-y-1.5">
+            <Label>
+              Projeto <span className="text-xs text-muted-foreground">(opcional)</span>
+            </Label>
+            <Select
+              value={projectId ?? "none"}
+              onValueChange={(v) => setProjectId(v === "none" ? null : v)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Vincular a um projeto..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Nenhum projeto</SelectItem>
+                {projects.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    <span className="inline-flex items-center gap-2">
+                      {p.is_internal && (
+                        <span className="text-[10px] px-1.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-950 dark:text-purple-300 dark:border-purple-900">
+                          Interno
+                        </span>
+                      )}
+                      <span>{p.title}</span>
+                      {p.clients?.name && (
+                        <span className="text-muted-foreground text-xs">· {p.clients.name}</span>
+                      )}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
           <div className="space-y-1.5">
             <Label>

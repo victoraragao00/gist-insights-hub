@@ -1,58 +1,48 @@
-## Plan: RFI sheet, colunas colapsadas como tabs e fundo de raia
+## Objetivo
 
-### 1. RFI Detail Sheet na RFIsPage
-Reusar o `RfiDetailSheet` existente (`src/components/rfis/RfiDetailSheet.tsx`) — não criar novo componente.
-- Em `src/pages/RFIsPage.tsx`:
-  - Adicionar `useState<RfiRow | null>` para `selectedRfi`.
-  - Substituir `onClick={() => navigate(`/demands/${demand.id}`)}` por `onClick={() => setSelectedRfi(rfi)}`.
-  - Renderizar `<RfiDetailSheet open onOpenChange rfi demandTitle clientName />` no fim, passando `rfi.demands.title` e `rfi.demands.clients.name`.
-  - Remover `useNavigate` se ficar sem uso (m11).
-- O sheet existente já tem botão "Abrir demanda" que navega para `/demands/:id` — fechar o sheet em sequência.
+Vincular pautas a projetos no `CreateAgendaDialog` e tornar o vínculo editável na `AgendaDetailPage`, com regras de compatibilidade por cliente.
 
-### 2. Colunas colapsadas como tabs verticais (lateral direita)
+## Mudanças
 
-#### KanbanBoard (CX) — `src/components/demands/KanbanColumn.tsx` ou board pai
-Localizar o componente que renderiza a lista de colunas (Kanban CX). Refatorar para:
-- Separar `expandedColumns` e `collapsedColumns` via `useCollapsedColumns`.
-- Wrapper raiz `flex h-full overflow-hidden` com:
-  - `<div className="flex-1 overflow-x-auto">` contendo apenas as colunas expandidas (sem stubs no grid).
-  - `<aside>` à direita renderizando uma tab vertical por coluna colapsada usando o `CollapsedColumnStub` existente (já está no formato vertical com dot+contador+nome). Manter aceitação de drop.
+### 1. `src/components/agendas/CreateAgendaDialog.tsx`
+- Remover restrição que só exibe o Select de Projeto quando `agendaType === "internal"`. Passar a exibir sempre.
+- Atualizar `useCompatibleProjects` para receber também o `agendaType`:
+  - `internal` → todos os projetos ativos (sem filtro de cliente).
+  - `client` → projetos do mesmo `client_id` OU `is_internal=true`.
+- `project_id` continua sendo enviado no insert (já existe).
 
-#### TechSwimlanePage — `src/components/demands/TechSwimlanePage.tsx`
-- Calcular `expandedCols` e `collapsedCols`.
-- `gridTemplate` baseado apenas em `expandedCols` (`180px ${...300px}`).
-- Headers e cells (lanes) iteram só em `expandedCols`.
-- Adicionar `<aside>` lateral à direita com tabs verticais (`CollapsedColumnStub`) — clicando, expande de volta.
-- Cells colapsados não existem mais no grid (remover branch `if (collapsed)` do `SwimlaneCell`).
+### 2. `src/hooks/useMeetingAgendas.ts`
+- `useMeetingAgenda`: incluir join `projects:project_id(id, title, is_internal)` no select.
+- Estender `MeetingAgendaWithClient` com `project_id?: string | null` (já existe na tabela) e `projects?: { id; title; is_internal } | null`.
+- `agenda_type` tipado como `"client" | "internal"` no retorno (cast onde necessário).
 
-### 3. Background por área no Swimlane TECH
+### 3. `src/pages/AgendaDetailPage.tsx`
+- A página não tem sidebar; o vínculo de projeto será exibido na **meta row** do Header Card (ao lado de cliente/data/local/duração), seguindo o mesmo padrão visual editável inline.
+- Novo subcomponente `AgendaProjectField` (no mesmo arquivo) com:
+  - `useCompatibleProjects(agenda.client_id, agenda.agenda_type)` (hook compartilhado — ver passo 4).
+  - `useMutation` que faz `update meeting_agendas set project_id` e invalida `["meeting_agenda", id]` + `["meeting_agendas"]`.
+  - Quando vinculado: badge "Interno" (se aplicável) + título clicável navegando para `/projects/:id` com ícone `ExternalLink` + botão `X` para desvincular.
+  - Quando vazio: Select inline com placeholder "Vincular projeto...".
+  - Toasts via `sonner` ("Projeto atualizado" / erro).
 
-#### Migration
-- `ALTER TABLE demand_areas ADD COLUMN IF NOT EXISTS background_color TEXT;` + COMMENT.
+### 4. Hook compartilhado `useCompatibleProjects`
+- Extrair `useCompatibleProjects` para `src/hooks/useProjects.ts` (já abriga hooks de projetos) e reutilizar tanto no `CreateAgendaDialog` quanto no `AgendaDetailPage`.
+- Assinatura: `useCompatibleProjects(clientId?: string | null, agendaType?: "client" | "internal")`.
 
-#### Tipos e hook
-- `DemandArea` (`src/hooks/useDemandAreas.ts`): adicionar `background_color: string | null`.
-- `useManageAreas.updateArea` já aceita `fields` genéricos — usar para gravar `background_color`.
+## Padrões / Checklist
 
-#### AreaSettingsTab — color picker de fundo
-- Em `AreaRow`, ao lado da paleta de cores principal, adicionar input `type=color` (visualmente uma swatch quadrada com placeholder "BG" quando vazio) que dispara `onUpdate({ background_color: value })`.
-- Botão pequeno de "limpar" ao lado para voltar a `null` (clique direito ou ícone X) — opcional; se complicado, oferecer apenas o picker.
+- m9: toda escrita via `useMutation` (criar e atualizar).
+- m11: remover imports não usados após o refactor (ex.: `useQuery` solto no Dialog, se sair).
+- m8: destructurar `{ error }` em todas as queries/mutations.
+- m4/m5: `staleTime: 60_000`, `queryKey` inclui `clientId` + `agendaType`.
+- m3: apenas `sonner`.
+- Sem novas migrations — `project_id` já existe em `meeting_agendas`.
+- Não tocar em `src/integrations/supabase/*`, `supabase/migrations/*`, `.env`, `CONTEXT.md`, `AGENTS.md`, `CLAUDE.md`.
 
-#### Swimlane lane background
-- `useAreasByWorkspace("tech")` já traz `background_color`. Em `SwimlaneLane`:
-  - Helper `hexToRgba(hex, alpha)` no mesmo arquivo.
-  - `bgStyle = area?.background_color ? { backgroundColor: hexToRgba(area.background_color, 0.12) } : {}`.
-  - Aplicar `style={bgStyle}` no container da lane (`<div className="grid ... bg-card/40 ...">` substituir/compor com `bgStyle`).
-  - Repassar `bgStyle` para `SwimlaneCell` para que cada célula mantenha o fundo da raia (compõe com `isOver` ainda visível usando `ring`/sobreposição leve).
+## Verificação manual
 
-### 4. Qualidade
-- `useMutation` para toda escrita (já é o padrão; `useManageAreas` cobre `background_color`).
-- Remover imports não usados (m11) — especialmente `useNavigate` no `RFIsPage` e quaisquer imports residuais nas alterações de Kanban/Swimlane.
-- Apenas `sonner`. Sem alterações em arquivos protegidos.
-
-### Verificação
-1. Clicar em linha da RFIsPage abre o sheet (sem navegar). Botão na seção da demanda navega e fecha.
-2. Colapsar uma coluna no Kanban CX → vira tab vertical na lateral direita; expandir clicando.
-3. Mesmo comportamento no Swimlane TECH — grid encolhe ao remover a coluna.
-4. Settings → Áreas → segundo color picker grava `background_color`.
-5. Swimlane TECH renderiza fundo com 12% de opacidade na raia e células da área; áreas sem cor permanecem neutras; drop zone visível.
+1. Criar pauta de cliente X → Select mostra apenas projetos de X + internos.
+2. Criar pauta interna → Select mostra todos os projetos ativos.
+3. Salvar pauta com projeto → vínculo persistido.
+4. AgendaDetailPage exibe campo Projeto editável; alterar dispara toast.
+5. Pauta com projeto: link navega para `/projects/:id`; botão `X` desvincula.

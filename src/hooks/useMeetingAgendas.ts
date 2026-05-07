@@ -21,10 +21,13 @@ export interface MeetingAgenda {
   created_by: string;
   created_at: string | null;
   updated_at: string | null;
+  agenda_type?: "client" | "internal";
+  project_id?: string | null;
 }
 
 export interface MeetingAgendaWithClient extends MeetingAgenda {
   clients?: { name: string } | null;
+  projects?: { id: string; title: string; is_internal: boolean } | null;
 }
 
 export interface MeetingAgendasFilters {
@@ -83,11 +86,11 @@ export function useMeetingAgenda(agendaId: string | null) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("meeting_agendas")
-        .select("*, clients(name)")
+        .select("*, clients(name), projects:project_id(id, title, is_internal)")
         .eq("id", agendaId!)
         .maybeSingle();
       if (error) throw error;
-      return data as MeetingAgendaWithClient | null;
+      return data as unknown as MeetingAgendaWithClient | null;
     },
   });
 }
