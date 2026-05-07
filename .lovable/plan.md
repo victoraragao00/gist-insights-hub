@@ -1,69 +1,62 @@
-## Contexto
+## Plano: SLA flexível, preservar contexto ao mover workspace, configurações de Tipos & Prioridades
 
-Hoje as demandas têm:
-- **`workspace`** (`cx` | `tech`) na tabela `demands` — define se aparece no board CX Hub ou TECH. **Não há UI para alterar** após a criação.
-- **`assignee_id`** — responsável principal (1 só).
-- **`demand_collaborators`** — tabela já existe e suporta múltiplos colaboradores; está na sidebar do detalhe, mas pouco visível e não tem cara de "co-responsáveis" (aparece como "Colaboradores").
-- **`created_by`** — criador já é registrado.
+### 1. SLA — colunas após "FIM SLA" também param o contador
 
-Ou seja, a infra dos dois pedidos **já existe no banco**. O gap é puramente de UI/UX.
+**Problema:** hoje `get_demands_with_sla` só filtra `sla_first_response_at IS NULL`. Se o usuário pular a coluna marcada como `triggers_sla_response_at = true` e mover a demanda direto para uma coluna posterior, o SLA continua rodando.
 
-## Mudança 1 — Mover demanda entre boards (CX ↔ TECH)
+**Solução (migration em `get_demands_with_sla`):**
+- Calcular dentro da função o `position` mínimo entre as colunas onde `triggers_sla_response_at = true` (chamarei de `sla_stop_position`).
+- Excluir do resultado qualquer demanda cuja coluna atual tenha `position >= sla_stop_position` **ou** que tenha `triggers_finished_at = true` / `cancellation_reason IS NOT NULL` / `sla_paused_at IS NOT NULL` (item 4).
+- Nenhum filtro novo no front; `useSlaDemandsBoard` continua igual.
 
-Adicionar ação "Mover para TECH" / "Mover para CX Hub" em **dois pontos**:
+### 2. Encerrar SLA manualmente (mantendo no backlog)
 
-1. **Sidebar do detalhe da demanda** (`DemandSidebar.tsx`) — nova linha "Workspace" com botão para alternar.
-2. **Menu de contexto do card** no Kanban (`DemandCard.tsx`) — opção rápida "Mover para TECH/CX".
+**Migration:**
+- Adicionar coluna `demands.sla_paused_at TIMESTAMPTZ NULL` + `sla_paused_by UUID NULL` + `sla_paused_reason TEXT NULL`.
+- `get_demands_with_sla` ignora demandas com `sla_paused_at IS NOT NULL`.
 
-Comportamento:
-- Atualiza `demands.workspace`.
-- Como cada workspace tem **áreas próprias** (`demand_areas.workspace`) e **colunas próprias** (`ticket_columns.workspace`), ao mover:
-  - Limpa `area_id` (usuário re-seleciona no novo board).
-  - Move para a primeira coluna ativa do novo workspace (estado "A Fazer").
-- Toast: "Demanda movida para TECH" + invalidação das queries dos dois boards.
-- Restrito a **admin ou criador** (RLS já permite update; checagem só de UX).
+**Frontend:**
+- No `DemandSidebar.tsx`, dentro da seção SLA (ou abaixo do "Board"), adicionar botão **"Encerrar SLA"** com `AlertDialog` solicitando motivo (textarea opcional).
+- Hook novo `usePauseSla` em `useDemands.ts` — atualiza os 3 campos e loga em `demand_activities` (`event_type='edited'`, descrição "SLA encerrado manualmente").
+- Botão inverso **"Reativar SLA"** quando `sla_paused_at` estiver setado (limpa os 3 campos).
+- Badge "SLA encerrado" no header da demanda quando pausado.
 
-## Mudança 2 — Múltiplos responsáveis ("Criador + Co-responsáveis")
+### 3. Mover workspace preservando coluna e área
 
-Renomear/reorganizar a sidebar para deixar a estrutura clara:
+Ajuste em `useChangeDemandWorkspace` (`src/hooks/useDemands.ts`):
+- **Remover** o `update` em `area_id` e `column_id`. Manter apenas `{ workspace: targetWorkspace }`.
+- Manter o log em `demand_activities`.
+- Confirmação no `AlertDialog` do sidebar continua a mesma; só ajustar a copy ("As informações de coluna, área e responsável serão preservadas.").
 
-```
-Criador          [readonly]  Pedro Murillo
-Responsável      [select]    Ana Paula  (assignee_id atual)
-Co-responsáveis  [+ chip]    [Victor] [Laura] [+]
-Observadores     [eye]       (watchers atuais)
-```
+> Observação: como `demand_areas` tem coluna `workspace`, uma área pode pertencer a apenas um board. Vamos preservar de qualquer forma — se a área não bater com o novo workspace, a UI do filtro de área simplesmente não a exibirá, mas o vínculo permanece intacto e visível na demanda. (Sem mudança de schema necessária.)
 
-- **Criador** — mostra `created_by` resolvido em `user_profiles` (somente leitura).
-- **Responsável** — mantém `assignee_id` (1 só, o "dono").
-- **Co-responsáveis** — UI renomeada de "Colaboradores"; usa `demand_collaborators` (já tem hooks `useAddCollaborator`/`useRemoveCollaborator`). Combobox com busca + chips removíveis.
-- Funciona igual em CX e TECH (mesma sidebar).
+### 4. Configurações: Tipos e Prioridades
 
-No **DemandCard** do Kanban, mostrar avatar do responsável + stack de até 2 avatares de co-responsáveis (+N) — `demand_collaborators` já é carregado em batch (`useDemandCollaboratorsBatch`), só falta renderizar o stack.
+Criar dois novos componentes em `src/components/settings/` e plugá-los como abas (admin only) em `SettingsPage.tsx`:
 
-No filtro **"Minhas tasks"** (já existe) — incluir demandas onde o usuário é co-responsável (`useMyCollaboratorDemandIds` já existe e já é usado, validar que continua funcionando).
+**`DemandTypesSettingsTab.tsx`** (tabela `demand_types` — já existe):
+- Lista (ordenada por `position`) com colunas: Nome, Cor, Ícone, Ativo.
+- CRUD: criar, editar inline, ativar/desativar (soft, via `active`), reordenar via setas ↑↓ (atualiza `position`).
+- Hook novo `useDemandTypesAdmin` (read/create/update). RLS `demand_types_manage` já cobre admin.
 
-## Arquivos a tocar
+**`DemandPrioritiesSettingsTab.tsx`** (nova tabela `demand_priority_config`):
+- Migration: criar `demand_priority_config (priority demand_priority PK, label TEXT, color TEXT, sla_default_hours INT, position INT, updated_at)`. Seed das 4 prioridades atuais com os labels existentes (`priorityLabel`) e cores derivadas de `priorityBadgeStyles.ts`.
+- RLS: SELECT autenticados; INSERT/UPDATE/DELETE só admin (`is_admin()`).
+- UI: tabela com Label, Cor (color picker), SLA padrão (horas) — bota um botão "Salvar" por linha.
+- `priorityBadgeClass` / `priorityLabel` passam a ler dessa tabela via novo hook `useDemandPriorityConfig` (com fallback para os valores hardcoded atuais para não quebrar o render durante o load).
 
-**Frontend apenas** (sem migration, sem edge function):
+A aba existente "Prioridades" (tier de clientes) será **renomeada para "Tiers de Cliente"** para evitar confusão; a nova aba se chama "Prioridades".
 
-- `src/hooks/useDemands.ts` — adicionar mutation `useChangeDemandWorkspace(demandId, newWorkspace)` que atualiza `workspace` + `area_id=null` + `column_id` para a 1ª coluna do novo workspace.
-- `src/components/demands/detail/DemandSidebar.tsx`:
-  - Nova seção "Workspace" com botão de alternar (AlertDialog de confirmação).
-  - Renomear bloco "Colaboradores" → "Co-responsáveis"; adicionar bloco "Criador" (readonly) acima de "Responsável".
-- `src/components/demands/DemandCard.tsx` — stack de avatares de co-responsáveis ao lado do responsável (já recebe `collaborators` via prop).
-- `src/components/demands/KanbanColumn.tsx` (ou onde está o context menu do card) — item de menu "Mover para TECH/CX".
+### Detalhes técnicos
 
-## Fora de escopo
-
-- Nenhuma migration (schema já suporta tudo).
-- Notificações automáticas para co-responsáveis ao mover board (pode ser próximo passo se você quiser).
-- Permissões: mantém RLS atual; qualquer admin/criador pode mover.
-
-## Validação
-
-1. Abrir demanda em `/demands/:id` no workspace CX → sidebar mostra "Workspace: CX Hub" com botão "Mover para TECH".
-2. Clicar → confirmar → demanda some do board CX, aparece em TECH na coluna "A Fazer", `area_id` zerado.
-3. Sidebar mostra Criador (readonly), Responsável (select), Co-responsáveis (combobox + chips).
-4. Adicionar 2 co-responsáveis → card no Kanban mostra avatar do responsável + 2 avatares de co-responsáveis.
-5. Filtro "Minhas tasks" inclui demanda onde sou co-responsável.
+- **Migrations** (uma única migration para o pacote):
+  1. `ALTER TABLE demands ADD COLUMN sla_paused_at TIMESTAMPTZ, sla_paused_by UUID, sla_paused_reason TEXT;`
+  2. `CREATE TABLE demand_priority_config (...)` + RLS + seed.
+  3. `CREATE OR REPLACE FUNCTION get_demands_with_sla(...)` com a nova lógica de `sla_stop_position` e filtro de `sla_paused_at`.
+- **Frontend tocado:**
+  - `src/hooks/useDemands.ts` — ajuste de `useChangeDemandWorkspace` + novos `usePauseSla` / `useResumeSla`.
+  - `src/components/demands/detail/DemandSidebar.tsx` — botão Encerrar/Reativar SLA + badge.
+  - `src/components/demands/detail/DemandHeader.tsx` — badge "SLA encerrado".
+  - `src/pages/SettingsPage.tsx` — novas abas + renomear "Prioridades" → "Tiers de Cliente".
+  - Novos: `DemandTypesSettingsTab.tsx`, `DemandPrioritiesSettingsTab.tsx`, `useDemandTypesAdmin.ts`, `useDemandPriorityConfig.ts`.
+- **Sem mudanças** em `triggers_finished_at` / `triggers_sla_response_at` das colunas (o admin já configura via tab "Colunas"). Apenas a função SQL passa a respeitar `position` ao invés de exigir passagem pela coluna.

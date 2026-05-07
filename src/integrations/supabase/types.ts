@@ -900,6 +900,33 @@ export type Database = {
           },
         ]
       }
+      demand_priority_config: {
+        Row: {
+          color: string
+          label: string
+          position: number
+          priority: Database["public"]["Enums"]["demand_priority"]
+          sla_default_hours: number
+          updated_at: string
+        }
+        Insert: {
+          color: string
+          label: string
+          position?: number
+          priority: Database["public"]["Enums"]["demand_priority"]
+          sla_default_hours?: number
+          updated_at?: string
+        }
+        Update: {
+          color?: string
+          label?: string
+          position?: number
+          priority?: Database["public"]["Enums"]["demand_priority"]
+          sla_default_hours?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       demand_relationships: {
         Row: {
           created_at: string
@@ -1175,6 +1202,9 @@ export type Database = {
           project_id: string | null
           resolution: string | null
           sla_first_response_at: string | null
+          sla_paused_at: string | null
+          sla_paused_by: string | null
+          sla_paused_reason: string | null
           source_demand_id: string | null
           started_at: string | null
           title: string
@@ -1208,6 +1238,9 @@ export type Database = {
           project_id?: string | null
           resolution?: string | null
           sla_first_response_at?: string | null
+          sla_paused_at?: string | null
+          sla_paused_by?: string | null
+          sla_paused_reason?: string | null
           source_demand_id?: string | null
           started_at?: string | null
           title: string
@@ -1241,6 +1274,9 @@ export type Database = {
           project_id?: string | null
           resolution?: string | null
           sla_first_response_at?: string | null
+          sla_paused_at?: string | null
+          sla_paused_by?: string | null
+          sla_paused_reason?: string | null
           source_demand_id?: string | null
           started_at?: string | null
           title?: string
