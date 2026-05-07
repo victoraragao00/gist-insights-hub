@@ -221,27 +221,25 @@ interface CellProps {
   columnId: string;
   demands: DemandRow[];
   onCardClick: (d: DemandRow) => void;
-  collapsed: boolean;
+  bgStyle?: React.CSSProperties;
   taskCounts?: Record<string, { total: number; done: number }>;
   collaboratorsByDemand?: Record<string, DemandCollaborator[]>;
   blockerTypesById?: Record<string, BlockerType>;
 }
 
-function SwimlaneCell({ areaId, columnId, demands, onCardClick, collapsed, taskCounts, collaboratorsByDemand, blockerTypesById }: CellProps) {
+function SwimlaneCell({ areaId, columnId, demands, onCardClick, bgStyle, taskCounts, collaboratorsByDemand, blockerTypesById }: CellProps) {
   const id = `${areaId ?? NO_AREA}::${columnId}`;
-  const { setNodeRef, isOver } = useDroppable({ id, disabled: collapsed });
-
-  if (collapsed) {
-    return <div className="bg-muted/10" aria-hidden />;
-  }
+  const { setNodeRef, isOver } = useDroppable({ id });
 
   return (
     <div
       ref={setNodeRef}
       className={cn(
         "min-h-20 rounded-md p-1.5 space-y-1.5 transition-colors",
-        isOver ? "bg-primary/5 ring-2 ring-primary/20" : "bg-muted/20"
+        isOver ? "ring-2 ring-primary/30" : "",
+        !bgStyle && (isOver ? "bg-primary/5" : "bg-muted/20"),
       )}
+      style={bgStyle}
     >
       {demands.map((d) => (
         <div key={d.id} className="max-w-[280px]">
