@@ -73,7 +73,12 @@ export default function TechDashboardPage() {
             onProjectChange={setProjectId}
           />
 
-          <AlertCards data={data.alerts} period={period} onNavigate={navigate} />
+          <AlertCards
+            data={data.alerts}
+            period={period}
+            onNavigate={navigate}
+            blockingStalled={blockingStalled}
+          />
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <ThroughputChart data={data.throughput} />
