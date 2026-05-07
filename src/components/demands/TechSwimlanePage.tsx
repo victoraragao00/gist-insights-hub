@@ -222,7 +222,7 @@ interface CellProps {
   columnId: string;
   demands: DemandRow[];
   onCardClick: (d: DemandRow) => void;
-  bgStyle?: React.CSSProperties;
+  bgStyle?: CSSProperties;
   taskCounts?: Record<string, { total: number; done: number }>;
   collaboratorsByDemand?: Record<string, DemandCollaborator[]>;
   blockerTypesById?: Record<string, BlockerType>;
