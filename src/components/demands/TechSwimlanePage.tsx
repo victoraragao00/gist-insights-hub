@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import { useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
