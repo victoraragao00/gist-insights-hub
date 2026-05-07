@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { priorityBadgeClass, priorityLabel } from "./detail/priorityBadgeStyles";
+import type { DemandPriority } from "@/hooks/useDemands";
 
 interface DemandSlaQuickSheetProps {
   demandId: string | null;
