@@ -1,20 +1,21 @@
-## Hotfix CTX1 — RLS em `get_cx_analytics_metrics`
+## Hotfix CTX6 — guard `is_admin()` em `deactivate_stale_clients`
 
-Migration única que recria a função com o filtro `user_accessible_client_ids(auth.uid())` no CTE `base`, fechando o vazamento cross-cliente quando `p_client_id IS NULL`.
+Migration única recriando a função com guard admin-only no início, sem alterar a lógica do `UPDATE`.
 
 ### Mudanças
 
-1. **Nova migration** em `supabase/migrations/` aplicando `CREATE OR REPLACE FUNCTION public.get_cx_analytics_metrics(...)` com o SQL exato fornecido no prompt.
-2. **`COMMENT ON FUNCTION`** documentando o filtro RLS e o comportamento de admins/`bypass_client_access`.
+1. Nova migration em `supabase/migrations/` com `CREATE OR REPLACE FUNCTION public.deactivate_stale_clients(_days integer)` exatamente como no SQL fornecido.
+2. Adiciona `IF NOT public.is_admin() THEN RAISE EXCEPTION 'Admin only'; END IF;` antes do `UPDATE`.
+3. `COMMENT ON FUNCTION` documentando que é admin-only.
 
 ### Garantias
 
-- Assinatura preservada: `(p_period_days INT DEFAULT 30, p_client_id UUID DEFAULT NULL) RETURNS JSON LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public`.
-- Shape do JSON inalterado (frontend `useCxAnalytics.ts` continua compatível, incluindo `reopen_count` adicionado client-side).
-- Apenas o `WHERE` do CTE `base` muda — adiciona `AND d.client_id IN (SELECT * FROM public.user_accessible_client_ids(auth.uid()))` e o guard `IF auth.uid() IS NULL THEN RAISE`.
-- Nenhuma outra função (`get_demand_analytics`, `get_tech_dashboard_metrics`, `user_accessible_client_ids`, `is_admin`) é tocada.
-- Nenhum arquivo de frontend, `src/integrations/supabase/types.ts` ou `supabase/config.toml` é alterado.
+- Assinatura preservada: `(_days integer) RETURNS integer LANGUAGE plpgsql SECURITY DEFINER SET search_path = public`.
+- Filtros do `UPDATE` (`auto_created='true'`, `last_seen_at`, triple `NOT EXISTS`) inalterados.
+- `is_admin()` não é tocada.
+- Nenhuma outra função, tabela, policy ou RPC alterada.
+- `EXECUTE` para `authenticated` permanece (guard interno é a barreira).
 
 ### Verificação pós-deploy
 
-Executar no SQL Editor as 5 queries da seção "Verificação" do prompt (smoke test, isolamento viewer, paridade admin, `p_client_id` específico acessível/não acessível, sanity check de funções vizinhas) e colar resultados na thread.
+Rodar no SQL Editor as 4 queries da seção "Verificação": admin com `_days=99999` (esperar 0), non-admin (esperar `ERROR: Admin only`), conferência de candidatos vs row_count e sanity de `is_admin()`.
