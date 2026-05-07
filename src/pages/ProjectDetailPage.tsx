@@ -43,8 +43,10 @@ import {
 import { useProjectAgendas } from "@/hooks/useMeetingAgendas";
 import { StatusBadge } from "@/components/projects/StatusBadge";
 import { ProjectDemandsTab } from "@/components/projects/tabs/ProjectDemandsTab";
+import { ProjectMeetingsTab } from "@/components/projects/tabs/ProjectMeetingsTab";
 import { ProjectSquadTab } from "@/components/projects/tabs/ProjectSquadTab";
 import { ProjectActivityTab } from "@/components/projects/tabs/ProjectActivityTab";
+import { formatHours } from "@/lib/formatHours";
 
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
