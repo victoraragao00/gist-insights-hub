@@ -138,7 +138,7 @@ export function ProjectDemandsTab({ project }: ProjectDemandsTabProps) {
       )}
 
       <LinkDemandDialog
-        projectId={projectId}
+        project={project}
         open={showLink}
         onOpenChange={setShowLink}
       />
