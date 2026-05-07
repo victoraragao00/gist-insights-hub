@@ -72,12 +72,14 @@ export function CreateAgendaDialog({ open, onOpenChange, defaultClientId }: Crea
   const [satisfactionScore, setSatisfactionScore] = useState<number | null>(null);
   const [nextSteps, setNextSteps] = useState("");
 
-  const { data: techProjects = [] } = useProjects("tech");
-  const { data: cxProjects = [] } = useProjects("cx");
-  const projects = useMemo(
-    () => [...techProjects, ...cxProjects].sort((a, b) => a.title.localeCompare(b.title)),
-    [techProjects, cxProjects]
-  );
+  const { data: compatibleProjects = [] } = useCompatibleProjects(clientId || null);
+  const projects = useMemo(() => compatibleProjects, [compatibleProjects]);
+
+  // Reset selected project if it no longer matches client
+  useEffect(() => {
+    if (!projectId) return;
+    if (!projects.some((p) => p.id === projectId)) setProjectId(null);
+  }, [projects, projectId]);
 
   const isVisible = (field: keyof AgendaFieldConfig) => {
     if (!fieldConfig) return true;
