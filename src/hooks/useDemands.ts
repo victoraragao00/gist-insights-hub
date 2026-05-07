@@ -334,28 +334,10 @@ export function useChangeDemandWorkspace() {
     }) => {
       if (input.currentWorkspace === input.targetWorkspace) return;
 
-      // Find first column of target workspace (lowest position).
-      // ticket_columns has no `workspace` column — columns are shared across boards,
-      // so we use the same column ordering. Just pick the first column by position
-      // as the new "to-do" landing if current column is a finalizing one.
-      const { data: cols, error: colErr } = await supabase
-        .from("ticket_columns")
-        .select("id, position")
-        .order("position", { ascending: true })
-        .limit(1);
-      if (colErr) throw colErr;
-      const firstColId = cols?.[0]?.id ?? null;
-
-      const updates: Record<string, unknown> = {
-        workspace: input.targetWorkspace,
-        // Areas are workspace-specific — clear so user re-selects in the new board.
-        area_id: null,
-      };
-      if (firstColId) updates.column_id = firstColId;
-
+      // Preserve column, area, assignee — only flip the workspace flag.
       const { error } = await supabase
         .from("demands")
-        .update(updates)
+        .update({ workspace: input.targetWorkspace })
         .eq("id", input.demandId);
       if (error) throw error;
 
