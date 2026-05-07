@@ -22,6 +22,7 @@ export interface ProjectRow {
   owner_id: string;
   due_date: string | null;
   original_due_date: string | null;
+  hours_estimated: number | null;
   cancelled_at: string | null;
   cancelled_by: string | null;
   workspace: string;
