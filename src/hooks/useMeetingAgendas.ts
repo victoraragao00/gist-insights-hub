@@ -21,10 +21,13 @@ export interface MeetingAgenda {
   created_by: string;
   created_at: string | null;
   updated_at: string | null;
+  agenda_type?: "client" | "internal";
+  project_id?: string | null;
 }
 
 export interface MeetingAgendaWithClient extends MeetingAgenda {
   clients?: { name: string } | null;
+  projects?: { id: string; title: string; is_internal: boolean } | null;
 }
 
 export interface MeetingAgendasFilters {
