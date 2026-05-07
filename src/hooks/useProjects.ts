@@ -25,6 +25,7 @@ export interface ProjectRow {
   cancelled_by: string | null;
   workspace: string;
   client_id: string | null;
+  is_internal: boolean;
   created_at: string;
   updated_at: string;
   user_profiles: UserMini | null;
@@ -63,7 +64,7 @@ export interface ProjectDemandRow {
 
 const PROJECT_SELECT = `
   id, title, description, owner_id, due_date, cancelled_at, cancelled_by,
-  workspace, client_id, created_at, updated_at,
+  workspace, client_id, is_internal, created_at, updated_at,
   user_profiles!projects_owner_id_fkey(id, full_name, email),
   clients(id, name)
 `;
@@ -195,6 +196,7 @@ interface CreateProjectInput {
   due_date?: string | null;
   client_id?: string | null;
   workspace?: string;
+  is_internal?: boolean;
 }
 
 export function useCreateProject() {
@@ -203,15 +205,25 @@ export function useCreateProject() {
   return useMutation({
     mutationFn: async (input: CreateProjectInput) => {
       if (!user?.id) throw new Error("Não autenticado");
-      const { data, error } = await supabase.rpc("create_project", {
+      const { data: created, error } = await supabase.rpc("create_project", {
         p_title: input.title,
         p_description: input.description ?? null,
         p_due_date: input.due_date ?? null,
-        p_client_id: input.client_id ?? null,
+        p_client_id: input.is_internal ? null : (input.client_id ?? null),
         p_workspace: input.workspace ?? "tech",
       });
       if (error) throw error;
-      return data;
+      const newId = created && typeof created === "object" && "id" in created
+        ? (created as { id: string }).id
+        : (created as unknown as string | null);
+      if (input.is_internal && newId) {
+        const { error: updErr } = await supabase
+          .from("projects")
+          .update({ is_internal: true })
+          .eq("id", newId);
+        if (updErr) throw updErr;
+      }
+      return created;
     },
     onSuccess: () => {
       toast.success("Projeto criado");

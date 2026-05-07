@@ -37,7 +37,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
           {project.title}
         </h3>
         <div className="flex items-center gap-1.5 shrink-0">
-          {!project.client_id && project.workspace === "tech" && (
+          {project.is_internal && (
             <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-950 dark:text-purple-300 dark:border-purple-900 font-medium">
               Interno
             </span>
@@ -46,7 +46,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
         </div>
       </div>
 
-      {project.clients && project.client_id && (
+      {project.clients && !project.is_internal && (
         <p className="text-xs text-muted-foreground mb-3 flex items-center gap-1">
           <Building2 className="h-3 w-3" />
           {project.clients.name}

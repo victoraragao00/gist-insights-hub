@@ -37,6 +37,7 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
       due_date: dueDate || null,
       client_id: isInternal ? null : (clientId || null),
       workspace: isInternal ? "tech" : activeWorkspace,
+      is_internal: isInternal,
     });
     setTitle(""); setDescription(""); setDueDate(""); setClientId(""); setIsInternal(false);
     onOpenChange(false);
