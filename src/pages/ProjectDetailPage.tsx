@@ -220,17 +220,7 @@ export default function ProjectDetailPage() {
               label="Cliente"
               value={project.clients?.name ?? "—"}
             />
-            <SidebarRow
-              label="Data de entrega"
-              value={
-                project.due_date
-                  ? format(new Date(project.due_date), "dd MMM yyyy", {
-                      locale: ptBR,
-                    })
-                  : "—"
-              }
-              icon={CalendarDays}
-            />
+            <ProjectDueDateField project={project} />
             <SidebarRow
               label="Criado em"
               value={format(new Date(project.created_at), "dd MMM yyyy", {
