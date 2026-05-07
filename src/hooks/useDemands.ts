@@ -334,28 +334,10 @@ export function useChangeDemandWorkspace() {
     }) => {
       if (input.currentWorkspace === input.targetWorkspace) return;
 
-      // Find first column of target workspace (lowest position).
-      // ticket_columns has no `workspace` column — columns are shared across boards,
-      // so we use the same column ordering. Just pick the first column by position
-      // as the new "to-do" landing if current column is a finalizing one.
-      const { data: cols, error: colErr } = await supabase
-        .from("ticket_columns")
-        .select("id, position")
-        .order("position", { ascending: true })
-        .limit(1);
-      if (colErr) throw colErr;
-      const firstColId = cols?.[0]?.id ?? null;
-
-      const updates: Record<string, unknown> = {
-        workspace: input.targetWorkspace,
-        // Areas are workspace-specific — clear so user re-selects in the new board.
-        area_id: null,
-      };
-      if (firstColId) updates.column_id = firstColId;
-
+      // Preserve column, area, assignee — only flip the workspace flag.
       const { error } = await supabase
         .from("demands")
-        .update(updates)
+        .update({ workspace: input.targetWorkspace })
         .eq("id", input.demandId);
       if (error) throw error;
 
@@ -401,5 +383,63 @@ export function useDeleteDemand() {
       toast.success("Demanda excluída");
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : "Erro ao excluir demanda"),
+  });
+}
+
+export function usePauseSla() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: async (input: { demandId: string; reason?: string | null }) => {
+      const { error } = await supabase
+        .from("demands")
+        .update({
+          sla_paused_at: new Date().toISOString(),
+          sla_paused_by: user?.id ?? null,
+          sla_paused_reason: input.reason?.trim() || null,
+        })
+        .eq("id", input.demandId);
+      if (error) throw error;
+      await supabase.from("demand_activities").insert({
+        demand_id: input.demandId,
+        event_type: "edited",
+        description: `SLA encerrado manualmente${input.reason?.trim() ? ` — ${input.reason.trim()}` : ""}`,
+        created_by: user?.id ?? null,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["demands"] });
+      queryClient.invalidateQueries({ queryKey: ["demand"] });
+      queryClient.invalidateQueries({ queryKey: ["sla_demands"] });
+      toast.success("SLA encerrado");
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Erro ao encerrar SLA"),
+  });
+}
+
+export function useResumeSla() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: async (demandId: string) => {
+      const { error } = await supabase
+        .from("demands")
+        .update({ sla_paused_at: null, sla_paused_by: null, sla_paused_reason: null })
+        .eq("id", demandId);
+      if (error) throw error;
+      await supabase.from("demand_activities").insert({
+        demand_id: demandId,
+        event_type: "edited",
+        description: "SLA reativado",
+        created_by: user?.id ?? null,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["demands"] });
+      queryClient.invalidateQueries({ queryKey: ["demand"] });
+      queryClient.invalidateQueries({ queryKey: ["sla_demands"] });
+      toast.success("SLA reativado");
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Erro ao reativar SLA"),
   });
 }
