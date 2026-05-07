@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Link2, X } from "lucide-react";
+import { AlertTriangle, Link2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
@@ -16,6 +16,7 @@ import {
 import {
   useProjectDemands,
   useUnlinkDemandFromProject,
+  type ProjectRow,
 } from "@/hooks/useProjects";
 import { LinkDemandDialog } from "../LinkDemandDialog";
 import {
@@ -26,10 +27,11 @@ import type { DemandPriority } from "@/hooks/useDemands";
 import { useDemandTaskCounts } from "@/hooks/useDemandTasks";
 
 interface ProjectDemandsTabProps {
-  projectId: string;
+  project: ProjectRow;
 }
 
-export function ProjectDemandsTab({ projectId }: ProjectDemandsTabProps) {
+export function ProjectDemandsTab({ project }: ProjectDemandsTabProps) {
+  const projectId = project.id;
   const navigate = useNavigate();
   const { data: demands = [] } = useProjectDemands(projectId);
   const demandIds = demands.map((d) => d.id);
