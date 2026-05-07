@@ -34,6 +34,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
   useTicketColumns, useDemandTypes, useUpdateDemand, useMoveDemand, useDeleteDemand,
+  useChangeDemandWorkspace,
   useDemandActivities, type DemandRow,
 } from "@/hooks/useDemands";
 import { useDemandAreas } from "@/hooks/useDemandAreas";
@@ -102,9 +103,11 @@ export function DemandSidebar({ demand, onActivityTabSelect, onClose }: DemandSi
   const updateMutation = useUpdateDemand();
   const moveMutation = useMoveDemand();
   const deleteMutation = useDeleteDemand();
+  const changeWorkspaceMutation = useChangeDemandWorkspace();
 
   const linkDemand = useLinkDemandToProject();
   const unlinkDemand = useUnlinkDemandFromProject();
+  const [moveBoardOpen, setMoveBoardOpen] = useState(false);
   
 
   const [rfiSheetOpen, setRfiSheetOpen] = useState(false);
@@ -332,6 +335,28 @@ export function DemandSidebar({ demand, onActivityTabSelect, onClose }: DemandSi
             </Select>
           </div>
 
+          {(() => {
+            const creatorProfile = userProfiles.find((u) => u.id === demand.created_by);
+            const creatorLabel = creatorProfile?.full_name || creatorProfile?.email || "—";
+            return (
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Criador</Label>
+                <div className="flex items-center gap-1.5 h-8 px-2 rounded-md border border-border bg-muted/30 text-sm">
+                  {creatorProfile ? (
+                    <>
+                      <span className="w-5 h-5 rounded-full bg-muted text-muted-foreground text-[10px] font-medium flex items-center justify-center shrink-0">
+                        {initialsOf(creatorLabel)}
+                      </span>
+                      <span className="truncate">{creatorLabel}</span>
+                    </>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground">Responsável</Label>
             <Select
@@ -358,8 +383,130 @@ export function DemandSidebar({ demand, onActivityTabSelect, onClose }: DemandSi
             </Select>
           </div>
 
+          {/* Co-responsáveis */}
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Co-responsáveis</Label>
+            <div className="flex flex-wrap items-center gap-1.5">
+              {collaborators.map((c) => {
+                const label = c.full_name || c.email || "—";
+                return (
+                  <Badge
+                    key={c.id}
+                    variant="outline"
+                    className="text-[11px] gap-1 pl-1 pr-1 py-0 h-6"
+                  >
+                    <span className="w-4 h-4 rounded-full bg-muted text-foreground/70 text-[9px] font-semibold flex items-center justify-center">
+                      {initialsOf(label)}
+                    </span>
+                    <span className="max-w-[120px] truncate">{label}</span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        removeCollaborator.mutate({ demandId: demand.id, userId: c.user_id })
+                      }
+                      className="text-muted-foreground hover:text-destructive ml-0.5"
+                      aria-label={`Remover ${label}`}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                );
+              })}
+              <Popover open={collabPopoverOpen} onOpenChange={setCollabPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-6 px-2 text-xs">
+                    <Plus className="h-3 w-3 mr-1" /> Adicionar
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-64 p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Buscar pessoa..." />
+                    <CommandList>
+                      <CommandEmpty>Nenhuma pessoa encontrada</CommandEmpty>
+                      <CommandGroup>
+                        {userProfiles
+                          .filter(
+                            (u) =>
+                              u.id !== demand.assignee_id &&
+                              !collaborators.some((c) => c.user_id === u.id),
+                          )
+                          .map((u) => (
+                            <CommandItem
+                              key={u.id}
+                              value={`${u.full_name ?? ""} ${u.email ?? ""}`}
+                              onSelect={() => {
+                                addCollaborator.mutate({
+                                  demandId: demand.id,
+                                  userId: u.id,
+                                });
+                                setCollabPopoverOpen(false);
+                              }}
+                            >
+                              {u.full_name ?? u.email}
+                            </CommandItem>
+                          ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
+
+          {/* Workspace / Board */}
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Board</Label>
+            <div className="flex items-center justify-between gap-2 h-8 px-2 rounded-md border border-border bg-muted/30 text-sm">
+              <span className="font-medium">
+                {demand.workspace === "tech" ? "TECH" : "CX Hub"}
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-xs text-primary hover:text-primary"
+                onClick={() => setMoveBoardOpen(true)}
+                disabled={changeWorkspaceMutation.isPending}
+              >
+                Mover para {demand.workspace === "tech" ? "CX Hub" : "TECH"}
+              </Button>
+            </div>
+          </div>
+
         </div>
       </section>
+
+      {/* Move board confirmation */}
+      <AlertDialog open={moveBoardOpen} onOpenChange={setMoveBoardOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Mover demanda para o board {demand.workspace === "tech" ? "CX Hub" : "TECH"}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              A demanda sai do board atual e vai para a primeira coluna do novo board.
+              A área será limpa, pois cada board tem áreas próprias — você poderá selecionar
+              a nova área depois.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                const target = demand.workspace === "tech" ? "cx" : "tech";
+                changeWorkspaceMutation.mutate({
+                  demandId: demand.id,
+                  currentWorkspace: (demand.workspace === "tech" ? "tech" : "cx"),
+                  targetWorkspace: target,
+                });
+                setMoveBoardOpen(false);
+              }}
+            >
+              Mover
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
 
       {/* RFI */}
       <section className="rounded-lg border border-border bg-card p-4 space-y-3">

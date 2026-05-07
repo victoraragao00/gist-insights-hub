@@ -322,6 +322,69 @@ export function useUpdateDemand() {
   });
 }
 
+export function useChangeDemandWorkspace() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async (input: {
+      demandId: string;
+      currentWorkspace: "cx" | "tech";
+      targetWorkspace: "cx" | "tech";
+    }) => {
+      if (input.currentWorkspace === input.targetWorkspace) return;
+
+      // Find first column of target workspace (lowest position).
+      // ticket_columns has no `workspace` column — columns are shared across boards,
+      // so we use the same column ordering. Just pick the first column by position
+      // as the new "to-do" landing if current column is a finalizing one.
+      const { data: cols, error: colErr } = await supabase
+        .from("ticket_columns")
+        .select("id, position")
+        .order("position", { ascending: true })
+        .limit(1);
+      if (colErr) throw colErr;
+      const firstColId = cols?.[0]?.id ?? null;
+
+      const updates: Record<string, unknown> = {
+        workspace: input.targetWorkspace,
+        // Areas are workspace-specific — clear so user re-selects in the new board.
+        area_id: null,
+      };
+      if (firstColId) updates.column_id = firstColId;
+
+      const { error } = await supabase
+        .from("demands")
+        .update(updates)
+        .eq("id", input.demandId);
+      if (error) throw error;
+
+      const fromLabel = input.currentWorkspace === "tech" ? "TECH" : "CX Hub";
+      const toLabel = input.targetWorkspace === "tech" ? "TECH" : "CX Hub";
+      const { error: actErr } = await supabase.from("demand_activities").insert({
+        demand_id: input.demandId,
+        event_type: "edited" as const,
+        description: `Demanda movida do board ${fromLabel} para ${toLabel}`,
+        from_value: fromLabel,
+        to_value: toLabel,
+        created_by: user?.id ?? null,
+      });
+      if (actErr) console.warn("[useChangeDemandWorkspace] activity log failed:", actErr.message);
+
+      return input.targetWorkspace;
+    },
+    onSuccess: (target) => {
+      queryClient.invalidateQueries({ queryKey: ["demands"] });
+      queryClient.invalidateQueries({ queryKey: ["demand"] });
+      queryClient.invalidateQueries({ queryKey: ["client_demands"] });
+      const label = target === "tech" ? "TECH" : "CX Hub";
+      toast.success(`Demanda movida para ${label}`);
+    },
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : "Erro ao mover demanda"),
+  });
+}
+
 export function useDeleteDemand() {
   const queryClient = useQueryClient();
 
