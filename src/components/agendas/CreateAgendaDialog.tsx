@@ -42,7 +42,7 @@ export function CreateAgendaDialog({ open, onOpenChange, defaultClientId }: Crea
   const [satisfactionScore, setSatisfactionScore] = useState<number | null>(null);
   const [nextSteps, setNextSteps] = useState("");
 
-  const { data: compatibleProjects = [] } = useCompatibleProjects(clientId || null);
+  const { data: compatibleProjects = [] } = useCompatibleProjects(clientId || null, agendaType);
   const projects = useMemo(() => compatibleProjects, [compatibleProjects]);
 
   // Reset selected project if it no longer matches client
