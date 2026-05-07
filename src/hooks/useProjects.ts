@@ -213,8 +213,9 @@ export function useCreateProject() {
         p_workspace: input.workspace ?? "tech",
       });
       if (error) throw error;
-      const newId = (created as { id?: string } | string | null) &&
-        typeof created === "object" ? (created as { id: string }).id : (created as string | null);
+      const newId = created && typeof created === "object" && "id" in created
+        ? (created as { id: string }).id
+        : (created as unknown as string | null);
       if (input.is_internal && newId) {
         const { error: updErr } = await supabase
           .from("projects")
