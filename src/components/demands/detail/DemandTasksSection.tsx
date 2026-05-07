@@ -27,52 +27,6 @@ interface UserProfileMini {
   email: string | null;
 }
 
-const NEXT_STATUS: Record<DemandTaskStatus, DemandTaskStatus> = {
-  open: "in_progress",
-  in_progress: "done",
-  done: "open",
-};
-
-const STATUS_CHIP: Record<DemandTaskStatus, { label: string; chip: string }> = {
-  open: {
-    label: "Aberto",
-    chip: "bg-muted/60 text-muted-foreground border-border/60",
-  },
-  in_progress: {
-    label: "Em andamento",
-    chip: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900",
-  },
-  done: {
-    label: "Concluído",
-    chip: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900",
-  },
-};
-
-function getInitials(label?: string | null) {
-  if (!label) return "?";
-  return label.split(/\s+/).filter(Boolean).map((p) => p[0]).slice(0, 2).join("").toUpperCase();
-}
-
-function StatusIcon({ status }: { status: DemandTaskStatus }) {
-  if (status === "done") {
-    return (
-      <div className="w-[18px] h-[18px] rounded-full border-[1.5px] border-emerald-500 bg-emerald-500 flex items-center justify-center">
-        <Check className="h-2.5 w-2.5 text-white" strokeWidth={2.5} />
-      </div>
-    );
-  }
-  if (status === "in_progress") {
-    return (
-      <div className="w-[18px] h-[18px] rounded-full border-[1.5px] border-blue-400 bg-blue-50 dark:bg-blue-950 flex items-center justify-center">
-        <div className="w-2 h-2 rounded-full bg-blue-500" />
-      </div>
-    );
-  }
-  return (
-    <div className="w-[18px] h-[18px] rounded-full border-[1.5px] border-border hover:border-primary hover:bg-primary/10 transition-colors" />
-  );
-}
-
 interface Props {
   demandId: string;
 }
