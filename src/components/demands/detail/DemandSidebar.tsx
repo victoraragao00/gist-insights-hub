@@ -616,6 +616,76 @@ export function DemandSidebar({ demand, onActivityTabSelect, onClose }: DemandSi
         )}
       </section>
 
+      {/* SLA */}
+      <section className="rounded-lg border border-border bg-card p-4 space-y-3">
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          SLA
+        </p>
+        {demand.sla_paused_at ? (
+          <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <Badge variant="outline" className="text-xs">
+                <TimerOff className="h-3 w-3 mr-1" /> SLA encerrado
+              </Badge>
+              <span className="text-xs text-muted-foreground">
+                {formatDistanceToNow(new Date(demand.sla_paused_at), { addSuffix: true, locale: ptBR })}
+              </span>
+            </div>
+            {demand.sla_paused_reason && (
+              <p className="text-xs text-foreground">{demand.sla_paused_reason}</p>
+            )}
+            <Button
+              variant="outline" size="sm" className="h-7 text-xs w-full"
+              onClick={() => resumeSlaMutation.mutate(demand.id)}
+              disabled={resumeSlaMutation.isPending}
+            >
+              <Timer className="h-3 w-3 mr-1" /> Reativar SLA
+            </Button>
+          </div>
+        ) : (
+          <Button
+            variant="outline" size="sm" className="h-8 text-xs w-full"
+            onClick={() => { setPauseSlaReason(""); setPauseSlaOpen(true); }}
+          >
+            <TimerOff className="h-3 w-3 mr-1" /> Encerrar SLA
+          </Button>
+        )}
+      </section>
+
+      {/* Encerrar SLA dialog */}
+      <AlertDialog open={pauseSlaOpen} onOpenChange={setPauseSlaOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Encerrar SLA desta demanda?</AlertDialogTitle>
+            <AlertDialogDescription>
+              O contador de SLA para de rodar imediatamente, independentemente da coluna.
+              A demanda continua aberta no board normalmente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-1.5">
+            <Label htmlFor="sla-pause-reason" className="text-xs">Motivo (opcional)</Label>
+            <Textarea
+              id="sla-pause-reason"
+              value={pauseSlaReason}
+              onChange={(e) => setPauseSlaReason(e.target.value)}
+              placeholder="Ex.: aguardando definição do cliente, mantida em backlog..."
+              rows={3}
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                pauseSlaMutation.mutate({ demandId: demand.id, reason: pauseSlaReason });
+                setPauseSlaOpen(false);
+              }}
+            >
+              Encerrar SLA
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Watchers */}
       <section className="rounded-lg border border-border bg-card p-4 space-y-3">
         <div className="flex items-center justify-between">
