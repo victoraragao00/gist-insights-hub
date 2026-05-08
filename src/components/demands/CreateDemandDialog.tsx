@@ -363,19 +363,35 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaul
           {/* Description */}
           <div className="space-y-1.5">
             <Label>Descrição</Label>
-            <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} />
+            <RichTextEditor
+              value={description}
+              onSave={setDescription}
+              uploadPathPrefix={draftPrefix}
+              minHeight={96}
+              placeholder="Descreva o problema. Cole ou arraste imagens diretamente aqui."
+            />
           </div>
 
           {/* Expected Result */}
           <div className="space-y-1.5">
             <Label>Resultado Esperado</Label>
-            <Textarea value={expectedResult} onChange={(e) => setExpectedResult(e.target.value)} rows={2} />
+            <RichTextEditor
+              value={expectedResult}
+              onSave={setExpectedResult}
+              uploadPathPrefix={draftPrefix}
+              minHeight={64}
+            />
           </div>
 
           {/* Notes */}
           <div className="space-y-1.5">
             <Label>Notas</Label>
-            <Input value={notes} onChange={(e) => setNotes(e.target.value)} />
+            <RichTextEditor
+              value={notes}
+              onSave={setNotes}
+              uploadPathPrefix={draftPrefix}
+              minHeight={64}
+            />
           </div>
 
           {/* RFI URL + External Link */}
