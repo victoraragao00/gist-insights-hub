@@ -52,6 +52,11 @@ import { ProjectMeetingsTab } from "@/components/projects/tabs/ProjectMeetingsTa
 import { ProjectSquadTab } from "@/components/projects/tabs/ProjectSquadTab";
 import { ProjectActivityTab } from "@/components/projects/tabs/ProjectActivityTab";
 import { formatHours } from "@/lib/formatHours";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import { useUsers } from "@/hooks/useUsers";
+import { useClient } from "@/context/ClientContext";
 
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
