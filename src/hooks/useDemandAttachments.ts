@@ -150,6 +150,55 @@ export function useAddLink() {
   });
 }
 
+/**
+ * Upload a single image inline (used by the rich-text editor for paste/drag/insert).
+ * Does NOT create a row in `demand_attachments` — inline images live only inside the HTML.
+ * Returns the storage path and a short-lived signed URL for immediate preview.
+ */
+export async function uploadInlineImage(
+  demandId: string,
+  file: File,
+): Promise<{ storagePath: string; signedUrl: string }> {
+  const ts = Date.now();
+  const rand = Math.random().toString(36).slice(2, 8);
+  const ext = (file.name.split(".").pop() || "png").toLowerCase().replace(/[^\w]/g, "");
+  const path = `demands/${demandId}/inline/${ts}_${rand}.${ext}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from("demand-attachments")
+    .upload(path, file, { cacheControl: "3600", upsert: false });
+  if (uploadError) throw uploadError;
+
+  const { data, error } = await supabase.storage
+    .from("demand-attachments")
+    .createSignedUrl(path, 3600);
+  if (error) throw error;
+  return { storagePath: path, signedUrl: data.signedUrl };
+}
+
+/**
+ * Resolve a list of storage paths to signed URLs (1h, refreshed every 30min).
+ */
+export function useResolveStoragePaths(paths: string[]) {
+  const sorted = [...new Set(paths)].sort();
+  return useQuery({
+    queryKey: ["demand_inline_signed", sorted.join("|")],
+    staleTime: 30 * 60_000,
+    enabled: sorted.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase.storage
+        .from("demand-attachments")
+        .createSignedUrls(sorted, 3600);
+      if (error) throw error;
+      const map: Record<string, string> = {};
+      data?.forEach((entry, idx) => {
+        if (entry.signedUrl) map[sorted[idx]] = entry.signedUrl;
+      });
+      return map;
+    },
+  });
+}
+
 export function useDeleteAttachment() {
   const queryClient = useQueryClient();
 
