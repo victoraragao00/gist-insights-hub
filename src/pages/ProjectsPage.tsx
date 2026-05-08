@@ -150,12 +150,18 @@ export default function ProjectsPage() {
             <ProjectCardFiltered key={p.id} project={p} filter={filter} />
           ))}
         </div>
-      ) : (
+      ) : viewMode === "grouped" ? (
         <div className="space-y-4">
           {groups.map((g) => (
             <ClientGroup key={g.key} groupKey={g.key} label={g.label} projects={g.projects} filter={filter} />
           ))}
         </div>
+      ) : (
+        <ProjectsCalendarView
+          projects={projects}
+          mode={calendarMode}
+          onModeChange={setCalendarMode}
+        />
       )}
 
       <CreateProjectDialog open={showCreate} onOpenChange={setShowCreate} />
