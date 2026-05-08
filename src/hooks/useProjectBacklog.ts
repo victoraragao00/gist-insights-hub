@@ -100,7 +100,7 @@ export function useMarkBacklogConverted(projectId: string | undefined) {
       const { error } = await supabase
         .from("project_backlog_items")
         .update({
-          status: "converted",
+          status: "aberto",
           converted_demand_id: demandId,
           converted_at: new Date().toISOString(),
         })
