@@ -29,10 +29,14 @@ interface CreateDemandDialogProps {
   onOpenChange: (open: boolean) => void;
   defaultColumnId?: string;
   defaultClientId?: string;
+  defaultProjectId?: string;
+  defaultTitle?: string;
+  defaultDescriptionHtml?: string;
   workspace?: "cx" | "tech";
+  onCreated?: (demandId: string) => void;
 }
 
-export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaultClientId, workspace = "cx" }: CreateDemandDialogProps) {
+export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaultClientId, defaultProjectId, defaultTitle, defaultDescriptionHtml, workspace = "cx", onCreated }: CreateDemandDialogProps) {
   const { clients } = useClient();
   const { user } = useAuth();
   const { data: columns = [] } = useTicketColumns();
