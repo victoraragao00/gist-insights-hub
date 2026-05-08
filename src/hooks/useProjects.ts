@@ -316,6 +316,10 @@ interface UpdateProjectInput {
     client_id: string | null;
     owner_id: string;
     hours_estimated: number | null;
+    planned_start_date: string | null;
+    planned_end_date: string | null;
+    actual_start_date: string | null;
+    actual_end_date: string | null;
   }>;
 }
 
@@ -333,6 +337,7 @@ export function useUpdateProject() {
       toast.success("Projeto atualizado");
       qc.invalidateQueries({ queryKey: ["project", vars.id] });
       qc.invalidateQueries({ queryKey: ["projects"] });
+      qc.invalidateQueries({ queryKey: ["project_date_history", vars.id] });
     },
     onError: (err: Error) => toast.error(`Erro: ${err.message}`),
   });
