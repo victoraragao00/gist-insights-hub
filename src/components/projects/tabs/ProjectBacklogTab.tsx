@@ -308,7 +308,6 @@ export function ProjectBacklogTab({ projectId, clientId, workspace = "tech" }: P
           defaultProjectId={projectId}
           defaultTitle={convertingItem.title}
           defaultDescriptionHtml={convertingItem.notes ?? ""}
-          defaultWorkspace={workspace}
           onCreated={(demandId) => {
             markConverted.mutate({ id: convertingItem.id, demandId });
             setConvertingItem(null);
