@@ -17,7 +17,7 @@ import {
 
 const SANITIZE_OPTIONS = {
   ADD_ATTR: ["data-storage-path", "target", "rel"],
-} as const;
+};
 
 function extractStoragePaths(html: string): string[] {
   const out: string[] = [];
