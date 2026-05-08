@@ -191,6 +191,7 @@ export function useCreateDemand() {
       assignee?: string;
       notes?: string;
       workspace?: "cx" | "tech";
+      project_id?: string | null;
     }) => {
       const { data, error } = await supabase
         .from("demands")
