@@ -385,6 +385,28 @@ export function useCancelProject() {
   });
 }
 
+export function useDeleteProject() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id }: { id: string }) => {
+      const { error } = await supabase.from("projects").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: (_d, vars) => {
+      toast.success("Projeto excluído");
+      qc.invalidateQueries({ queryKey: ["projects"] });
+      qc.invalidateQueries({ queryKey: ["project", vars.id] });
+      qc.invalidateQueries({ queryKey: ["project_demands", vars.id] });
+      qc.invalidateQueries({ queryKey: ["project_stats", vars.id] });
+      qc.invalidateQueries({ queryKey: ["unassigned_demands"] });
+      qc.invalidateQueries({ queryKey: ["demands"] });
+      qc.invalidateQueries({ queryKey: ["agendas"] });
+      qc.invalidateQueries({ queryKey: ["compatible_projects"] });
+    },
+    onError: (err: Error) => toast.error(`Erro: ${err.message}`),
+  });
+}
+
 export function useAddProjectMember() {
   const qc = useQueryClient();
   return useMutation({
