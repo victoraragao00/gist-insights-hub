@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
 
-export type BacklogStatus = "open" | "converted" | "discarded";
+export type BacklogStatus = "aguardando_priorizacao" | "aberto" | "concluido" | "cancelado";
 
 export interface BacklogItem {
   id: string;
