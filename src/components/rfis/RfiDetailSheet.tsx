@@ -20,7 +20,8 @@ interface RfiDetailSheetProps {
   onOpenChange: (open: boolean) => void;
   rfi: {
     id: string;
-    demand_id: string;
+    demand_id: string | null;
+    project_id?: string | null;
     rfi_number: string;
     subject: string | null;
     description: string | null;
@@ -31,6 +32,8 @@ interface RfiDetailSheetProps {
     budget_value: number | null;
     rfi_statuses?: { name: string; color: string | null } | null;
     user_profiles?: { full_name: string | null; email: string | null } | null;
+    demands?: { id: string; title: string; clients?: { name: string } | null } | null;
+    projects?: { id: string; title: string; is_internal?: boolean; clients?: { name: string } | null } | null;
   };
   demandTitle?: string;
   clientName?: string;
@@ -70,9 +73,14 @@ export function RfiDetailSheet({ open, onOpenChange, rfi, demandTitle, clientNam
 
   const saveField = useCallback(
     (field: string, value: string | number | null) => {
-      updateMutation.mutate({ id: rfi.id, demandId: rfi.demand_id, fields: { [field]: value } });
+      updateMutation.mutate({
+        id: rfi.id,
+        demandId: rfi.demand_id ?? undefined,
+        projectId: rfi.project_id ?? undefined,
+        fields: { [field]: value },
+      });
     },
-    [rfi.id, rfi.demand_id, updateMutation]
+    [rfi.id, rfi.demand_id, rfi.project_id, updateMutation]
   );
 
   return (
@@ -92,8 +100,19 @@ export function RfiDetailSheet({ open, onOpenChange, rfi, demandTitle, clientNam
         <div className="space-y-4 mt-4">
           {/* Referências */}
           <div className="text-xs text-muted-foreground space-y-1">
-            {demandTitle && <div>Demanda: <span className="font-medium text-foreground">{demandTitle}</span></div>}
-            {clientName && <div>Cliente: <span className="font-medium text-foreground">{clientName}</span></div>}
+            {rfi.project_id && rfi.projects ? (
+              <>
+                <div>Projeto: <span className="font-medium text-foreground">{rfi.projects.title}</span></div>
+                {(rfi.projects.clients?.name || clientName) && (
+                  <div>Cliente: <span className="font-medium text-foreground">{rfi.projects.clients?.name ?? clientName}</span></div>
+                )}
+              </>
+            ) : (
+              <>
+                {(demandTitle || rfi.demands?.title) && <div>Demanda: <span className="font-medium text-foreground">{demandTitle ?? rfi.demands?.title}</span></div>}
+                {(clientName || rfi.demands?.clients?.name) && <div>Cliente: <span className="font-medium text-foreground">{clientName ?? rfi.demands?.clients?.name}</span></div>}
+              </>
+            )}
           </div>
 
           <Separator />
