@@ -28,6 +28,10 @@ export interface ProjectRow {
   workspace: string;
   client_id: string | null;
   is_internal: boolean;
+  planned_start_date: string | null;
+  planned_end_date: string | null;
+  actual_start_date: string | null;
+  actual_end_date: string | null;
   created_at: string;
   updated_at: string;
   user_profiles: UserMini | null;
