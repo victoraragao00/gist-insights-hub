@@ -40,6 +40,7 @@ import {
   useUpdateProject,
   useUpdateProjectDueDate,
   useCancelProject,
+  useDeleteProject,
   type ProjectRow,
 } from "@/hooks/useProjects";
 import { useProjectAgendas } from "@/hooks/useMeetingAgendas";
