@@ -326,7 +326,7 @@ export default function ProjectDetailPage() {
             </section>
           )}
 
-          {isOwner && !project.cancelled_at && (
+          {isOwner && (
             <section className="rounded-lg border border-border bg-card p-4">
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-3">
                 Ações
