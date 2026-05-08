@@ -1,25 +1,85 @@
-## Excluir projeto
+## Documentos + Backlog de Tópicos em Projetos
 
-Hoje só existe **Cancelar projeto** (soft — `cancel_project` RPC marca `cancelled_at`). O usuário precisa também conseguir **excluir** definitivamente.
+Duas adições à página de Projeto, ambas para registrar trabalho **antes** de virar demanda formal no Kanban.
 
-A RLS já permite: `projects_delete` policy autoriza `DELETE` para o `owner_id = auth.uid()`. As FKs já estão preparadas:
-- `project_members.project_id` → `ON DELETE CASCADE`
-- `demands.project_id` → `ON DELETE SET NULL` (demandas vinculadas perdem o vínculo, não são apagadas)
-- `meeting_agendas.project_id` → `ON DELETE SET NULL`
+---
 
-Ou seja, **nenhuma migration é necessária**. Só falta UI + hook.
+### Parte A — Aba "Documentos"
 
-### Mudanças
+Reuso direto do padrão `client_documents` + bucket `client-documents` + `RichTextEditor` (mesmo editor usado nas demandas, com colar imagem).
 
-**`src/hooks/useProjects.ts`**
-- Adicionar `useDeleteProject()` mutation: `supabase.from("projects").delete().eq("id", id)`. Em sucesso, invalidar `["projects"]`, `["project_demands"]`, `["unassigned_demands"]`, `["demands"]`, `["agendas"]` e mostrar toast.
+**Banco** — nova tabela `project_documents`:
+- `project_id` (FK `projects.id` ON DELETE CASCADE)
+- `title`, `category` (`escopo` | `entregavel` | `nota` | `outro`)
+- `description` (HTML do RichTextEditor, suporta imagens inline)
+- `url` (link externo opcional)
+- `file_path`, `file_name`, `file_size_bytes`, `mime_type` (para anexos)
+- `created_by`, `created_at`, `updated_at`
 
-**`src/pages/ProjectDetailPage.tsx`**
-- Ao lado do botão "Cancelar projeto" (linha ~337), adicionar botão **"Excluir projeto"** (variante destructive/ghost, ícone `Trash2`), visível apenas para `isOwner`.
-- Envolver em `AlertDialog` com texto explicando que a ação é **permanente**, que demandas vinculadas serão **desvinculadas** (não apagadas) e reuniões internas perderão o vínculo.
-- Ao confirmar: chamar `deleteProject.mutateAsync({ id })` e em seguida `navigate("/projects")`.
+RLS: owner do projeto **ou** membro em `project_members` pode SELECT/INSERT/UPDATE/DELETE.
+
+Storage: bucket privado `project-documents` com policies espelhando o RLS (path `<project_id>/...`). Imagens inline coladas no editor vão em `<project_id>/inline/...`.
+
+**Hook** `src/hooks/useProjectDocuments.ts` — cópia de `useClientDocuments.ts` (queries, create/update/delete, upload com cleanup).
+
+**UI** — novo componente `ProjectDocumentsTab.tsx`:
+- Lista por categoria com botões "Novo documento" (abre dialog com `RichTextEditor`) e "Anexar arquivo" (file picker direto).
+- Dialog de detalhe: Título, Categoria (select), URL externa, Conteúdo rich-text.
+- Cada item mostra ícone (📄 escrito / 📎 arquivo), título, badge de categoria, autor, data; clique abre detalhe; ações Salvar/Excluir.
+
+---
+
+### Parte B — Aba "Backlog" (tópicos pré-demanda)
+
+Lugar leve para listar coisas que **vão virar demanda**, sem entrar no Kanban ainda. Ao maturar, um clique converte em demanda real.
+
+**Banco** — nova tabela `project_backlog_items`:
+- `project_id` (FK `projects.id` ON DELETE CASCADE)
+- `title` (texto curto)
+- `notes` (HTML rich-text, opcional — também aceita imagens coladas)
+- `status` (`open` | `converted` | `discarded`, default `open`)
+- `position` (int, para reordenar)
+- `converted_demand_id` (FK `demands.id` ON DELETE SET NULL, preenchido ao converter)
+- `converted_at`, `created_by`, `created_at`, `updated_at`
+
+RLS idêntica a `project_documents` (owner ou member do projeto).
+
+**Hook** `src/hooks/useProjectBacklog.ts`:
+- `useProjectBacklog(projectId)` — lista por `position`, com filtro de status.
+- `useCreateBacklogItem`, `useUpdateBacklogItem`, `useDeleteBacklogItem`, `useReorderBacklogItems`.
+- `useConvertBacklogToDemand(projectId)` — abre `CreateDemandDialog` pré-preenchido (título + notas → descrição) com `project_id` fixo. Após criar com sucesso, atualiza o item: `status='converted'`, `converted_demand_id=<id>`, `converted_at=now()`.
+
+**UI** — novo componente `ProjectBacklogTab.tsx`:
+- Visual estilo lista de tarefas (similar a `demand_tasks`): linha com checkbox/handle, título inline-editável, ícone para abrir notas, badge de status, menu `⋯`.
+- Adicionar topo: input "Novo tópico" → Enter cria.
+- Reordenar com drag (`@dnd-kit`, já no projeto).
+- Por padrão mostra `open`; toggle para ver `converted` / `discarded`.
+- Item já convertido mostra link "→ Ver demanda #X" (rota da demanda) e fica desabilitado para edição.
+- Ação principal por item: **"Converter em demanda"** — abre o `CreateDemandDialog` existente em modo pré-preenchido (já recebe `project_id` por padrão; precisa expor props `defaultTitle` e `defaultDescriptionHtml` se ainda não existirem). Botão secundário: "Descartar".
+
+**Integração com `CreateDemandDialog`:**
+- Adicionar props opcionais: `defaultProjectId`, `defaultTitle`, `defaultDescriptionHtml`, `onCreated?(demandId)`.
+- Sem mudança de comportamento para os fluxos atuais (props opcionais).
+- A conversão usa `onCreated` para marcar o backlog item.
+
+---
+
+### Estrutura final da `ProjectDetailPage`
+
+```text
+[Demandas] [Backlog] [Documentos] [Reuniões] [Squad] [Atividade]
+```
 
 ### Verificação
-- Owner abre projeto → vê "Excluir projeto" → confirma → volta para `/projects`, projeto sumiu da lista.
-- Demandas que estavam no projeto continuam existindo, agora sem `project_id`, e voltam a aparecer em "Demandas não vinculadas".
-- Não-owner não vê o botão (e o RLS bloquearia mesmo se forçado).
+
+- Owner/membro do projeto consegue: criar tópicos no backlog, escrever notas com imagens, reordenar, converter em demanda (a demanda nasce vinculada ao projeto e o tópico marca `converted` com link).
+- Documentos: criar nota escrita com imagem colada, anexar arquivo, editar, excluir.
+- Não-membro não vê as abas e o RLS bloqueia chamadas diretas.
+- Excluir o projeto remove documentos, backlog items e arquivos do bucket (FK CASCADE + cleanup no hook de delete).
+
+### Detalhes técnicos
+
+- Sem nova dependência (reuso de `RichTextEditor`, `@dnd-kit`, `CreateDemandDialog`, padrão `client_documents`).
+- HTML do rich-text armazenado direto na coluna (mesmo padrão de demandas).
+- `converted_demand_id` com `ON DELETE SET NULL` para não perder o histórico do tópico se a demanda for apagada.
+- `position` reindexado em batch via mutation única ao reordenar.

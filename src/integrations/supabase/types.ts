@@ -1707,6 +1707,133 @@ export type Database = {
           },
         ]
       }
+      project_backlog_items: {
+        Row: {
+          converted_at: string | null
+          converted_demand_id: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          position: number
+          project_id: string
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          converted_at?: string | null
+          converted_demand_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          position?: number
+          project_id: string
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          converted_at?: string | null
+          converted_demand_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          position?: number
+          project_id?: string
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_backlog_items_converted_demand_id_fkey"
+            columns: ["converted_demand_id"]
+            isOneToOne: false
+            referencedRelation: "demands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_backlog_items_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_backlog_items_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_documents: {
+        Row: {
+          category: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          file_name: string | null
+          file_path: string | null
+          file_size_bytes: number | null
+          id: string
+          mime_type: string | null
+          project_id: string
+          title: string
+          updated_at: string
+          url: string | null
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          file_name?: string | null
+          file_path?: string | null
+          file_size_bytes?: number | null
+          id?: string
+          mime_type?: string | null
+          project_id: string
+          title: string
+          updated_at?: string
+          url?: string | null
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          file_name?: string | null
+          file_path?: string | null
+          file_size_bytes?: number | null
+          id?: string
+          mime_type?: string | null
+          project_id?: string
+          title?: string
+          updated_at?: string
+          url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_documents_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_documents_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_members: {
         Row: {
           added_at: string

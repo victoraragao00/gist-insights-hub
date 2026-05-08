@@ -46,6 +46,8 @@ import {
 import { useProjectAgendas } from "@/hooks/useMeetingAgendas";
 import { StatusBadge } from "@/components/projects/StatusBadge";
 import { ProjectDemandsTab } from "@/components/projects/tabs/ProjectDemandsTab";
+import { ProjectBacklogTab } from "@/components/projects/tabs/ProjectBacklogTab";
+import { ProjectDocumentsTab } from "@/components/projects/tabs/ProjectDocumentsTab";
 import { ProjectMeetingsTab } from "@/components/projects/tabs/ProjectMeetingsTab";
 import { ProjectSquadTab } from "@/components/projects/tabs/ProjectSquadTab";
 import { ProjectActivityTab } from "@/components/projects/tabs/ProjectActivityTab";
@@ -188,12 +190,24 @@ export default function ProjectDetailPage() {
           <Tabs defaultValue="demands">
             <TabsList>
               <TabsTrigger value="demands">Demandas</TabsTrigger>
+              <TabsTrigger value="backlog">Backlog</TabsTrigger>
+              <TabsTrigger value="documents">Documentos</TabsTrigger>
               <TabsTrigger value="meetings">Reuniões</TabsTrigger>
               <TabsTrigger value="squad">Squad</TabsTrigger>
               <TabsTrigger value="activity">Atividade</TabsTrigger>
             </TabsList>
             <TabsContent value="demands" className="mt-4">
               <ProjectDemandsTab project={project} />
+            </TabsContent>
+            <TabsContent value="backlog" className="mt-4">
+              <ProjectBacklogTab
+                projectId={id}
+                clientId={project.client_id}
+                workspace={project.workspace === "cx" ? "cx" : "tech"}
+              />
+            </TabsContent>
+            <TabsContent value="documents" className="mt-4">
+              <ProjectDocumentsTab projectId={id} />
             </TabsContent>
             <TabsContent value="meetings" className="mt-4">
               <ProjectMeetingsTab projectId={id} />

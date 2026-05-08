@@ -29,10 +29,14 @@ interface CreateDemandDialogProps {
   onOpenChange: (open: boolean) => void;
   defaultColumnId?: string;
   defaultClientId?: string;
+  defaultProjectId?: string;
+  defaultTitle?: string;
+  defaultDescriptionHtml?: string;
   workspace?: "cx" | "tech";
+  onCreated?: (demandId: string) => void;
 }
 
-export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaultClientId, workspace = "cx" }: CreateDemandDialogProps) {
+export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaultClientId, defaultProjectId, defaultTitle, defaultDescriptionHtml, workspace = "cx", onCreated }: CreateDemandDialogProps) {
   const { clients } = useClient();
   const { user } = useAuth();
   const { data: columns = [] } = useTicketColumns();
@@ -58,20 +62,30 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaul
   const updateRfiMutation = useUpdateRfi();
   const addLinkMutation = useAddLink();
 
-  const [title, setTitle] = useState("");
+  const [title, setTitle] = useState(defaultTitle ?? "");
   const [clientId, setClientId] = useState(defaultClientId ?? "");
   const [typeId, setTypeId] = useState("");
   const [areaId, setAreaId] = useState("");
   const [assigneeId, setAssigneeId] = useState("");
   const [priority, setPriority] = useState<DemandPriority>("medium");
   const [columnId, setColumnId] = useState(defaultColumnId ?? "");
-  const [description, setDescription] = useState("");
+  const [description, setDescription] = useState(defaultDescriptionHtml ?? "");
   const [expectedResult, setExpectedResult] = useState("");
   const [notes, setNotes] = useState("");
   const [rfiUrl, setRfiUrl] = useState("");
   const [externalLink, setExternalLink] = useState("");
   const [createdDemandId, setCreatedDemandId] = useState<string | null>(null);
   const [showLinkDialog, setShowLinkDialog] = useState(false);
+
+  // Sync defaults when dialog (re)opens with new pre-fills
+  useEffect(() => {
+    if (open) {
+      if (defaultTitle !== undefined) setTitle(defaultTitle);
+      if (defaultDescriptionHtml !== undefined) setDescription(defaultDescriptionHtml);
+      if (defaultClientId !== undefined) setClientId(defaultClientId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, defaultTitle, defaultDescriptionHtml, defaultClientId]);
 
   // Stable draft id used as inline-image upload prefix before the demand exists.
   const draftIdRef = useRef<string>("");
@@ -106,6 +120,7 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaul
         expected_result: expectedResult || undefined,
         notes: notes || undefined,
         workspace,
+        project_id: defaultProjectId ?? undefined,
       },
       {
         onSuccess: async (data) => {
@@ -115,6 +130,7 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaul
             resetForm();
             return;
           }
+          if (onCreated) onCreated(newId);
 
           // Side-effects: optional RFI + external link.
           // Do not block the post-creation view if either fails — toasts will surface errors.
