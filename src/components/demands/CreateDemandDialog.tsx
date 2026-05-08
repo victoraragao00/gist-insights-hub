@@ -165,6 +165,16 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaul
     setExternalLink("");
     setCreatedDemandId(null);
     setShowLinkDialog(false);
+    // Rotate draft id so subsequent demand starts with a fresh inline-image namespace.
+    draftIdRef.current = crypto.randomUUID();
+  };
+
+  // Cancel without creating: best-effort cleanup of orphan inline images.
+  const handleCancel = () => {
+    const prefix = draftPrefix;
+    void cleanupDraftInlineImages(prefix);
+    resetForm();
+    onOpenChange(false);
   };
 
   const handleFinish = () => {
