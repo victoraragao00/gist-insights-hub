@@ -4,7 +4,6 @@ import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -21,8 +20,8 @@ import {
   useSignedAttachmentUrls,
 } from "@/hooks/useDemandAttachments";
 import { useDemandAnalysis, useAnalyzeDemand } from "@/hooks/useDemandAnalysis";
-import { useAutoResize } from "@/hooks/useAutoResize";
 import { AttachmentThumbnail } from "./AttachmentThumbnail";
+import { RichTextEditor } from "../RichTextEditor";
 
 
 const ACCEPTED_FILE_TYPES = "image/*,application/pdf,.doc,.docx,.xls,.xlsx,.csv";
@@ -49,10 +48,6 @@ export function DemandContentTab({ demand }: DemandContentTabProps) {
   const [resolution, setResolution] = useState(demand.resolution ?? "");
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [newLinkUrl, setNewLinkUrl] = useState("");
-
-  const descRef = useAutoResize(description);
-  const resultRef = useAutoResize(expectedResult);
-  const notesRef = useAutoResize(notes);
 
   const hasResolution = !!resolution && resolution.trim() !== "";
 
@@ -86,42 +81,39 @@ export function DemandContentTab({ demand }: DemandContentTabProps) {
     <div className="space-y-6">
       <div className="space-y-1.5">
         <Label className="text-xs text-muted-foreground">Descrição</Label>
-        <Textarea
-          ref={descRef}
+        <RichTextEditor
+          demandId={demand.id}
           value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          onBlur={() => {
-            if (description !== (demand.description ?? "")) saveField("description", description, "Descrição");
+          placeholder="Descreva a demanda... (cole ou arraste imagens)"
+          onSave={(html) => {
+            setDescription(html);
+            saveField("description", html, "Descrição");
           }}
-          placeholder="Descreva a demanda..."
-          className="resize-none overflow-hidden min-h-[80px]"
         />
       </div>
 
       <div className="space-y-1.5">
         <Label className="text-xs text-muted-foreground">Resultado esperado</Label>
-        <Textarea
-          ref={resultRef}
+        <RichTextEditor
+          demandId={demand.id}
           value={expectedResult}
-          onChange={(e) => setExpectedResult(e.target.value)}
-          onBlur={() => {
-            if (expectedResult !== (demand.expected_result ?? "")) saveField("expected_result", expectedResult, "Resultado Esperado");
-          }}
           placeholder="O que precisa ser entregue?"
-          className="resize-none overflow-hidden min-h-[80px]"
+          onSave={(html) => {
+            setExpectedResult(html);
+            saveField("expected_result", html, "Resultado Esperado");
+          }}
         />
       </div>
       <div className="space-y-1.5">
         <Label className="text-xs text-muted-foreground">Notas internas</Label>
-        <Textarea
-          ref={notesRef}
+        <RichTextEditor
+          demandId={demand.id}
           value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          onBlur={() => {
-            if (notes !== (demand.notes ?? "")) saveField("notes", notes, "Notas");
-          }}
           placeholder="Notas internas..."
-          className="resize-none overflow-hidden min-h-[80px]"
+          onSave={(html) => {
+            setNotes(html);
+            saveField("notes", html, "Notas");
+          }}
         />
       </div>
 
@@ -141,18 +133,19 @@ export function DemandContentTab({ demand }: DemandContentTabProps) {
         >
           Resolução
         </Label>
-        <Textarea
+        <RichTextEditor
+          demandId={demand.id}
           value={resolution}
-          onChange={(e) => setResolution(e.target.value)}
-          onBlur={() => {
-            if (resolution !== (demand.resolution ?? "")) saveField("resolution", resolution, "Resolução");
-          }}
-          rows={3}
           placeholder="Como foi resolvido..."
+          minHeight={60}
           className={cn(
-            "border-0 bg-transparent p-0 resize-none focus-visible:ring-0 shadow-none",
+            "border-0 bg-transparent",
             hasResolution ? "text-emerald-900 dark:text-emerald-200" : "",
           )}
+          onSave={(html) => {
+            setResolution(html);
+            saveField("resolution", html, "Resolução");
+          }}
         />
       </div>
 
