@@ -561,3 +561,137 @@ function HoursEditField({ value, onSave }: HoursEditFieldProps) {
     </button>
   );
 }
+
+function ProjectOwnerField({ project, canEdit }: { project: ProjectRow; canEdit: boolean }) {
+  const { data: users = [] } = useUsers();
+  const updateProject = useUpdateProject();
+  const [editing, setEditing] = useState(false);
+
+  const label =
+    project.user_profiles?.full_name || project.user_profiles?.email || "—";
+
+  if (editing && canEdit) {
+    return (
+      <div className="flex items-center justify-between py-1.5 text-sm border-b border-border/30">
+        <span className="text-muted-foreground text-xs">Owner</span>
+        <Select
+          defaultValue={project.owner_id}
+          onValueChange={async (v) => {
+            if (v && v !== project.owner_id) {
+              await updateProject.mutateAsync({ id: project.id, fields: { owner_id: v } });
+            }
+            setEditing(false);
+          }}
+        >
+          <SelectTrigger className="h-7 text-xs w-[60%]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {users
+              .filter((u) => u.active)
+              .map((u) => (
+                <SelectItem key={u.user_id} value={u.user_id}>
+                  {u.full_name || u.email}
+                </SelectItem>
+              ))}
+          </SelectContent>
+        </Select>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center justify-between py-1.5 text-sm border-b border-border/30">
+      <span className="text-muted-foreground text-xs">Owner</span>
+      <button
+        type="button"
+        onClick={() => canEdit && setEditing(true)}
+        disabled={!canEdit}
+        className={cn(
+          "text-xs font-medium truncate max-w-[60%] text-right",
+          canEdit && "hover:text-primary transition-colors cursor-pointer",
+        )}
+        title={canEdit ? "Clique para alterar" : undefined}
+      >
+        {label}
+      </button>
+    </div>
+  );
+}
+
+function ProjectClientField({ project, canEdit }: { project: ProjectRow; canEdit: boolean }) {
+  const { clients } = useClient();
+  const updateProject = useUpdateProject();
+  const [pending, setPending] = useState<string | null>(null);
+
+  const label = project.is_internal
+    ? "Interno"
+    : (project.clients?.name ?? "—");
+
+  if (project.is_internal) {
+    return (
+      <div className="flex items-center justify-between py-1.5 text-sm border-b border-border/30">
+        <span className="text-muted-foreground text-xs">Cliente</span>
+        <span className="text-xs font-medium text-muted-foreground">Interno</span>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="flex items-center justify-between py-1.5 text-sm border-b border-border/30">
+        <span className="text-muted-foreground text-xs">Cliente</span>
+        {canEdit ? (
+          <Select
+            value={project.client_id ?? ""}
+            onValueChange={(v) => {
+              if (v && v !== project.client_id) setPending(v);
+            }}
+          >
+            <SelectTrigger className="h-7 text-xs w-[60%]">
+              <SelectValue placeholder="Selecionar cliente">
+                {label}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {clients.map((c) => (
+                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : (
+          <span className="text-xs font-medium truncate max-w-[60%] text-right">{label}</span>
+        )}
+      </div>
+
+      <AlertDialog open={!!pending} onOpenChange={(v) => { if (!v) setPending(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Trocar cliente do projeto?</AlertDialogTitle>
+            <AlertDialogDescription>
+              As demandas, backlog e documentos já existentes <strong>não serão movidos</strong> —
+              eles permanecem com o cliente atual. Apenas novos itens criados a partir
+              de agora herdarão o novo cliente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                if (pending) {
+                  await updateProject.mutateAsync({
+                    id: project.id,
+                    fields: { client_id: pending },
+                  });
+                }
+                setPending(null);
+              }}
+            >
+              Confirmar troca
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
