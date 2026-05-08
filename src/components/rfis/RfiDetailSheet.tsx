@@ -32,8 +32,8 @@ interface RfiDetailSheetProps {
     budget_value: number | null;
     rfi_statuses?: { name: string; color: string | null } | null;
     user_profiles?: { full_name: string | null; email: string | null } | null;
-    demands?: { id: string; title: string; clients?: { name: string } | null } | null;
-    projects?: { id: string; title: string; is_internal?: boolean; clients?: { name: string } | null } | null;
+    demands?: { id?: string; title: string; clients?: { name: string } | null } | null;
+    projects?: { id?: string; title: string; is_internal?: boolean; clients?: { name: string } | null } | null;
   };
   demandTitle?: string;
   clientName?: string;
