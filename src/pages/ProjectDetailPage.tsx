@@ -51,6 +51,9 @@ import { ProjectDocumentsTab } from "@/components/projects/tabs/ProjectDocuments
 import { ProjectMeetingsTab } from "@/components/projects/tabs/ProjectMeetingsTab";
 import { ProjectSquadTab } from "@/components/projects/tabs/ProjectSquadTab";
 import { ProjectActivityTab } from "@/components/projects/tabs/ProjectActivityTab";
+import { ProjectRfisTab } from "@/components/projects/tabs/ProjectRfisTab";
+import { ProjectDateHistoryTab } from "@/components/projects/tabs/ProjectDateHistoryTab";
+import { ProjectDatesSection } from "@/components/projects/ProjectDatesSection";
 import { formatHours } from "@/lib/formatHours";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -199,6 +202,8 @@ export default function ProjectDetailPage() {
               <TabsTrigger value="documents">Documentos</TabsTrigger>
               <TabsTrigger value="meetings">Reuniões</TabsTrigger>
               <TabsTrigger value="squad">Squad</TabsTrigger>
+              <TabsTrigger value="rfis">RFIs</TabsTrigger>
+              <TabsTrigger value="history">Histórico</TabsTrigger>
               <TabsTrigger value="activity">Atividade</TabsTrigger>
             </TabsList>
             <TabsContent value="demands" className="mt-4">
@@ -224,6 +229,12 @@ export default function ProjectDetailPage() {
                 isOwner={isOwner}
               />
             </TabsContent>
+            <TabsContent value="rfis" className="mt-4">
+              <ProjectRfisTab projectId={id} canCreate={isOwner} />
+            </TabsContent>
+            <TabsContent value="history" className="mt-4">
+              <ProjectDateHistoryTab projectId={id} />
+            </TabsContent>
             <TabsContent value="activity" className="mt-4">
               <ProjectActivityTab projectId={id} />
             </TabsContent>
@@ -246,6 +257,8 @@ export default function ProjectDetailPage() {
               })}
             />
           </section>
+
+          <ProjectDatesSection project={project} canEdit={isOwner} />
 
           <section className="rounded-lg border border-border bg-card p-4">
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-2">
