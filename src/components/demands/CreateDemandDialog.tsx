@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -6,7 +6,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { RichTextEditor } from "@/components/demands/RichTextEditor";
+import { cleanupDraftInlineImages } from "@/hooks/useDemandAttachments";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -71,6 +72,11 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaul
   const [externalLink, setExternalLink] = useState("");
   const [createdDemandId, setCreatedDemandId] = useState<string | null>(null);
   const [showLinkDialog, setShowLinkDialog] = useState(false);
+
+  // Stable draft id used as inline-image upload prefix before the demand exists.
+  const draftIdRef = useRef<string>("");
+  if (!draftIdRef.current) draftIdRef.current = crypto.randomUUID();
+  const draftPrefix = `demands/_drafts/${draftIdRef.current}/inline`;
 
   // Pre-fill area if there's exactly 1 area available for this workspace
   useEffect(() => {
@@ -159,6 +165,16 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaul
     setExternalLink("");
     setCreatedDemandId(null);
     setShowLinkDialog(false);
+    // Rotate draft id so subsequent demand starts with a fresh inline-image namespace.
+    draftIdRef.current = crypto.randomUUID();
+  };
+
+  // Cancel without creating: best-effort cleanup of orphan inline images.
+  const handleCancel = () => {
+    const prefix = draftPrefix;
+    void cleanupDraftInlineImages(prefix);
+    resetForm();
+    onOpenChange(false);
   };
 
   const handleFinish = () => {
@@ -255,7 +271,7 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaul
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(v) => { if (!v) handleCancel(); else onOpenChange(v); }}>
       <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Nova Demanda</DialogTitle>
@@ -357,19 +373,35 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaul
           {/* Description */}
           <div className="space-y-1.5">
             <Label>Descrição</Label>
-            <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} />
+            <RichTextEditor
+              value={description}
+              onSave={setDescription}
+              uploadPathPrefix={draftPrefix}
+              minHeight={96}
+              placeholder="Descreva o problema. Cole ou arraste imagens diretamente aqui."
+            />
           </div>
 
           {/* Expected Result */}
           <div className="space-y-1.5">
             <Label>Resultado Esperado</Label>
-            <Textarea value={expectedResult} onChange={(e) => setExpectedResult(e.target.value)} rows={2} />
+            <RichTextEditor
+              value={expectedResult}
+              onSave={setExpectedResult}
+              uploadPathPrefix={draftPrefix}
+              minHeight={64}
+            />
           </div>
 
           {/* Notes */}
           <div className="space-y-1.5">
             <Label>Notas</Label>
-            <Input value={notes} onChange={(e) => setNotes(e.target.value)} />
+            <RichTextEditor
+              value={notes}
+              onSave={setNotes}
+              uploadPathPrefix={draftPrefix}
+              minHeight={64}
+            />
           </div>
 
           {/* RFI URL + External Link */}
@@ -402,7 +434,7 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaul
         </div>
 
         <DialogFooter className="mt-4">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button variant="outline" onClick={handleCancel}>Cancelar</Button>
           <Button onClick={handleSubmit} disabled={!canSubmit || createMutation.isPending}>
             {createMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
             Criar

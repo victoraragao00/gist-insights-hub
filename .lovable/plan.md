@@ -1,58 +1,39 @@
-# Imagens inline na descrição das demandas (CX e TECH)
+## Editor rico com imagens no diálogo de criação de demanda
 
-## Objetivo
-Permitir que o time cole/arraste/anexe imagens **dentro do corpo** dos campos "Descrição", "Resultado esperado", "Notas internas" e "Resolução" da demanda — exatamente como na referência (texto + imagem intercalada). Vale para os boards CX Hub e TECH (mesmo componente).
+Hoje o `RichTextEditor` (com colar/arrastar imagens) só está disponível na aba de detalhes da demanda já criada (`DemandContentTab.tsx`). No diálogo "Nova Demanda" (`CreateDemandDialog.tsx`), os campos **Descrição**, **Resultado Esperado** e **Notas** ainda usam `<Textarea>`/`<Input>` simples — sem suporte a imagens inline.
 
-## Abordagem
-Trocar os `<Textarea>` desses 4 campos por um **editor rich-text leve baseado em Tiptap** (já é o padrão de fato em apps com paste/drag de imagem) salvando o conteúdo como **HTML sanitizado** nas mesmas colunas (`description`, `expected_result`, `notes`, `resolution`).
+### O que será feito
 
-Imagens viram anexos no bucket privado `demand-attachments` (já existente) e são embutidas como `<img data-storage-path="demands/<id>/...">`. Na renderização (e no editor), um pequeno hook resolve o `data-storage-path` para uma **signed URL** (1h) e injeta no `src`. Isso evita o problema de URLs expirando dentro do conteúdo persistido.
+Substituir os campos de texto livre do `CreateDemandDialog` pelo mesmo `RichTextEditor` usado na edição, de modo que o usuário possa colar/arrastar imagens já durante a criação.
 
-Compatibilidade: conteúdo antigo (texto puro) é renderizado como `<p>` normal — Tiptap aceita texto direto. Sem migração de dados.
+### Desafio técnico (upload antes do ID existir)
 
-## Escopo de UI
-- `src/components/demands/detail/DemandContentTab.tsx` — substituir 4 Textareas pelo novo `<RichTextEditor>`. Manter auto-save no blur (debounce 500ms ao invés de blur puro, porque o editor não tem evento blur 1:1 — usar `onUpdate` debounced).
-- `src/components/demands/RichTextEditor.tsx` (novo) — wrapper Tiptap com:
-  - StarterKit (parágrafo, bold, italic, listas, headings 2-3, link)
-  - Extension `Image` customizada com `data-storage-path`
-  - Toolbar mínima (negrito, itálico, lista, link, imagem)
-  - Handler `paste` e `drop` que detecta `image/*` → chama `uploadInlineImage()` → insere `<img data-storage-path=...>` no cursor
-  - Botão "Imagem" na toolbar abre file picker
-- `src/components/demands/RichTextView.tsx` (novo) — renderiza HTML salvo (read-only) resolvendo as signed URLs. Usado em qualquer lugar futuro que precise exibir a descrição sem editar (ex: página pública, project tab).
+O upload inline atual usa `demandId` no caminho do storage (`demands/<id>/inline/...`). Como a demanda ainda não existe na criação, vamos usar um **ID temporário** (UUID gerado no client via `crypto.randomUUID()`) como pasta de staging:
 
-## Escopo de hooks
-- `src/hooks/useDemandAttachments.ts` — adicionar:
-  - `useUploadInlineImage(demandId)` → upload pra `demands/<id>/inline/<uuid>.<ext>`, **sem** criar registro em `demand_attachments` (inline não polui a lista de anexos). Retorna `{ storagePath }`.
-  - `useResolveStoragePaths(paths: string[])` → retorna `Record<path, signedUrl>` com `staleTime: 30min`, queryKey inclui paths sorted.
+- Caminho de upload: `demands/_drafts/<draftId>/inline/<uuid>.<ext>`
+- Após `createMutation` retornar com sucesso e o novo `demand.id`, executar um passo de **promoção**: mover (copiar + deletar) os arquivos da pasta `_drafts/<draftId>/` para `demands/<newId>/inline/` e atualizar os atributos `data-storage-path` no HTML salvo (replace simples no string) antes ou logo depois do insert.
 
-## Escopo de dependências
-- `bun add @tiptap/react @tiptap/starter-kit @tiptap/extension-image @tiptap/extension-link`
-- `bun add dompurify @types/dompurify` (sanitizar HTML antes de salvar)
+Alternativa mais simples (preferida): **manter o caminho `_drafts/<draftId>` no HTML salvo**. As imagens continuam acessíveis via signed URL (mesmo bucket, mesma RLS de leitura por usuário autenticado). Sem job de movimentação. Trade-off: arquivos órfãos se o usuário cancelar — limpamos no `onOpenChange(false)` chamando `storage.remove()` do prefixo do draft.
 
-## Escopo backend
-Nada. As colunas `description`/`expected_result`/`notes`/`resolution` já são `text` e aceitam HTML. Bucket `demand-attachments` já existe com RLS. Sem migration.
+Vamos com a alternativa simples (drafts permanentes + cleanup ao cancelar).
 
-## Detalhes técnicos
-1. **Persistência:** o editor emite HTML via `editor.getHTML()`. Antes de salvar, `DOMPurify.sanitize(html, { ALLOWED_ATTR: [..., 'data-storage-path'], ALLOWED_TAGS: [..., 'img'] })`.
-2. **Resolução de imagens:** ao montar `RichTextEditor` com `content`, percorrer o DOM, coletar todos `data-storage-path`, chamar `useResolveStoragePaths`, e atribuir `img.src = map[path]`. Mesmo no `RichTextView`.
-3. **Upload inline:**
-   - Paste: `editor.view.props.handlePaste` intercepta `event.clipboardData.files` com `image/*`.
-   - Drop: `handleDrop` análogo.
-   - Botão toolbar: input file `accept="image/*"`.
-   - Fluxo: gera `uuid`, faz `supabase.storage.from('demand-attachments').upload(path, file)`, insere node Image com `data-storage-path=path` e `src=` (signed URL otimista de 1h obtida no momento do upload).
-4. **Auto-save:** `onUpdate` debounce 600ms; só salva se `editor.getHTML() !== lastSaved`. Mostra indicador "salvando…" sutil ao lado do label.
-5. **Atalhos:** Ctrl/Cmd+B, I, K (link) — nativos do Tiptap.
+### Mudanças
 
-## Fora de escopo
-- Comentários da demanda (continua plain text por enquanto — pode ser feito num segundo passo reusando `RichTextEditor`).
-- Mensagens do Gist (renderização própria).
-- Migração de descrições antigas para HTML — não necessário.
+**`src/hooks/useDemandAttachments.ts`**
+- Generalizar `useUploadInlineImage` para aceitar um `pathPrefix` (ex: `demands/<id>/inline` ou `demands/_drafts/<draftId>/inline`) em vez de receber só `demandId`.
+- Adicionar helper `useCleanupDraftInlineImages(draftId)` que lista e remove arquivos do prefixo de draft.
 
-## Verificação
-1. Colar print (Ctrl+V) no campo Descrição → imagem aparece inline → recarregar a página → imagem continua aparecendo.
-2. Arrastar arquivo de imagem para o campo → idem.
-3. Botão "Imagem" da toolbar → file picker → upload → inserção no cursor.
-4. Mover demanda entre boards CX/TECH → conteúdo (incl. imagens) preservado.
-5. Demanda antiga (sem HTML) abre normalmente como texto.
-6. Abrir 1h depois → signed URLs renovadas automaticamente (refetch após 30min).
-7. Editar negrito/lista/link funciona em todos os 4 campos.
+**`src/components/demands/RichTextEditor.tsx`**
+- Aceitar prop opcional `uploadPathPrefix?: string` (default mantém comportamento atual baseado em `demandId`).
+- Quando recebido, usa esse prefixo no upload em vez de `demands/<demandId>/inline`.
+
+**`src/components/demands/CreateDemandDialog.tsx`**
+- Gerar `draftId` (UUID) com `useRef` na primeira abertura do diálogo.
+- Substituir os 3 `<Textarea>`/`<Input>` (Descrição, Resultado Esperado, Notas) por `<RichTextEditor uploadPathPrefix={`demands/_drafts/${draftId}/inline`} />`.
+- No `resetForm()` e ao fechar sem criar (`onOpenChange(false)` antes de ter `createdDemandId`), chamar cleanup das imagens do draft.
+- Após sucesso da criação, **não** limpar — o HTML salvo já referencia esses paths e continuará renderizando via signed URL.
+
+### Verificação
+- Abrir "Nova Demanda" → colar imagem na Descrição → criar → abrir detalhes → imagem aparece.
+- Abrir "Nova Demanda" → colar imagem → cancelar → arquivos do draft são removidos do storage.
+- Campos vazios continuam salvando como `null`/string vazia normalmente.

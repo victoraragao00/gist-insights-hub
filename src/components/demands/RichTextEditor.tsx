@@ -39,7 +39,8 @@ function rewriteImageSrcs(root: HTMLElement, map: Record<string, string>) {
 interface RichTextEditorProps {
   value: string;
   onSave: (html: string) => void;
-  demandId: string;
+  demandId?: string;
+  uploadPathPrefix?: string;
   placeholder?: string;
   minHeight?: number;
   className?: string;
@@ -49,6 +50,7 @@ export function RichTextEditor({
   value,
   onSave,
   demandId,
+  uploadPathPrefix,
   placeholder,
   minHeight = 80,
   className,
@@ -61,21 +63,24 @@ export function RichTextEditor({
   const handleImageFile = useCallback(
     async (editor: Editor, file: File) => {
       if (!file.type.startsWith("image/")) return false;
+      if (!uploadPathPrefix && !demandId) {
+        toast.error("Não foi possível enviar a imagem (contexto ausente)");
+        return false;
+      }
       setUploading(true);
       try {
-        const { storagePath, signedUrl } = await uploadInlineImage(demandId, file);
+        const { storagePath, signedUrl } = uploadPathPrefix
+          ? await uploadInlineImage(uploadPathPrefix, file, { isPathPrefix: true })
+          : await uploadInlineImage(demandId!, file);
         editor
           .chain()
           .focus()
           .setImage({ src: signedUrl, alt: file.name } as { src: string; alt?: string })
           .run();
-        // Annotate the just-inserted image with its storage path so we can re-sign later.
-        // Tiptap's Image extension doesn't accept custom attrs by default; do it via DOM.
         queueMicrotask(() => {
           const dom = editor.view.dom as HTMLElement;
           const imgs = dom.querySelectorAll<HTMLImageElement>(`img[src="${signedUrl}"]`);
           imgs.forEach((img) => img.setAttribute("data-storage-path", storagePath));
-          // Trigger an update so the new attribute is persisted
           editor.commands.focus();
         });
         return true;
@@ -86,7 +91,7 @@ export function RichTextEditor({
         setUploading(false);
       }
     },
-    [demandId],
+    [demandId, uploadPathPrefix],
   );
 
   const editor = useEditor({
