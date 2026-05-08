@@ -137,7 +137,7 @@ export function RichTextEditor({
       },
     },
     onUpdate: ({ editor: ed }) => {
-      const html = DOMPurify.sanitize(ed.getHTML(), SANITIZE_OPTIONS) as string;
+      const html = String(DOMPurify.sanitize(ed.getHTML(), SANITIZE_OPTIONS));
       if (debounceRef.current) clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(() => {
         if (html !== lastSavedRef.current) {
