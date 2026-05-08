@@ -70,7 +70,9 @@ export interface ProjectDemandRow {
 
 const PROJECT_SELECT = `
   id, title, description, owner_id, due_date, original_due_date, hours_estimated,
-  cancelled_at, cancelled_by, workspace, client_id, is_internal, created_at, updated_at,
+  cancelled_at, cancelled_by, workspace, client_id, is_internal,
+  planned_start_date, planned_end_date, actual_start_date, actual_end_date,
+  created_at, updated_at,
   user_profiles!projects_owner_id_fkey(id, full_name, email),
   clients(id, name)
 `;
