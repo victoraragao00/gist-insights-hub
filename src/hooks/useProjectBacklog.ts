@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
 
-export type BacklogStatus = "open" | "converted" | "discarded";
+export type BacklogStatus = "aguardando_priorizacao" | "aberto" | "concluido" | "cancelado";
 
 export interface BacklogItem {
   id: string;
@@ -100,7 +100,7 @@ export function useMarkBacklogConverted(projectId: string | undefined) {
       const { error } = await supabase
         .from("project_backlog_items")
         .update({
-          status: "converted",
+          status: "aberto",
           converted_demand_id: demandId,
           converted_at: new Date().toISOString(),
         })

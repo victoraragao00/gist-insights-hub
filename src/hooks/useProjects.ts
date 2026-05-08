@@ -308,6 +308,7 @@ interface UpdateProjectInput {
     description: string | null;
     due_date: string | null;
     client_id: string | null;
+    owner_id: string;
     hours_estimated: number | null;
   }>;
 }

@@ -15,7 +15,10 @@ import {
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Plus, MoreHorizontal, FileText, ArrowRight, Loader2, Trash2, Sparkles, Ban } from "lucide-react";
+import {
+  Plus, MoreHorizontal, FileText, ArrowRight, Loader2, Trash2, Sparkles,
+  Ban, CheckCircle2, RotateCcw, Clock,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { RichTextEditor } from "@/components/demands/RichTextEditor";
 import { CreateDemandDialog } from "@/components/demands/CreateDemandDialog";
@@ -36,16 +39,26 @@ interface Props {
 }
 
 const STATUS_LABEL: Record<BacklogStatus, string> = {
-  open: "Aberto",
-  converted: "Convertido",
-  discarded: "Descartado",
+  aguardando_priorizacao: "Aguardando priorização",
+  aberto: "Aberto",
+  concluido: "Concluído",
+  cancelado: "Cancelado",
 };
 
 const STATUS_STYLES: Record<BacklogStatus, string> = {
-  open: "bg-muted text-muted-foreground",
-  converted: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200",
-  discarded: "bg-muted text-muted-foreground line-through",
+  aguardando_priorizacao: "bg-muted text-muted-foreground",
+  aberto: "bg-primary/10 text-primary",
+  concluido: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200",
+  cancelado: "bg-muted text-muted-foreground line-through",
 };
+
+const FILTER_ORDER: Array<BacklogStatus | "all"> = [
+  "aguardando_priorizacao",
+  "aberto",
+  "concluido",
+  "cancelado",
+  "all",
+];
 
 export function ProjectBacklogTab({ projectId, clientId, workspace = "tech" }: Props) {
   const { data: items = [], isLoading } = useProjectBacklog(projectId);
@@ -54,7 +67,7 @@ export function ProjectBacklogTab({ projectId, clientId, workspace = "tech" }: P
   const deleteItem = useDeleteBacklogItem(projectId);
   const markConverted = useMarkBacklogConverted(projectId);
 
-  const [filter, setFilter] = useState<BacklogStatus | "all">("open");
+  const [filter, setFilter] = useState<BacklogStatus | "all">("aguardando_priorizacao");
   const [newTitle, setNewTitle] = useState("");
   const [editing, setEditing] = useState<BacklogItem | null>(null);
   const [convertingItem, setConvertingItem] = useState<BacklogItem | null>(null);
@@ -82,25 +95,19 @@ export function ProjectBacklogTab({ projectId, clientId, workspace = "tech" }: P
     );
   };
 
+  const setStatus = (item: BacklogItem, status: BacklogStatus) => {
+    updateItem.mutate({ id: item.id, status });
+  };
+
   if (isLoading) {
     return <div className="py-12 text-center text-sm text-muted-foreground">Carregando...</div>;
-  }
-
-  if (!clientId) {
-    return (
-      <div className="rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground text-center">
-        O backlog converte tópicos em demandas, e demandas precisam de um cliente.
-        Este projeto não possui cliente vinculado, então a conversão está indisponível.
-        Você ainda pode usar a aba <strong>Documentos</strong> para registrar escopo e notas.
-      </div>
-    );
   }
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <div className="flex gap-1">
-          {(["open", "converted", "discarded", "all"] as const).map((s) => (
+        <div className="flex gap-1 flex-wrap">
+          {FILTER_ORDER.map((s) => (
             <button
               key={s}
               type="button"
@@ -140,26 +147,29 @@ export function ProjectBacklogTab({ projectId, clientId, workspace = "tech" }: P
 
       {filtered.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground text-sm border border-dashed border-border rounded-lg">
-          {filter === "open"
-            ? "Nenhum tópico aberto. Adicione algo que ainda vai virar demanda."
-            : `Nenhum tópico ${STATUS_LABEL[filter as BacklogStatus]?.toLowerCase() ?? ""}.`}
+          {filter === "aguardando_priorizacao"
+            ? "Nenhum tópico aguardando priorização. Adicione algo que ainda vai virar demanda."
+            : `Nenhum tópico ${filter === "all" ? "" : STATUS_LABEL[filter as BacklogStatus]?.toLowerCase()}.`}
         </div>
       ) : (
         <ul className="divide-y divide-border border border-border rounded-lg overflow-hidden">
           {filtered.map((item) => {
-            const isConverted = item.status === "converted";
-            const isDiscarded = item.status === "discarded";
-            const isOpen = item.status === "open";
+            const isWaiting = item.status === "aguardando_priorizacao";
+            const isOpen = item.status === "aberto";
+            const isDone = item.status === "concluido";
+            const isCancelled = item.status === "cancelado";
+            const editable = isWaiting || isDone || isCancelled;
+            const canConvert = isWaiting && !!clientId;
             return (
               <li key={item.id} className="flex items-center gap-3 px-3 py-2 hover:bg-muted/30 group">
                 <button
                   type="button"
-                  onClick={() => setEditing(item)}
+                  onClick={() => editable && setEditing(item)}
                   className="flex-1 min-w-0 text-left flex items-center gap-2"
-                  disabled={!isOpen}
+                  disabled={!editable}
                 >
                   {item.notes && <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0" />}
-                  <span className={cn("text-sm truncate", isDiscarded && "text-muted-foreground line-through")}>
+                  <span className={cn("text-sm truncate", isCancelled && "text-muted-foreground line-through")}>
                     {item.title}
                   </span>
                 </button>
@@ -168,7 +178,7 @@ export function ProjectBacklogTab({ projectId, clientId, workspace = "tech" }: P
                   {STATUS_LABEL[item.status]}
                 </Badge>
 
-                {isConverted && item.converted_demand_id && (
+                {isOpen && item.converted_demand_id && (
                   <RouterLink
                     to={`/demands/${item.converted_demand_id}`}
                     className="text-xs text-primary inline-flex items-center gap-1 hover:underline shrink-0"
@@ -177,7 +187,7 @@ export function ProjectBacklogTab({ projectId, clientId, workspace = "tech" }: P
                   </RouterLink>
                 )}
 
-                {isOpen && (
+                {canConvert && (
                   <Button
                     size="sm"
                     variant="outline"
@@ -196,23 +206,29 @@ export function ProjectBacklogTab({ projectId, clientId, workspace = "tech" }: P
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    {isOpen && (
+                    {editable && (
                       <DropdownMenuItem onClick={() => setEditing(item)}>
                         Editar
                       </DropdownMenuItem>
                     )}
-                    {isOpen && (
-                      <DropdownMenuItem
-                        onClick={() => updateItem.mutate({ id: item.id, status: "discarded" })}
-                      >
-                        <Ban className="h-3.5 w-3.5 mr-2" /> Descartar
+                    {!isWaiting && !isOpen && (
+                      <DropdownMenuItem onClick={() => setStatus(item, "aguardando_priorizacao")}>
+                        <RotateCcw className="h-3.5 w-3.5 mr-2" /> Reabrir (aguardando)
                       </DropdownMenuItem>
                     )}
-                    {isDiscarded && (
-                      <DropdownMenuItem
-                        onClick={() => updateItem.mutate({ id: item.id, status: "open" })}
-                      >
-                        Reabrir
+                    {!isDone && (
+                      <DropdownMenuItem onClick={() => setStatus(item, "concluido")}>
+                        <CheckCircle2 className="h-3.5 w-3.5 mr-2" /> Marcar como concluído
+                      </DropdownMenuItem>
+                    )}
+                    {!isCancelled && (
+                      <DropdownMenuItem onClick={() => setStatus(item, "cancelado")}>
+                        <Ban className="h-3.5 w-3.5 mr-2" /> Cancelar
+                      </DropdownMenuItem>
+                    )}
+                    {!isOpen && item.converted_demand_id && (
+                      <DropdownMenuItem onClick={() => setStatus(item, "aberto")}>
+                        <Clock className="h-3.5 w-3.5 mr-2" /> Voltar para Aberto
                       </DropdownMenuItem>
                     )}
                     <DropdownMenuSeparator />
@@ -229,7 +245,7 @@ export function ProjectBacklogTab({ projectId, clientId, workspace = "tech" }: P
                         <AlertDialogHeader>
                           <AlertDialogTitle>Excluir tópico?</AlertDialogTitle>
                           <AlertDialogDescription>
-                            "{item.title}" será removido permanentemente. Demandas convertidas
+                            "{item.title}" será removido permanentemente. Demandas vinculadas
                             não são afetadas.
                           </AlertDialogDescription>
                         </AlertDialogHeader>
@@ -292,7 +308,6 @@ export function ProjectBacklogTab({ projectId, clientId, workspace = "tech" }: P
           defaultProjectId={projectId}
           defaultTitle={convertingItem.title}
           defaultDescriptionHtml={convertingItem.notes ?? ""}
-          workspace={workspace}
           onCreated={(demandId) => {
             markConverted.mutate({ id: convertingItem.id, demandId });
             setConvertingItem(null);
