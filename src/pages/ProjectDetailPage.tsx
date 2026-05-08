@@ -59,6 +59,7 @@ export default function ProjectDetailPage() {
   const { data: stats } = useProjectStats(id);
   const updateProject = useUpdateProject();
   const cancelProject = useCancelProject();
+  const deleteProject = useDeleteProject();
   const { data: projectAgendas = [] } = useProjectAgendas(id);
 
   const [titleEdit, setTitleEdit] = useState("");
