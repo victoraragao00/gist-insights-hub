@@ -73,6 +73,11 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaul
   const [createdDemandId, setCreatedDemandId] = useState<string | null>(null);
   const [showLinkDialog, setShowLinkDialog] = useState(false);
 
+  // Stable draft id used as inline-image upload prefix before the demand exists.
+  const draftIdRef = useRef<string>("");
+  if (!draftIdRef.current) draftIdRef.current = crypto.randomUUID();
+  const draftPrefix = `demands/_drafts/${draftIdRef.current}/inline`;
+
   // Pre-fill area if there's exactly 1 area available for this workspace
   useEffect(() => {
     if (areaId || areas.length === 0) return;
