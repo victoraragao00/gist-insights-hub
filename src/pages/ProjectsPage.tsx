@@ -1,17 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, ChevronDown, ChevronRight, List, FolderTree } from "lucide-react";
+import { Plus, ChevronDown, ChevronRight, List, FolderTree, CalendarDays } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useProjects, useProjectStats, type ProjectRow } from "@/hooks/useProjects";
 import { ProjectCard } from "@/components/projects/ProjectCard";
 import { CreateProjectDialog } from "@/components/projects/CreateProjectDialog";
+import { ProjectsCalendarView, type CalendarMode } from "@/components/projects/ProjectsCalendarView";
 import { statusConfig, type ProjectStatus } from "@/lib/projectStatus";
 
 const FILTERS = ["Todos", "Planejamento", "Ativo", "Concluído"] as const;
 type Filter = (typeof FILTERS)[number];
-type ViewMode = "list" | "grouped";
+type ViewMode = "list" | "grouped" | "calendar";
 
 const VIEW_KEY = "projects:viewMode";
+const CAL_MODE_KEY = "projects:calendarMode";
 
 export default function ProjectsPage() {
   const { data: projects = [], isLoading } = useProjects("tech");
@@ -20,12 +22,21 @@ export default function ProjectsPage() {
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     if (typeof window === "undefined") return "list";
     const stored = window.localStorage.getItem(VIEW_KEY);
-    return stored === "grouped" ? "grouped" : "list";
+    if (stored === "grouped" || stored === "calendar") return stored;
+    return "list";
+  });
+  const [calendarMode, setCalendarMode] = useState<CalendarMode>(() => {
+    if (typeof window === "undefined") return "planned";
+    const stored = window.localStorage.getItem(CAL_MODE_KEY);
+    return stored === "actual" ? "actual" : "planned";
   });
 
   useEffect(() => {
     window.localStorage.setItem(VIEW_KEY, viewMode);
   }, [viewMode]);
+  useEffect(() => {
+    window.localStorage.setItem(CAL_MODE_KEY, calendarMode);
+  }, [calendarMode]);
 
   // Build groups by client (only used when viewMode === "grouped")
   const groups = useMemo(() => {
@@ -106,6 +117,18 @@ export default function ProjectsPage() {
             )}
           >
             <FolderTree className="h-3.5 w-3.5" /> Agrupado por cliente
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode("calendar")}
+            className={cn(
+              "inline-flex items-center gap-1.5 text-xs px-3 py-1 rounded-full transition-colors",
+              viewMode === "calendar"
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            <CalendarDays className="h-3.5 w-3.5" /> Calendário
           </button>
         </div>
       </div>
