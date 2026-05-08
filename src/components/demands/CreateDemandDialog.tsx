@@ -434,7 +434,7 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaul
         </div>
 
         <DialogFooter className="mt-4">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button variant="outline" onClick={handleCancel}>Cancelar</Button>
           <Button onClick={handleSubmit} disabled={!canSubmit || createMutation.isPending}>
             {createMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
             Criar
