@@ -31,6 +31,7 @@ export interface DemandFilters {
   workspace?: "cx" | "tech";
   mine_user_id?: string;
   mine_collab_ids?: string[];
+  assignee_ids?: string[];
 }
 
 // ── Queries ──
