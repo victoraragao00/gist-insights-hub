@@ -35,6 +35,7 @@ import {
   useMyCollaboratorDemandIds,
 } from "@/hooks/useDemandCollaborators";
 import { useBlockerTypes, type BlockerType } from "@/hooks/useBlockerTypes";
+import { MultiAssigneeFilter } from "@/components/demands/MultiAssigneeFilter";
 
 // ── Filter Combobox ──
 
@@ -113,6 +114,16 @@ const DemandsPage = () => {
   const [filterPriority, setFilterPriority] = useState<string>("");
   const [filterArea, setFilterArea] = useState<string>("");
   const [myTasksOnly, setMyTasksOnly] = useState(false);
+  const [filterAssigneeIds, setFilterAssigneeIds] = useState<string[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const raw = window.localStorage.getItem("demands:assignee_ids");
+      return raw ? (JSON.parse(raw) as string[]) : [];
+    } catch { return []; }
+  });
+  useEffect(() => {
+    window.localStorage.setItem("demands:assignee_ids", JSON.stringify(filterAssigneeIds));
+  }, [filterAssigneeIds]);
 
   const { data: myCollabIds = [] } = useMyCollaboratorDemandIds(myTasksOnly);
 
@@ -130,7 +141,8 @@ const DemandsPage = () => {
     workspace: activeWorkspace,
     mine_user_id: myTasksOnly && user?.id ? user.id : undefined,
     mine_collab_ids: myTasksOnly ? myCollabIds : undefined,
-  }), [debouncedSearch, filterClient, filterType, filterPriority, filterArea, activeWorkspace, myTasksOnly, user?.id, myCollabIds]);
+    assignee_ids: !myTasksOnly && filterAssigneeIds.length > 0 ? filterAssigneeIds : undefined,
+  }), [debouncedSearch, filterClient, filterType, filterPriority, filterArea, activeWorkspace, myTasksOnly, user?.id, myCollabIds, filterAssigneeIds]);
 
   const { data: demands = [], isLoading: demandsLoading } = useDemands(filters);
   const moveMutation = useMoveDemand();
@@ -332,6 +344,11 @@ const DemandsPage = () => {
                 ...areas.map((a) => ({ value: a.id, label: a.name })),
               ]}
               className="w-36"
+            />
+            <MultiAssigneeFilter
+              value={filterAssigneeIds}
+              onChange={setFilterAssigneeIds}
+              className="w-44"
             />
             <button
               type="button"

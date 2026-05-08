@@ -103,7 +103,7 @@ export default function RFIsPage() {
             <thead>
               <tr className="border-b border-border">
                 <th className="text-left py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Código</th>
-                <th className="text-left py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Demanda</th>
+                <th className="text-left py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Vinculado a</th>
                 <th className="text-left py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Cliente</th>
                 <th className="text-left py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Workspace</th>
                 <th className="text-left py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Status</th>
@@ -114,9 +114,15 @@ export default function RFIsPage() {
             <tbody>
               {rfis.map((rfi) => {
                 const demand = rfi.demands as { id: string; title: string; workspace?: string; clients?: { name: string } | null } | null;
+                const project = rfi.projects as { id: string; title: string; workspace?: string; is_internal?: boolean; clients?: { name: string } | null } | null;
                 const status = rfi.rfi_statuses;
                 const assignee = rfi.user_profiles;
-                const isTech = demand?.workspace === "tech";
+                const linkedToProject = !!project;
+                const workspaceLabel = linkedToProject ? project?.workspace : demand?.workspace;
+                const isTech = workspaceLabel === "tech";
+                const cliName = linkedToProject
+                  ? (project?.is_internal ? "Interno" : (project?.clients?.name ?? "—"))
+                  : (demand?.clients?.name ?? "—");
                 return (
                   <tr
                     key={rfi.id}
@@ -124,8 +130,18 @@ export default function RFIsPage() {
                     onClick={() => setSelectedRfiId(rfi.id)}
                   >
                     <td className="py-3 font-mono text-xs font-medium">{rfi.rfi_number}</td>
-                    <td className="py-3 max-w-xs truncate">{demand?.title ?? "—"}</td>
-                    <td className="py-3 text-muted-foreground">{demand?.clients?.name ?? "—"}</td>
+                    <td className="py-3 max-w-xs truncate">
+                      <span className={cn(
+                        "inline-block text-[10px] px-1.5 py-0.5 rounded mr-1.5 font-medium uppercase tracking-wide",
+                        linkedToProject
+                          ? "bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-900"
+                          : "bg-muted text-muted-foreground border border-border",
+                      )}>
+                        {linkedToProject ? "Projeto" : "Demanda"}
+                      </span>
+                      <span className="truncate">{linkedToProject ? project?.title : (demand?.title ?? "—")}</span>
+                    </td>
+                    <td className="py-3 text-muted-foreground">{cliName}</td>
                     <td className="py-3">
                       <span className={cn(
                         "text-[11px] px-2 py-0.5 rounded-full border font-medium",
