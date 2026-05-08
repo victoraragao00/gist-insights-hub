@@ -120,6 +120,7 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaul
         expected_result: expectedResult || undefined,
         notes: notes || undefined,
         workspace,
+        project_id: defaultProjectId ?? undefined,
       },
       {
         onSuccess: async (data) => {
@@ -129,6 +130,7 @@ export function CreateDemandDialog({ open, onOpenChange, defaultColumnId, defaul
             resetForm();
             return;
           }
+          if (onCreated) onCreated(newId);
 
           // Side-effects: optional RFI + external link.
           // Do not block the post-creation view if either fails — toasts will surface errors.
