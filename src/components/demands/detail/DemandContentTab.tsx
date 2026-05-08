@@ -4,7 +4,6 @@ import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -21,8 +20,8 @@ import {
   useSignedAttachmentUrls,
 } from "@/hooks/useDemandAttachments";
 import { useDemandAnalysis, useAnalyzeDemand } from "@/hooks/useDemandAnalysis";
-import { useAutoResize } from "@/hooks/useAutoResize";
 import { AttachmentThumbnail } from "./AttachmentThumbnail";
+import { RichTextEditor } from "../RichTextEditor";
 
 
 const ACCEPTED_FILE_TYPES = "image/*,application/pdf,.doc,.docx,.xls,.xlsx,.csv";
