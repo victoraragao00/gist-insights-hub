@@ -229,3 +229,22 @@ export function useDeleteAttachment() {
     onError: (err) => toast.error(err instanceof Error ? err.message : "Erro ao remover anexo"),
   });
 }
+
+/**
+ * Remove all files under a draft inline image prefix (e.g. `demands/_drafts/<draftId>/inline`).
+ * Best-effort: errors are logged, never thrown.
+ */
+export async function cleanupDraftInlineImages(prefix: string): Promise<void> {
+  const cleanPrefix = prefix.replace(/\/+$/, "");
+  const { data, error } = await supabase.storage
+    .from("demand-attachments")
+    .list(cleanPrefix, { limit: 1000 });
+  if (error) {
+    console.warn("cleanupDraftInlineImages list error:", error.message);
+    return;
+  }
+  if (!data || data.length === 0) return;
+  const paths = data.map((f) => `${cleanPrefix}/${f.name}`);
+  const { error: rmErr } = await supabase.storage.from("demand-attachments").remove(paths);
+  if (rmErr) console.warn("cleanupDraftInlineImages remove error:", rmErr.message);
+}
