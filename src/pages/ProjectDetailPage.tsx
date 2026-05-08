@@ -331,6 +331,7 @@ export default function ProjectDetailPage() {
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-3">
                 Ações
               </p>
+              {!project.cancelled_at && (
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button
