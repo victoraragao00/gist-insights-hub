@@ -5,10 +5,12 @@ import { ptBR } from "date-fns/locale";
 import {
   ChevronLeft,
   XCircle,
+  Trash2,
   Building2,
   Clock,
   User,
   AlertTriangle,
+
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -38,6 +40,7 @@ import {
   useUpdateProject,
   useUpdateProjectDueDate,
   useCancelProject,
+  useDeleteProject,
   type ProjectRow,
 } from "@/hooks/useProjects";
 import { useProjectAgendas } from "@/hooks/useMeetingAgendas";
@@ -56,6 +59,7 @@ export default function ProjectDetailPage() {
   const { data: stats } = useProjectStats(id);
   const updateProject = useUpdateProject();
   const cancelProject = useCancelProject();
+  const deleteProject = useDeleteProject();
   const { data: projectAgendas = [] } = useProjectAgendas(id);
 
   const [titleEdit, setTitleEdit] = useState("");
@@ -322,11 +326,12 @@ export default function ProjectDetailPage() {
             </section>
           )}
 
-          {isOwner && !project.cancelled_at && (
+          {isOwner && (
             <section className="rounded-lg border border-border bg-card p-4">
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-3">
                 Ações
               </p>
+              {!project.cancelled_at && (
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button
@@ -357,6 +362,43 @@ export default function ProjectDetailPage() {
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
+              </AlertDialog>
+              )}
+
+              <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full mt-2 text-destructive border-destructive/30 hover:bg-destructive/10"
+                    >
+                      <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                      Excluir projeto
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Excluir projeto?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Esta ação é <strong>permanente</strong> e não pode ser desfeita.
+                        As demandas vinculadas <strong>não serão apagadas</strong> —
+                        apenas perderão o vínculo com este projeto. Reuniões internas
+                        associadas também serão desvinculadas.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Voltar</AlertDialogCancel>
+                      <AlertDialogAction
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        onClick={async () => {
+                          await deleteProject.mutateAsync({ id });
+                          navigate("/projects");
+                        }}
+                      >
+                        Sim, excluir definitivamente
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
               </AlertDialog>
             </section>
           )}

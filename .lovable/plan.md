@@ -1,39 +1,25 @@
-## Editor rico com imagens no diálogo de criação de demanda
+## Excluir projeto
 
-Hoje o `RichTextEditor` (com colar/arrastar imagens) só está disponível na aba de detalhes da demanda já criada (`DemandContentTab.tsx`). No diálogo "Nova Demanda" (`CreateDemandDialog.tsx`), os campos **Descrição**, **Resultado Esperado** e **Notas** ainda usam `<Textarea>`/`<Input>` simples — sem suporte a imagens inline.
+Hoje só existe **Cancelar projeto** (soft — `cancel_project` RPC marca `cancelled_at`). O usuário precisa também conseguir **excluir** definitivamente.
 
-### O que será feito
+A RLS já permite: `projects_delete` policy autoriza `DELETE` para o `owner_id = auth.uid()`. As FKs já estão preparadas:
+- `project_members.project_id` → `ON DELETE CASCADE`
+- `demands.project_id` → `ON DELETE SET NULL` (demandas vinculadas perdem o vínculo, não são apagadas)
+- `meeting_agendas.project_id` → `ON DELETE SET NULL`
 
-Substituir os campos de texto livre do `CreateDemandDialog` pelo mesmo `RichTextEditor` usado na edição, de modo que o usuário possa colar/arrastar imagens já durante a criação.
-
-### Desafio técnico (upload antes do ID existir)
-
-O upload inline atual usa `demandId` no caminho do storage (`demands/<id>/inline/...`). Como a demanda ainda não existe na criação, vamos usar um **ID temporário** (UUID gerado no client via `crypto.randomUUID()`) como pasta de staging:
-
-- Caminho de upload: `demands/_drafts/<draftId>/inline/<uuid>.<ext>`
-- Após `createMutation` retornar com sucesso e o novo `demand.id`, executar um passo de **promoção**: mover (copiar + deletar) os arquivos da pasta `_drafts/<draftId>/` para `demands/<newId>/inline/` e atualizar os atributos `data-storage-path` no HTML salvo (replace simples no string) antes ou logo depois do insert.
-
-Alternativa mais simples (preferida): **manter o caminho `_drafts/<draftId>` no HTML salvo**. As imagens continuam acessíveis via signed URL (mesmo bucket, mesma RLS de leitura por usuário autenticado). Sem job de movimentação. Trade-off: arquivos órfãos se o usuário cancelar — limpamos no `onOpenChange(false)` chamando `storage.remove()` do prefixo do draft.
-
-Vamos com a alternativa simples (drafts permanentes + cleanup ao cancelar).
+Ou seja, **nenhuma migration é necessária**. Só falta UI + hook.
 
 ### Mudanças
 
-**`src/hooks/useDemandAttachments.ts`**
-- Generalizar `useUploadInlineImage` para aceitar um `pathPrefix` (ex: `demands/<id>/inline` ou `demands/_drafts/<draftId>/inline`) em vez de receber só `demandId`.
-- Adicionar helper `useCleanupDraftInlineImages(draftId)` que lista e remove arquivos do prefixo de draft.
+**`src/hooks/useProjects.ts`**
+- Adicionar `useDeleteProject()` mutation: `supabase.from("projects").delete().eq("id", id)`. Em sucesso, invalidar `["projects"]`, `["project_demands"]`, `["unassigned_demands"]`, `["demands"]`, `["agendas"]` e mostrar toast.
 
-**`src/components/demands/RichTextEditor.tsx`**
-- Aceitar prop opcional `uploadPathPrefix?: string` (default mantém comportamento atual baseado em `demandId`).
-- Quando recebido, usa esse prefixo no upload em vez de `demands/<demandId>/inline`.
-
-**`src/components/demands/CreateDemandDialog.tsx`**
-- Gerar `draftId` (UUID) com `useRef` na primeira abertura do diálogo.
-- Substituir os 3 `<Textarea>`/`<Input>` (Descrição, Resultado Esperado, Notas) por `<RichTextEditor uploadPathPrefix={`demands/_drafts/${draftId}/inline`} />`.
-- No `resetForm()` e ao fechar sem criar (`onOpenChange(false)` antes de ter `createdDemandId`), chamar cleanup das imagens do draft.
-- Após sucesso da criação, **não** limpar — o HTML salvo já referencia esses paths e continuará renderizando via signed URL.
+**`src/pages/ProjectDetailPage.tsx`**
+- Ao lado do botão "Cancelar projeto" (linha ~337), adicionar botão **"Excluir projeto"** (variante destructive/ghost, ícone `Trash2`), visível apenas para `isOwner`.
+- Envolver em `AlertDialog` com texto explicando que a ação é **permanente**, que demandas vinculadas serão **desvinculadas** (não apagadas) e reuniões internas perderão o vínculo.
+- Ao confirmar: chamar `deleteProject.mutateAsync({ id })` e em seguida `navigate("/projects")`.
 
 ### Verificação
-- Abrir "Nova Demanda" → colar imagem na Descrição → criar → abrir detalhes → imagem aparece.
-- Abrir "Nova Demanda" → colar imagem → cancelar → arquivos do draft são removidos do storage.
-- Campos vazios continuam salvando como `null`/string vazia normalmente.
+- Owner abre projeto → vê "Excluir projeto" → confirma → volta para `/projects`, projeto sumiu da lista.
+- Demandas que estavam no projeto continuam existindo, agora sem `project_id`, e voltam a aparecer em "Demandas não vinculadas".
+- Não-owner não vê o botão (e o RLS bloquearia mesmo se forçado).
