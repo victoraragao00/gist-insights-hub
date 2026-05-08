@@ -1771,6 +1771,54 @@ export type Database = {
           },
         ]
       }
+      project_date_changes: {
+        Row: {
+          changed_at: string
+          changed_by: string | null
+          field: string
+          id: string
+          new_value: string | null
+          note: string | null
+          old_value: string | null
+          project_id: string
+        }
+        Insert: {
+          changed_at?: string
+          changed_by?: string | null
+          field: string
+          id?: string
+          new_value?: string | null
+          note?: string | null
+          old_value?: string | null
+          project_id: string
+        }
+        Update: {
+          changed_at?: string
+          changed_by?: string | null
+          field?: string
+          id?: string
+          new_value?: string | null
+          note?: string | null
+          old_value?: string | null
+          project_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_date_changes_changed_by_fkey"
+            columns: ["changed_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_date_changes_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_documents: {
         Row: {
           category: string
@@ -1875,6 +1923,8 @@ export type Database = {
       }
       projects: {
         Row: {
+          actual_end_date: string | null
+          actual_start_date: string | null
           cancelled_at: string | null
           cancelled_by: string | null
           client_id: string | null
@@ -1886,11 +1936,15 @@ export type Database = {
           is_internal: boolean
           original_due_date: string | null
           owner_id: string
+          planned_end_date: string | null
+          planned_start_date: string | null
           title: string
           updated_at: string
           workspace: string
         }
         Insert: {
+          actual_end_date?: string | null
+          actual_start_date?: string | null
           cancelled_at?: string | null
           cancelled_by?: string | null
           client_id?: string | null
@@ -1902,11 +1956,15 @@ export type Database = {
           is_internal?: boolean
           original_due_date?: string | null
           owner_id: string
+          planned_end_date?: string | null
+          planned_start_date?: string | null
           title: string
           updated_at?: string
           workspace?: string
         }
         Update: {
+          actual_end_date?: string | null
+          actual_start_date?: string | null
           cancelled_at?: string | null
           cancelled_by?: string | null
           client_id?: string | null
@@ -1918,6 +1976,8 @@ export type Database = {
           is_internal?: boolean
           original_due_date?: string | null
           owner_id?: string
+          planned_end_date?: string | null
+          planned_start_date?: string | null
           title?: string
           updated_at?: string
           workspace?: string
@@ -1979,11 +2039,12 @@ export type Database = {
           budget_value: number | null
           created_at: string | null
           created_by: string
-          demand_id: string
+          demand_id: string | null
           description: string | null
           due_date: string | null
           id: string
           link: string | null
+          project_id: string | null
           rfi_number: string
           rfi_seq_number: number
           status_id: string | null
@@ -1995,11 +2056,12 @@ export type Database = {
           budget_value?: number | null
           created_at?: string | null
           created_by: string
-          demand_id: string
+          demand_id?: string | null
           description?: string | null
           due_date?: string | null
           id?: string
           link?: string | null
+          project_id?: string | null
           rfi_number: string
           rfi_seq_number: number
           status_id?: string | null
@@ -2011,11 +2073,12 @@ export type Database = {
           budget_value?: number | null
           created_at?: string | null
           created_by?: string
-          demand_id?: string
+          demand_id?: string | null
           description?: string | null
           due_date?: string | null
           id?: string
           link?: string | null
+          project_id?: string | null
           rfi_number?: string
           rfi_seq_number?: number
           status_id?: string | null
@@ -2033,8 +2096,15 @@ export type Database = {
           {
             foreignKeyName: "rfis_demand_id_fkey"
             columns: ["demand_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "demands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rfis_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
           {
@@ -2319,6 +2389,8 @@ export type Database = {
           p_workspace?: string
         }
         Returns: {
+          actual_end_date: string | null
+          actual_start_date: string | null
           cancelled_at: string | null
           cancelled_by: string | null
           client_id: string | null
@@ -2330,6 +2402,8 @@ export type Database = {
           is_internal: boolean
           original_due_date: string | null
           owner_id: string
+          planned_end_date: string | null
+          planned_start_date: string | null
           title: string
           updated_at: string
           workspace: string
