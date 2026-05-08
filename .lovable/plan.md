@@ -1,57 +1,89 @@
-## Três pendências em Projetos
+## Escopo confirmado
 
-### 1. Status do Backlog (4 estados) com transições manuais
+Seis ajustes em Projetos/Demandas/RFIs.
 
-Hoje o backlog tem 3 estados (`open`, `converted`, `discarded`). Vamos renomear/expandir para 4:
+---
 
-| Novo status | Quando | Origem (migração) |
-|---|---|---|
-| `aguardando_priorizacao` | Tópico ainda não virou demanda | mapeia de `open` |
-| `aberto` | Existe demanda vinculada | mapeia de `converted` (já tem `converted_demand_id`) |
-| `concluido` | Resolvido sem demanda (ou marcado manualmente como pronto) | novo |
-| `cancelado` | Não vai acontecer | mapeia de `discarded` |
+## 1. RFI vinculada a Demanda OU Projeto (XOR)
 
-**Regras de transição**
-- Criar tópico → `aguardando_priorizacao`
-- "Converter em demanda" → `aberto` + grava `converted_demand_id` (já existe)
-- Menu `⋯` permite mover livremente entre os 4 (com confirmação ao "Cancelar" e ao limpar status de um item já convertido)
-- Filtros de aba: `Aguardando priorização` (default) · `Aberto` · `Concluído` · `Cancelado` · `Todos`
-- Cores: aguardando = muted, aberto = primary suave, concluído = emerald, cancelado = muted/line-through
+Migration em `rfis`:
+- `ALTER COLUMN demand_id DROP NOT NULL`
+- `DROP CONSTRAINT rfis_demand_id_key` (UNIQUE)
+- `ADD COLUMN project_id uuid REFERENCES projects(id) ON DELETE CASCADE`
+- `ADD CONSTRAINT rfis_xor CHECK ((demand_id IS NOT NULL) <> (project_id IS NOT NULL))` — exatamente um.
+- Índice `idx_rfis_project_id`.
+- Atualizar RLS para também permitir acesso quando `project_id` aponta para projeto cujo `client_id` está em `user_accessible_client_ids` (ou é projeto interno acessível).
 
-**Backend**
-- Migration: `ALTER TABLE project_backlog_items` — atualizar CHECK constraint para os 4 novos valores; `UPDATE` em massa para remapear (`open→aguardando_priorizacao`, `converted→aberto`, `discarded→cancelado`); mudar default para `aguardando_priorizacao`.
-- Hook `useProjectBacklog.ts`: atualizar tipo `BacklogStatus`, ajustar `useMarkBacklogConverted` (status `aberto`), expor `useSetBacklogStatus`.
+Frontend:
+- `useRfis.ts`: aceitar `project_id`; novo hook `useProjectRfis(projectId)`.
+- `RfiDetailSheet`: mostra "Vinculado a: Demanda X" ou "Projeto Y" (apenas leitura do vínculo — definido na criação).
+- `CreateRfiDialog`: recebe contexto (`{ demandId }` ou `{ projectId }`) e bloqueia o outro campo.
+- Nova aba **RFIs** em `ProjectDetailPage` com botão "Nova RFI" pré-vinculada ao projeto.
+- `RFIsPage` (lista global): coluna "Vinculado a" mostrando Demanda X ou Projeto Y.
 
-### 2. Editar Cliente e Owner em projeto já criado
+## 2. Filtro multi-pessoa no Kanban de Demandas
 
-No sidebar de `ProjectDetailPage`, transformar as linhas **Owner** e **Cliente** em campos editáveis (apenas para o `isOwner === true`, igual aos outros campos).
+- `useDemands.ts`: trocar `assignee_id?: string` por `assignee_ids?: string[]` em `DemandFilters`; query usa `.in("assignee_id", ids)`.
+- `DemandsPage.tsx`: novo `MultiAssigneeFilter` baseado em `Combobox` com checkboxes (memória: Combobox para listas grandes). Mantém atalho "Minhas".
+- Persistir em `localStorage` (`demands:assignees`).
+- Atualizar `useExportDemandsCSV` para aceitar a nova shape.
 
-- **Owner**: `Combobox` com `user_profiles` (mesma fonte do `UserSelect`). Ao salvar, `UPDATE projects SET owner_id`. Registra atividade.
-- **Cliente**: `Combobox` com clientes acessíveis (mesma fonte de `CreateProjectDialog`). Ao salvar, `UPDATE projects SET client_id`. Avisa via `AlertDialog` que mudar o cliente **não move demandas/backlog/documentos já existentes** — eles permanecem com o cliente anterior (apenas novos itens herdam o novo). Registra atividade.
+## 3. Datas previstas e reais em Projetos
 
-Hook: adicionar `useUpdateProject` (já pode existir parcialmente — reaproveitar) com campos `owner_id` e `client_id`.
+Migration em `projects`:
+- `ADD COLUMN planned_start_date date`
+- `ADD COLUMN planned_end_date date`
+- `ADD COLUMN actual_start_date date`
+- `ADD COLUMN actual_end_date date`
+- Backfill: `planned_end_date := due_date`, `planned_start_date := created_at::date`.
+- Manter `due_date` por compat (sincronizado com `planned_end_date` via trigger ou via app).
 
-### 3. Visualização agrupada por cliente em `/projects`
+Frontend:
+- Sidebar de `ProjectDetailPage`: 4 campos editáveis (Início previsto, Fim previsto, Início real, Fim real) com `Calendar` + Popover.
+- `useUpdateProject`: aceitar os 4 campos.
+- `ProjectCard`: mostrar range previsto.
 
-Em `ProjectsPage`, adicionar toggle ao lado dos filtros de status:
+## 4. Histórico de movimentações de datas (apenas Projetos nesta fase)
 
-```
-[ Lista ] [ Agrupado por cliente ]
-```
+Nova tabela `project_date_changes`:
+- `id`, `project_id` (FK CASCADE), `field text` (`planned_start|planned_end|actual_start|actual_end`), `old_value date`, `new_value date`, `changed_by uuid REFERENCES user_profiles(id)`, `changed_at timestamptz default now()`, `note text`.
+- RLS leitura: quem vê o projeto vê o histórico.
+- Trigger `BEFORE UPDATE` em `projects`: para cada uma das 4 colunas alteradas, insere row em `project_date_changes` com `auth.uid()`.
+- Hook `useProjectDateHistory(projectId)`.
+- Nova aba **Histórico** em `ProjectDetailPage`: timeline ordenada `desc` no formato "Fulano alterou Fim Previsto: DD/MM/AAAA → DD/MM/AAAA".
 
-- **Lista** (atual): grid de cards.
-- **Agrupado**: para cada cliente (ordem alfabética, "Internos" no fim), uma seção colapsável com header `Nome do cliente · N projetos` e o grid de cards dentro. Estado de colapso por cliente em `useState` local (default: aberto).
-- Filtro por status continua aplicando dentro de cada grupo; clientes sem projetos no filtro são ocultados.
-- Persistir preferência (lista vs agrupado) em `localStorage` chave `projects:viewMode`.
+Demandas e RFIs ficam para fase posterior.
 
-### Detalhes técnicos
+## 5. Visualização em calendário de Projetos
 
-- **Arquivos editados**:
-  - `supabase/migrations/<ts>_backlog_status_v2.sql` (CHECK + UPDATE + DEFAULT)
-  - `src/hooks/useProjectBacklog.ts` (tipos + novo hook de status)
-  - `src/components/projects/tabs/ProjectBacklogTab.tsx` (filtros, badges, menu de status)
-  - `src/hooks/useProjects.ts` (mutation update owner/client)
-  - `src/pages/ProjectDetailPage.tsx` (sidebar editável)
-  - `src/pages/ProjectsPage.tsx` (toggle + agrupamento)
-- **Sem dependências novas.**
-- **Verificação**: backlog migrado mantém todos os itens com status equivalentes; converter tópico em demanda continua funcionando e marca `aberto`; owner consegue trocar cliente/owner e a mudança aparece em Atividade; agrupamento mostra projetos do mesmo cliente juntos e respeita o filtro de status.
+- `ProjectsPage.tsx`: toggle Lista | Agrupado | **Calendário**, persistido em `localStorage` (`projects:viewMode`).
+- Sub-toggle dentro do calendário: **Previsto / Real** (`projects:calendarMode`).
+  - Previsto usa `planned_start_date` → `planned_end_date`.
+  - Real usa `actual_start_date` → `actual_end_date` (projetos sem essas datas não aparecem em modo Real).
+- Componente `ProjectsCalendarView`: vista mensal estilo Gantt do print.
+  - Header: dias do mês.
+  - Linhas: um projeto por linha, agrupado por owner (similar ao print, com header colapsável).
+  - Barras horizontais coloridas por status, com título; click navega para o detalhe.
+  - Navegação mês anterior / mês atual / próximo mês.
+- Filtros (status, owner, cliente) compartilhados com a vista de lista.
+
+---
+
+## Arquivos afetados
+
+Migrations:
+- `..._rfi_project_link_xor.sql`
+- `..._project_planned_actual_dates.sql`
+- `..._project_date_history.sql`
+
+Hooks:
+- `src/hooks/useRfis.ts`, `src/hooks/useDemands.ts`, `src/hooks/useProjects.ts`, `src/hooks/useExportDemandsCSV.ts`
+- novos: `useProjectRfis.ts`, `useProjectDateHistory.ts`
+
+Componentes / páginas:
+- `src/pages/DemandsPage.tsx` + novo `src/components/demands/MultiAssigneeFilter.tsx`
+- `src/pages/ProjectsPage.tsx` + novo `src/components/projects/ProjectsCalendarView.tsx`
+- `src/pages/ProjectDetailPage.tsx` (4 campos de data + abas RFIs e Histórico)
+- `src/components/projects/tabs/ProjectRfisTab.tsx`
+- `src/components/projects/tabs/ProjectDateHistoryTab.tsx`
+- `src/components/rfis/RfiDetailSheet.tsx`, `src/pages/RFIsPage.tsx`

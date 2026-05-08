@@ -28,6 +28,10 @@ export interface ProjectRow {
   workspace: string;
   client_id: string | null;
   is_internal: boolean;
+  planned_start_date: string | null;
+  planned_end_date: string | null;
+  actual_start_date: string | null;
+  actual_end_date: string | null;
   created_at: string;
   updated_at: string;
   user_profiles: UserMini | null;
@@ -66,7 +70,9 @@ export interface ProjectDemandRow {
 
 const PROJECT_SELECT = `
   id, title, description, owner_id, due_date, original_due_date, hours_estimated,
-  cancelled_at, cancelled_by, workspace, client_id, is_internal, created_at, updated_at,
+  cancelled_at, cancelled_by, workspace, client_id, is_internal,
+  planned_start_date, planned_end_date, actual_start_date, actual_end_date,
+  created_at, updated_at,
   user_profiles!projects_owner_id_fkey(id, full_name, email),
   clients(id, name)
 `;
@@ -310,6 +316,10 @@ interface UpdateProjectInput {
     client_id: string | null;
     owner_id: string;
     hours_estimated: number | null;
+    planned_start_date: string | null;
+    planned_end_date: string | null;
+    actual_start_date: string | null;
+    actual_end_date: string | null;
   }>;
 }
 
@@ -327,6 +337,7 @@ export function useUpdateProject() {
       toast.success("Projeto atualizado");
       qc.invalidateQueries({ queryKey: ["project", vars.id] });
       qc.invalidateQueries({ queryKey: ["projects"] });
+      qc.invalidateQueries({ queryKey: ["project_date_history", vars.id] });
     },
     onError: (err: Error) => toast.error(`Erro: ${err.message}`),
   });

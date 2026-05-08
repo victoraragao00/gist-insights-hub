@@ -31,6 +31,7 @@ export interface DemandFilters {
   workspace?: "cx" | "tech";
   mine_user_id?: string;
   mine_collab_ids?: string[];
+  assignee_ids?: string[];
 }
 
 // ── Queries ──
@@ -97,6 +98,8 @@ export function useDemands(filters?: DemandFilters) {
         } else {
           query = query.eq("assignee_id", filters.mine_user_id);
         }
+      } else if (filters?.assignee_ids && filters.assignee_ids.length > 0) {
+        query = query.in("assignee_id", filters.assignee_ids);
       }
 
       const { data, error } = await query;
