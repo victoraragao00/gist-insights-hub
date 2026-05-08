@@ -156,13 +156,17 @@ export function useAddLink() {
  * Returns the storage path and a short-lived signed URL for immediate preview.
  */
 export async function uploadInlineImage(
-  demandId: string,
+  pathPrefixOrDemandId: string,
   file: File,
+  opts?: { isPathPrefix?: boolean },
 ): Promise<{ storagePath: string; signedUrl: string }> {
   const ts = Date.now();
   const rand = Math.random().toString(36).slice(2, 8);
   const ext = (file.name.split(".").pop() || "png").toLowerCase().replace(/[^\w]/g, "");
-  const path = `demands/${demandId}/inline/${ts}_${rand}.${ext}`;
+  const prefix = opts?.isPathPrefix
+    ? pathPrefixOrDemandId.replace(/\/+$/, "")
+    : `demands/${pathPrefixOrDemandId}/inline`;
+  const path = `${prefix}/${ts}_${rand}.${ext}`;
 
   const { error: uploadError } = await supabase.storage
     .from("demand-attachments")
