@@ -231,18 +231,8 @@ export default function ProjectDetailPage() {
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Detalhes
             </p>
-            <SidebarRow
-              label="Owner"
-              value={
-                project.user_profiles?.full_name ||
-                project.user_profiles?.email ||
-                "—"
-              }
-            />
-            <SidebarRow
-              label="Cliente"
-              value={project.clients?.name ?? "—"}
-            />
+            <ProjectOwnerField project={project} canEdit={isOwner} />
+            <ProjectClientField project={project} canEdit={isOwner} />
             <ProjectDueDateField project={project} />
             <SidebarRow
               label="Criado em"
