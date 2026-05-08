@@ -5,10 +5,12 @@ import { ptBR } from "date-fns/locale";
 import {
   ChevronLeft,
   XCircle,
+  Trash2,
   Building2,
   Clock,
   User,
   AlertTriangle,
+
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
