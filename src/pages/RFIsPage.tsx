@@ -118,9 +118,6 @@ export default function RFIsPage() {
                 const status = rfi.rfi_statuses;
                 const assignee = rfi.user_profiles;
                 const linkedToProject = !!project;
-                const workspaceLabel = (linkedToProject ? project?.workspace : demand?.workspace);
-                const isTech = workspaceLabel === "tech";
-                const linkLabel = linkedToProject ? `Projeto: ${project?.title}` : (demand?.title ?? "—");
                 const cliName = linkedToProject
                   ? (project?.is_internal ? "Interno" : (project?.clients?.name ?? "—"))
                   : (demand?.clients?.name ?? "—");
@@ -174,8 +171,6 @@ export default function RFIsPage() {
               })}
             </tbody>
           </table>
-          {/* lint-suppress: linkLabel computed for accessibility/debug */}
-          {false && <span>{""}</span>}
         )}
       </div>
 
