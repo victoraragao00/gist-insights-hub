@@ -363,9 +363,9 @@ export default function ProjectDetailPage() {
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
+              )}
 
-              {isOwner && (
-                <AlertDialog>
+              <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button
                       variant="outline"
