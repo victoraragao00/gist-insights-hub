@@ -362,6 +362,44 @@ export default function ProjectDetailPage() {
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
+
+              {isOwner && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full mt-2 text-destructive border-destructive/30 hover:bg-destructive/10"
+                    >
+                      <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                      Excluir projeto
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Excluir projeto?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Esta ação é <strong>permanente</strong> e não pode ser desfeita.
+                        As demandas vinculadas <strong>não serão apagadas</strong> —
+                        apenas perderão o vínculo com este projeto. Reuniões internas
+                        associadas também serão desvinculadas.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Voltar</AlertDialogCancel>
+                      <AlertDialogAction
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        onClick={async () => {
+                          await deleteProject.mutateAsync({ id });
+                          navigate("/projects");
+                        }}
+                      >
+                        Sim, excluir definitivamente
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
             </section>
           )}
         </aside>
