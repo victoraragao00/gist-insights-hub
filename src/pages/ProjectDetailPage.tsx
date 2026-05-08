@@ -399,8 +399,7 @@ export default function ProjectDetailPage() {
                       </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
-                </AlertDialog>
-              )}
+              </AlertDialog>
             </section>
           )}
         </aside>
