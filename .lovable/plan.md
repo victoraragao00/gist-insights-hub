@@ -1,31 +1,62 @@
 ## Problema
 
-Ao editar campos no `DemandDetailPage` (coluna, prioridade, tipo, responsável, área...), a alteração só aparece após refresh manual.
+Status do projeto exibido nos cards (`Planejamento`, `Ativo`, `Concluído`) é calculado pela função SQL `get_project_stats`. A regra atual é:
 
-## Causa
+```
+planning  → total_demands = 0  OU  completion_pct = 0
+active    → completion_pct > 0  (pelo menos 1 demanda finalizada)
+completed → completion_pct = 100
+cancelled → cancelled_at IS NOT NULL
+```
 
-O hook `useUpdateDemand` (em `src/hooks/useDemands.ts`, linha 321-324) invalida apenas o queryKey `["demands"]` (lista do kanban), mas **não invalida** o queryKey `["demand", demandId]` usado por `useDemand` na página de detalhe.
+Por isso projetos com demandas **em andamento** (started_at preenchido mas ainda não concluídas) continuam aparecendo como "Planejamento" — só viram "Ativo" depois que a primeira demanda é concluída.
 
-Resultado: a mutation grava no banco, o kanban atualiza, mas a página detalhe continua exibindo o cache antigo.
+## Correção
 
-Outras mutations da mesma página (`useMoveDemand`) têm o mesmo problema — invalidam só `["demands"]`.
+Ajustar `get_project_stats` para considerar `active` sempre que houver pelo menos uma demanda iniciada (com `started_at IS NOT NULL`) ou já concluída, mantendo `planning` apenas para projetos sem nenhum trabalho em curso.
 
-## Fix
+Nova regra:
 
-Adicionar `queryClient.invalidateQueries({ queryKey: ["demand"] })` (e `["sla_demands"]` por consistência com outras mutations) em:
+```
+cancelled → cancelled_at IS NOT NULL
+completed → total > 0  E  completion_pct = 100
+active    → existe demanda com started_at IS NOT NULL  OU  completed > 0
+planning  → caso contrário (sem demandas, ou todas ainda não iniciadas)
+```
 
-- `useUpdateDemand.onSuccess`
-- `useMoveDemand.onSuccess` (linha ~222)
-- `useCreateDemand.onSuccess` se aplicável (linha ~281)
+## Implementação
 
-Isso fará o React Query refetch o detalhe imediatamente após qualquer edição, refletindo na tela na hora.
+Migration única que substitui `get_project_stats` adicionando contagem de demandas iniciadas:
 
-## Arquivos
+```sql
+SELECT COUNT(*) INTO v_started
+FROM demands
+WHERE project_id = p_project_id
+  AND started_at IS NOT NULL
+  AND cancellation_reason IS NULL;
 
-- `src/hooks/useDemands.ts` — adicionar invalidações nos `onSuccess` das mutations de update/move.
+v_status := CASE
+  WHEN v_project.cancelled_at IS NOT NULL THEN 'cancelled'
+  WHEN v_total > 0 AND v_completion_pct = 100 THEN 'completed'
+  WHEN v_started > 0 OR v_completed > 0 THEN 'active'
+  ELSE 'planning'
+END;
+```
+
+Restante da função (overdue, hours, by_column, return) permanece igual.
 
 ## Verificação
 
-1. Abrir uma demanda → alterar prioridade via Select → valor atualiza imediatamente.
-2. Alterar coluna/área/responsável/tipo → idem.
-3. Voltar ao kanban → card também reflete a mudança.
+1. Projeto com 0 demandas → `Planejamento` ✓
+2. Projeto com demandas só na 1ª coluna (não iniciadas) → `Planejamento` ✓
+3. Projeto com pelo menos 1 demanda em coluna que dispara `triggers_started_at` → `Ativo` ✓
+4. Projeto com todas as demandas finalizadas → `Concluído` ✓
+5. Projeto com `cancelled_at` → `Cancelado` ✓
+
+Como `useProjectStats` tem `staleTime` curto e é re-buscado ao abrir a página, os cards refletirão o novo status sem mudanças no frontend.
+
+## Arquivos
+
+- nova migration em `supabase/migrations/` recriando `get_project_stats`
+
+Sem mudanças de frontend.
