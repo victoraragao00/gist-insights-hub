@@ -253,7 +253,7 @@ export default function ProjectDetailPage() {
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Detalhes
             </p>
-            <ProjectOwnerField project={project} canEdit={isOwner} />
+            <ProjectOwnerField project={project} canEdit={canManageOwner} />
             <ProjectClientField project={project} canEdit={isOwner} />
             <ProjectDueDateField project={project} />
             <SidebarRow
