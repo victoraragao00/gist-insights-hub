@@ -584,56 +584,78 @@ function HoursEditField({ value, onSave }: HoursEditFieldProps) {
 function ProjectOwnerField({ project, canEdit }: { project: ProjectRow; canEdit: boolean }) {
   const { data: users = [] } = useUsers();
   const updateProject = useUpdateProject();
-  const [editing, setEditing] = useState(false);
+  const [open, setOpen] = useState(false);
 
   const label =
     project.user_profiles?.full_name || project.user_profiles?.email || "—";
 
-  if (editing && canEdit) {
-    return (
-      <div className="flex items-center justify-between py-1.5 text-sm border-b border-border/30">
-        <span className="text-muted-foreground text-xs">Owner</span>
-        <Select
-          defaultValue={project.owner_id}
-          onValueChange={async (v) => {
-            if (v && v !== project.owner_id) {
-              await updateProject.mutateAsync({ id: project.id, fields: { owner_id: v } });
-            }
-            setEditing(false);
-          }}
-        >
-          <SelectTrigger className="h-7 text-xs w-[60%]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {users
-              .filter((u) => u.active)
-              .map((u) => (
-                <SelectItem key={u.user_id} value={u.user_id}>
-                  {u.full_name || u.email}
-                </SelectItem>
-              ))}
-          </SelectContent>
-        </Select>
-      </div>
-    );
-  }
+  const activeUsers = users.filter((u) => u.active);
 
   return (
-    <div className="flex items-center justify-between py-1.5 text-sm border-b border-border/30">
-      <span className="text-muted-foreground text-xs">Owner</span>
-      <button
-        type="button"
-        onClick={() => canEdit && setEditing(true)}
-        disabled={!canEdit}
-        className={cn(
-          "text-xs font-medium truncate max-w-[60%] text-right",
-          canEdit && "hover:text-primary transition-colors cursor-pointer",
-        )}
-        title={canEdit ? "Clique para alterar" : undefined}
-      >
-        {label}
-      </button>
+    <div className="flex items-center justify-between py-1.5 text-sm border-b border-border/30 gap-2">
+      <span className="text-muted-foreground text-xs shrink-0">Owner</span>
+      {canEdit ? (
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              className="flex items-center gap-1 text-xs font-medium truncate max-w-[70%] text-right hover:text-primary transition-colors"
+              title="Clique para alterar"
+            >
+              <span className="truncate">{label}</span>
+              <ChevronsUpDown className="h-3 w-3 opacity-50 shrink-0" />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-[260px] p-0" align="end">
+            <Command>
+              <CommandInput placeholder="Buscar usuário..." className="h-9" />
+              <CommandList>
+                <CommandEmpty>Nenhum usuário encontrado.</CommandEmpty>
+                <CommandGroup>
+                  {activeUsers.map((u) => {
+                    const name = u.full_name || u.email || "—";
+                    const isCurrent = u.user_id === project.owner_id;
+                    return (
+                      <CommandItem
+                        key={u.user_id}
+                        value={`${name} ${u.email ?? ""}`}
+                        onSelect={async () => {
+                          setOpen(false);
+                          if (!isCurrent) {
+                            await updateProject.mutateAsync({
+                              id: project.id,
+                              fields: { owner_id: u.user_id },
+                            });
+                          }
+                        }}
+                      >
+                        <Check
+                          className={cn(
+                            "mr-2 h-4 w-4",
+                            isCurrent ? "opacity-100" : "opacity-0",
+                          )}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-medium truncate">{name}</p>
+                          {u.email && u.full_name && (
+                            <p className="text-[11px] text-muted-foreground truncate">
+                              {u.email}
+                            </p>
+                          )}
+                        </div>
+                      </CommandItem>
+                    );
+                  })}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
+      ) : (
+        <span className="text-xs font-medium truncate max-w-[70%] text-right">
+          {label}
+        </span>
+      )}
     </div>
   );
 }
