@@ -69,6 +69,7 @@ export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { isAdmin } = useUserRole();
   const { data: project, isLoading } = useProject(id);
   const { data: stats } = useProjectStats(id);
   const updateProject = useUpdateProject();
