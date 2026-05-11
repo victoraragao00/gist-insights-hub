@@ -245,6 +245,35 @@ function CommentItem({
   const deleteMutation = useDeleteComment();
   const isOwner = comment.created_by === currentUserId;
 
+  const { data: profiles = [] } = useQuery<Array<{ id: string; full_name: string | null; email: string | null }>>({
+    queryKey: ["user_profiles_mentions"],
+    staleTime: 300_000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("user_profiles")
+        .select("id, full_name, email")
+        .eq("active", true);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const author = comment.created_by
+    ? profiles.find((p) => p.id === comment.created_by)
+    : null;
+  const authorLabel = isOwner
+    ? "Você"
+    : author?.full_name || author?.email || "Usuário";
+  const initials = (author?.full_name || author?.email || "?")
+    .trim()
+    .split(/\s+/)
+    .map((s) => s[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("")
+    .toUpperCase() || "?";
+
+
   const handleSave = () => {
     if (!editContent.trim() || editContent === comment.content) {
       setEditing(false);
