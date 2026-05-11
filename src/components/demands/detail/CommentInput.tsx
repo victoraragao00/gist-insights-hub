@@ -135,7 +135,7 @@ export function CommentInput({ onSubmit, pending }: CommentInputProps) {
 
   // Render text with mention tokens replaced by styled chips
   const renderHighlightedText = () => {
-    const parts: React.ReactNode[] = [];
+    const parts: ReactNode[] = [];
     let lastIndex = 0;
     let match: RegExpExecArray | null;
     const re = new RegExp(MENTION_TOKEN_RE.source, "g");
