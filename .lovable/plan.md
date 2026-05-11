@@ -1,89 +1,64 @@
-## Escopo confirmado
+## Diagnóstico
 
-Seis ajustes em Projetos/Demandas/RFIs.
+### 1) Erro RLS ao editar projeto
+A policy `projects_update` só permite quando `owner_id = auth.uid()`. Quem não é dono (admin, membro do squad, etc.) recebe `new row violates row-level security policy`.
 
----
-
-## 1. RFI vinculada a Demanda OU Projeto (XOR)
-
-Migration em `rfis`:
-- `ALTER COLUMN demand_id DROP NOT NULL`
-- `DROP CONSTRAINT rfis_demand_id_key` (UNIQUE)
-- `ADD COLUMN project_id uuid REFERENCES projects(id) ON DELETE CASCADE`
-- `ADD CONSTRAINT rfis_xor CHECK ((demand_id IS NOT NULL) <> (project_id IS NOT NULL))` — exatamente um.
-- Índice `idx_rfis_project_id`.
-- Atualizar RLS para também permitir acesso quando `project_id` aponta para projeto cujo `client_id` está em `user_accessible_client_ids` (ou é projeto interno acessível).
-
-Frontend:
-- `useRfis.ts`: aceitar `project_id`; novo hook `useProjectRfis(projectId)`.
-- `RfiDetailSheet`: mostra "Vinculado a: Demanda X" ou "Projeto Y" (apenas leitura do vínculo — definido na criação).
-- `CreateRfiDialog`: recebe contexto (`{ demandId }` ou `{ projectId }`) e bloqueia o outro campo.
-- Nova aba **RFIs** em `ProjectDetailPage` com botão "Nova RFI" pré-vinculada ao projeto.
-- `RFIsPage` (lista global): coluna "Vinculado a" mostrando Demanda X ou Projeto Y.
-
-## 2. Filtro multi-pessoa no Kanban de Demandas
-
-- `useDemands.ts`: trocar `assignee_id?: string` por `assignee_ids?: string[]` em `DemandFilters`; query usa `.in("assignee_id", ids)`.
-- `DemandsPage.tsx`: novo `MultiAssigneeFilter` baseado em `Combobox` com checkboxes (memória: Combobox para listas grandes). Mantém atalho "Minhas".
-- Persistir em `localStorage` (`demands:assignees`).
-- Atualizar `useExportDemandsCSV` para aceitar a nova shape.
-
-## 3. Datas previstas e reais em Projetos
-
-Migration em `projects`:
-- `ADD COLUMN planned_start_date date`
-- `ADD COLUMN planned_end_date date`
-- `ADD COLUMN actual_start_date date`
-- `ADD COLUMN actual_end_date date`
-- Backfill: `planned_end_date := due_date`, `planned_start_date := created_at::date`.
-- Manter `due_date` por compat (sincronizado com `planned_end_date` via trigger ou via app).
-
-Frontend:
-- Sidebar de `ProjectDetailPage`: 4 campos editáveis (Início previsto, Fim previsto, Início real, Fim real) com `Calendar` + Popover.
-- `useUpdateProject`: aceitar os 4 campos.
-- `ProjectCard`: mostrar range previsto.
-
-## 4. Histórico de movimentações de datas (apenas Projetos nesta fase)
-
-Nova tabela `project_date_changes`:
-- `id`, `project_id` (FK CASCADE), `field text` (`planned_start|planned_end|actual_start|actual_end`), `old_value date`, `new_value date`, `changed_by uuid REFERENCES user_profiles(id)`, `changed_at timestamptz default now()`, `note text`.
-- RLS leitura: quem vê o projeto vê o histórico.
-- Trigger `BEFORE UPDATE` em `projects`: para cada uma das 4 colunas alteradas, insere row em `project_date_changes` com `auth.uid()`.
-- Hook `useProjectDateHistory(projectId)`.
-- Nova aba **Histórico** em `ProjectDetailPage`: timeline ordenada `desc` no formato "Fulano alterou Fim Previsto: DD/MM/AAAA → DD/MM/AAAA".
-
-Demandas e RFIs ficam para fase posterior.
-
-## 5. Visualização em calendário de Projetos
-
-- `ProjectsPage.tsx`: toggle Lista | Agrupado | **Calendário**, persistido em `localStorage` (`projects:viewMode`).
-- Sub-toggle dentro do calendário: **Previsto / Real** (`projects:calendarMode`).
-  - Previsto usa `planned_start_date` → `planned_end_date`.
-  - Real usa `actual_start_date` → `actual_end_date` (projetos sem essas datas não aparecem em modo Real).
-- Componente `ProjectsCalendarView`: vista mensal estilo Gantt do print.
-  - Header: dias do mês.
-  - Linhas: um projeto por linha, agrupado por owner (similar ao print, com header colapsável).
-  - Barras horizontais coloridas por status, com título; click navega para o detalhe.
-  - Navegação mês anterior / mês atual / próximo mês.
-- Filtros (status, owner, cliente) compartilhados com a vista de lista.
+### 2) Notificações de menções/demandas não chegam
+A tabela `demand_notifications` tem RLS habilitado, mas **não existe policy de INSERT**. Resultado: todo `insert` é rejeitado silenciosamente (o frontend só faz `console.error`). A tabela está com **0 linhas** — nenhuma notificação foi gravada até hoje.
 
 ---
 
-## Arquivos afetados
+## Plano
 
-Migrations:
-- `..._rfi_project_link_xor.sql`
-- `..._project_planned_actual_dates.sql`
-- `..._project_date_history.sql`
+### Migration 1 — Liberar UPDATE de projetos
 
-Hooks:
-- `src/hooks/useRfis.ts`, `src/hooks/useDemands.ts`, `src/hooks/useProjects.ts`, `src/hooks/useExportDemandsCSV.ts`
-- novos: `useProjectRfis.ts`, `useProjectDateHistory.ts`
+Atualizar `projects_update` para permitir:
+- **Owner** do projeto, **OU**
+- **Admin** global (`is_admin()`), **OU**
+- **Membro** do squad (`project_members`)
 
-Componentes / páginas:
-- `src/pages/DemandsPage.tsx` + novo `src/components/demands/MultiAssigneeFilter.tsx`
-- `src/pages/ProjectsPage.tsx` + novo `src/components/projects/ProjectsCalendarView.tsx`
-- `src/pages/ProjectDetailPage.tsx` (4 campos de data + abas RFIs e Histórico)
-- `src/components/projects/tabs/ProjectRfisTab.tsx`
-- `src/components/projects/tabs/ProjectDateHistoryTab.tsx`
-- `src/components/rfis/RfiDetailSheet.tsx`, `src/pages/RFIsPage.tsx`
+```sql
+DROP POLICY IF EXISTS projects_update ON public.projects;
+CREATE POLICY projects_update ON public.projects
+  FOR UPDATE
+  USING (
+    owner_id = auth.uid()
+    OR public.is_admin()
+    OR EXISTS (
+      SELECT 1 FROM public.project_members pm
+      WHERE pm.project_id = projects.id AND pm.user_id = auth.uid()
+    )
+  )
+  WITH CHECK (
+    owner_id = auth.uid()
+    OR public.is_admin()
+    OR EXISTS (
+      SELECT 1 FROM public.project_members pm
+      WHERE pm.project_id = projects.id AND pm.user_id = auth.uid()
+    )
+  );
+```
+
+> DELETE permanece restrito ao owner (não foi pedido alterar).
+
+### Migration 2 — Permitir INSERT em demand_notifications
+
+Adicionar policy de INSERT para usuários autenticados (o autor da notificação não precisa ser o destinatário — quem comenta avisa outros):
+
+```sql
+CREATE POLICY demand_notifications_insert ON public.demand_notifications
+  FOR INSERT TO authenticated
+  WITH CHECK (auth.uid() IS NOT NULL);
+```
+
+SELECT/UPDATE atuais já garantem que cada usuário só lê/marca como lida as próprias notificações.
+
+---
+
+## Verificação após aplicar
+
+1. Editar campos de um projeto como admin ou membro do squad — não deve mais dar erro RLS.
+2. Comentar em uma demanda mencionando outro usuário (`@`) — o destinatário deve ver o sino piscar (realtime já está configurado em `useDemandNotifications`).
+3. Trocar `assignee_id` de uma demanda — o novo responsável deve receber notificação tipo `assigned`.
+
+Nenhuma alteração de frontend é necessária — os hooks (`useUpdateProject`, `createDemandNotification`, `createMentionNotifications`) já estão corretos; só faltava o RLS permitir as escritas.
