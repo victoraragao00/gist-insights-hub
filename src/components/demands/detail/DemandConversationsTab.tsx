@@ -293,7 +293,7 @@ function CommentItem({
       <div className="flex-1 min-w-0 space-y-0.5">
         <div className="flex items-center gap-2">
           <span className="font-medium text-foreground">
-            {isOwner ? "Você" : (comment.created_by?.slice(0, 8) ?? "Usuário")}
+            {authorLabel}
           </span>
           {comment.created_at && (
             <span className="text-muted-foreground">
