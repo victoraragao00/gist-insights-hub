@@ -1,9 +1,11 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Link2, MessageSquare, Sparkles, Loader2, X, ChevronDown } from "lucide-react";
 import { CommentInput } from "./CommentInput";
 import { CommentText } from "./CommentText";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -243,6 +245,35 @@ function CommentItem({
   const deleteMutation = useDeleteComment();
   const isOwner = comment.created_by === currentUserId;
 
+  const { data: profiles = [] } = useQuery<Array<{ id: string; full_name: string | null; email: string | null }>>({
+    queryKey: ["user_profiles_mentions"],
+    staleTime: 300_000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("user_profiles")
+        .select("id, full_name, email")
+        .eq("active", true);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const author = comment.created_by
+    ? profiles.find((p) => p.id === comment.created_by)
+    : null;
+  const authorLabel = isOwner
+    ? "Você"
+    : author?.full_name || author?.email || "Usuário";
+  const initials = (author?.full_name || author?.email || "?")
+    .trim()
+    .split(/\s+/)
+    .map((s) => s[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("")
+    .toUpperCase() || "?";
+
+
   const handleSave = () => {
     if (!editContent.trim() || editContent === comment.content) {
       setEditing(false);
@@ -256,13 +287,13 @@ function CommentItem({
 
   return (
     <div className="flex gap-2 text-xs group">
-      <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary font-medium text-xs">
-        {(comment.created_by ?? "?")[0]?.toUpperCase()}
+      <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary font-medium text-[10px]">
+        {initials}
       </div>
       <div className="flex-1 min-w-0 space-y-0.5">
         <div className="flex items-center gap-2">
           <span className="font-medium text-foreground">
-            {isOwner ? "Você" : (comment.created_by?.slice(0, 8) ?? "Usuário")}
+            {authorLabel}
           </span>
           {comment.created_at && (
             <span className="text-muted-foreground">

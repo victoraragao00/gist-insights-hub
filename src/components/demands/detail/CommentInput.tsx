@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
@@ -133,16 +133,63 @@ export function CommentInput({ onSubmit, pending }: CommentInputProps) {
       .join("")
       .toUpperCase();
 
+  // Render text with mention tokens replaced by styled chips
+  const renderHighlightedText = () => {
+    const parts: ReactNode[] = [];
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+    const re = new RegExp(MENTION_TOKEN_RE.source, "g");
+    let i = 0;
+    while ((match = re.exec(text)) !== null) {
+      if (match.index > lastIndex) {
+        parts.push(<span key={`t${i++}`}>{text.slice(lastIndex, match.index)}</span>);
+      }
+      parts.push(
+        <span
+          key={`m${i++}`}
+          className="rounded bg-primary/15 text-primary px-1 py-0.5 font-medium"
+        >
+          @{match[1]}
+        </span>
+      );
+      lastIndex = match.index + match[0].length;
+    }
+    if (lastIndex < text.length) {
+      parts.push(<span key={`t${i++}`}>{text.slice(lastIndex)}</span>);
+    }
+    // trailing newline trick to keep last empty line visible
+    parts.push(<span key="end">{"\u200B"}</span>);
+    return parts;
+  };
+
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const handleScroll = () => {
+    if (overlayRef.current && textareaRef.current) {
+      overlayRef.current.scrollTop = textareaRef.current.scrollTop;
+    }
+  };
+
   return (
     <div className="relative space-y-1.5">
-      <Textarea
-        ref={textareaRef}
-        value={text}
-        onChange={handleChange}
-        onKeyDown={handleKeyDown}
-        placeholder="Adicionar comentário... Use @ para mencionar"
-        rows={2}
-      />
+      <div className="relative">
+        <div
+          ref={overlayRef}
+          aria-hidden="true"
+          className="absolute inset-0 pointer-events-none whitespace-pre-wrap break-words overflow-hidden rounded-md border border-transparent px-3 py-2 text-sm leading-[1.25rem]"
+        >
+          {renderHighlightedText()}
+        </div>
+        <Textarea
+          ref={textareaRef}
+          value={text}
+          onChange={handleChange}
+          onKeyDown={handleKeyDown}
+          onScroll={handleScroll}
+          placeholder="Adicionar comentário... Use @ para mencionar"
+          rows={2}
+          className="relative bg-transparent text-transparent caret-foreground selection:bg-primary/30 selection:text-transparent leading-[1.25rem]"
+        />
+      </div>
 
       {showMentions && filtered.length > 0 && (
         <div className="absolute bottom-full mb-1 left-0 w-64 bg-popover border border-border rounded-lg shadow-lg overflow-hidden z-50">
