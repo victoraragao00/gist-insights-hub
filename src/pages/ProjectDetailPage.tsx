@@ -60,6 +60,10 @@ import {
 } from "@/components/ui/select";
 import { useUsers } from "@/hooks/useUsers";
 import { useClient } from "@/context/ClientContext";
+import { useUserRole } from "@/hooks/useUserRole";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Check, ChevronsUpDown } from "lucide-react";
 
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
