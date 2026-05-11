@@ -287,8 +287,8 @@ function CommentItem({
 
   return (
     <div className="flex gap-2 text-xs group">
-      <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary font-medium text-xs">
-        {(comment.created_by ?? "?")[0]?.toUpperCase()}
+      <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary font-medium text-[10px]">
+        {initials}
       </div>
       <div className="flex-1 min-w-0 space-y-0.5">
         <div className="flex items-center gap-2">
