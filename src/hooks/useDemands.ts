@@ -220,6 +220,8 @@ export function useCreateDemand() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["demands"] });
+      queryClient.invalidateQueries({ queryKey: ["demand"] });
+      queryClient.invalidateQueries({ queryKey: ["client_demands"] });
       toast.success("Demanda criada");
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : "Erro ao criar demanda"),
