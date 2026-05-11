@@ -100,6 +100,7 @@ export default function ProjectDetailPage() {
   }
 
   const isOwner = project.owner_id === user?.id;
+  const canManageOwner = isOwner || isAdmin;
   const status = stats?.status ?? "planning";
   const pct = stats?.completion_pct ?? 0;
   const total = stats?.total_demands ?? 0;
