@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
+import { Loader2, Paperclip, Image as ImageIcon, X } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,13 +13,15 @@ interface UserOption {
 }
 
 interface CommentInputProps {
-  onSubmit: (input: { content: string; mentionedUserIds: string[] }) => void;
+  onSubmit: (input: { content: string; mentionedUserIds: string[]; files?: File[] }) => void;
   pending: boolean;
   initialText?: string;
   submitLabel?: string;
   onCancel?: () => void;
   autoFocus?: boolean;
   compact?: boolean;
+  /** Show file/image attach buttons. Defaults to true. Set false on edit flow. */
+  allowAttachments?: boolean;
 }
 
 const TOKEN_RE = /@\[([^\]]+)\]\(([0-9a-f-]{36})\)/g;
@@ -68,12 +70,16 @@ export function CommentInput({
   onCancel,
   autoFocus,
   compact,
+  allowAttachments = true,
 }: CommentInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
   const [text, setText] = useState(initialText);
   const [mentionQuery, setMentionQuery] = useState("");
   const [showMentions, setShowMentions] = useState(false);
   const [activeIdx, setActiveIdx] = useState(0);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
 
   // handle → { id, label } populated each time the user picks from suggestions
   const handleMapRef = useRef<Map<string, { id: string; label: string }>>(new Map());
@@ -163,11 +169,43 @@ export function CommentInput({
   };
 
   const handleSubmit = () => {
-    if (!text.trim() || pending) return;
+    if ((!text.trim() && pendingFiles.length === 0) || pending) return;
     const { content, mentionedUserIds } = plainToTokens(text, handleMapRef.current);
-    onSubmit({ content: content.trim(), mentionedUserIds });
-    if (!onCancel) setText(""); // create flow clears, edit flow keeps until parent unmounts
+    onSubmit({
+      content: content.trim(),
+      mentionedUserIds,
+      files: pendingFiles.length > 0 ? pendingFiles : undefined,
+    });
+    if (!onCancel) {
+      setText("");
+      setPendingFiles([]);
+    }
     setShowMentions(false);
+  };
+
+  const addFiles = (files: FileList | File[] | null | undefined) => {
+    if (!files) return;
+    const arr = Array.from(files);
+    if (arr.length === 0) return;
+    setPendingFiles((prev) => [...prev, ...arr]);
+  };
+
+  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const files = Array.from(e.clipboardData?.files ?? []).filter((f) =>
+      f.type.startsWith("image/"),
+    );
+    if (files.length > 0) {
+      e.preventDefault();
+      addFiles(files);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLTextAreaElement>) => {
+    const files = Array.from(e.dataTransfer?.files ?? []);
+    if (files.length > 0) {
+      e.preventDefault();
+      addFiles(files);
+    }
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
