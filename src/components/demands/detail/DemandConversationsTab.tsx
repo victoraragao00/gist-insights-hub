@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link2, MessageSquare, Sparkles, Loader2, X, ChevronDown } from "lucide-react";
+import { Link2, MessageSquare, Sparkles, Loader2, X, ChevronDown, Paperclip, Download } from "lucide-react";
 import { CommentInput, tokensToPlain } from "./CommentInput";
 import { CommentText } from "./CommentText";
 import { formatDistanceToNow } from "date-fns";
@@ -18,6 +18,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useAuth } from "@/context/AuthContext";
+import { useUserRole } from "@/hooks/useUserRole";
 import type { DemandRow } from "@/hooks/useDemands";
 import { useDemandInteractions, useUnlinkInteraction } from "@/hooks/useDemandInteractions";
 import {
@@ -27,6 +28,13 @@ import {
   useDemandComments, useCreateComment, useUpdateComment, useDeleteComment,
   type DemandComment,
 } from "@/hooks/useDemandComments";
+import {
+  useDemandCommentAttachments,
+  useSignedCommentAttachmentUrls,
+  useUploadCommentAttachments,
+  useDeleteCommentAttachment,
+  type DemandCommentAttachment,
+} from "@/hooks/useDemandCommentAttachments";
 import { LinkConversationDialog } from "../LinkConversationDialog";
 
 const SIDE_BADGE: Record<string, string> = {
@@ -40,12 +48,24 @@ interface DemandConversationsTabProps {
 
 export function DemandConversationsTab({ demand }: DemandConversationsTabProps) {
   const { user } = useAuth();
+  const { isAdmin } = useUserRole();
   const { data: linkedInteractions = [] } = useDemandInteractions(demand.id);
   const { data: convSummaries = [] } = useConversationSummaries(demand.id);
   const summarizeMutation = useSummarizeConversation();
   const unlinkMutation = useUnlinkInteraction();
   const { data: comments = [] } = useDemandComments(demand.id);
   const createCommentMutation = useCreateComment();
+  const uploadCommentAttachments = useUploadCommentAttachments();
+  const { data: commentAttachments = [] } = useDemandCommentAttachments(demand.id);
+  const { data: signedUrlMap = {} } = useSignedCommentAttachmentUrls(commentAttachments);
+
+  const attachmentsByComment = useMemo(() => {
+    const map: Record<string, DemandCommentAttachment[]> = {};
+    commentAttachments.forEach((a) => {
+      (map[a.comment_id] ||= []).push(a);
+    });
+    return map;
+  }, [commentAttachments]);
 
   const [linkConvOpen, setLinkConvOpen] = useState(false);
 
@@ -59,9 +79,23 @@ export function DemandConversationsTab({ demand }: DemandConversationsTabProps) 
   const handlePostComment = ({
     content,
     mentionedUserIds,
-  }: { content: string; mentionedUserIds: string[] }) => {
+    files,
+  }: { content: string; mentionedUserIds: string[]; files?: File[] }) => {
     if (createCommentMutation.isPending) return;
-    createCommentMutation.mutate({ demandId: demand.id, content, mentionedUserIds });
+    createCommentMutation.mutate(
+      { demandId: demand.id, content, mentionedUserIds },
+      {
+        onSuccess: (res) => {
+          if (files && files.length > 0 && res?.id) {
+            uploadCommentAttachments.mutate({
+              commentId: res.id,
+              demandId: demand.id,
+              files,
+            });
+          }
+        },
+      },
+    );
   };
 
   return (
