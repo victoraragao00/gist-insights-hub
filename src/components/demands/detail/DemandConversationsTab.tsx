@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link2, MessageSquare, Sparkles, Loader2, X, ChevronDown } from "lucide-react";
-import { CommentInput } from "./CommentInput";
+import { CommentInput, tokensToPlain } from "./CommentInput";
 import { CommentText } from "./CommentText";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
