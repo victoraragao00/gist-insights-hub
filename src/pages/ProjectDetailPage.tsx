@@ -479,7 +479,7 @@ function ProjectDueDateField({ project, canEdit }: { project: ProjectRow; canEdi
               </TooltipTrigger>
               <TooltipContent side="left" className="text-xs">
                 Data original:{" "}
-                {format(new Date(project.original_due_date), "dd/MM/yyyy", { locale: ptBR })}
+                {format(new Date(project.original_due_date + "T00:00:00"), "dd/MM/yyyy", { locale: ptBR })}
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
