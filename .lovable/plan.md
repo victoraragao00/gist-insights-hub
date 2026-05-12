@@ -1,53 +1,20 @@
-## Problema
+## Plano
 
-Hoje o squad de um projeto só pode ser editado pelo **Owner**. Como gestor de projetos (admin do CX Hub), você precisa adicionar/remover membros mesmo sem ser owner do projeto.
+1. **Corrigir a regra no banco**
+   - Atualizar a função `get_project_stats(p_project_id)` para considerar o projeto como `active` quando existir demanda vinculada em coluna de andamento, não apenas quando `demands.started_at` já foi preenchido.
+   - A regra ficará: `cancelled` > `completed` > `active` se houver demanda não cancelada com `started_at IS NOT NULL`, concluída, ou em coluna com `ticket_columns.triggers_started_at = true` > `planning`.
 
-A restrição existe em duas camadas:
+2. **Preservar comportamento atual de conclusão/cancelamento**
+   - Manter `completed` quando 100% das demandas estiverem em coluna finalizada.
+   - Manter `cancelled` quando o projeto tiver `cancelled_at`.
 
-1. **Frontend** — `ProjectSquadTab` recebe apenas `isOwner` e esconde o `UserSelect` e o botão de remover.
-2. **RLS** — As policies `project_members_insert` e `project_members_delete` só permitem quando `auth.uid() = projects.owner_id`.
+3. **Ajustar atualização visual após mover demanda**
+   - No hook de movimentação de demandas, invalidar também `project_stats` e `projects` para os cards/listas refletirem o novo status sem esperar o cache expirar.
 
-A troca de owner já considera admin (`canManageOwner = isOwner || isAdmin`), mas o squad ficou de fora.
+4. **Verificação**
+   - Validar que um projeto com demanda em `Em Progresso` passa de `Planejamento` para `Ativo`.
+   - Validar que projetos sem demandas em andamento continuam como `Planejamento`.
 
-## Mudanças
+## Detalhe técnico
 
-### 1. RLS — `project_members` (migration nova)
-
-Substituir as policies de INSERT e DELETE para permitir owner **ou** admin global:
-
-```sql
-DROP POLICY IF EXISTS "project_members_insert" ON public.project_members;
-DROP POLICY IF EXISTS "project_members_delete" ON public.project_members;
-
-CREATE POLICY "project_members_insert" ON public.project_members FOR INSERT
-  WITH CHECK (
-    EXISTS (SELECT 1 FROM public.projects WHERE id = project_id AND owner_id = auth.uid())
-    OR public.is_admin(auth.uid())
-  );
-
-CREATE POLICY "project_members_delete" ON public.project_members FOR DELETE
-  USING (
-    EXISTS (SELECT 1 FROM public.projects WHERE id = project_id AND owner_id = auth.uid())
-    OR public.is_admin(auth.uid())
-  );
-```
-
-(Usar a função `is_admin()` já existente no projeto, conforme padrão de RLS recursion prevention.)
-
-### 2. Frontend — `ProjectDetailPage.tsx`
-
-Trocar a prop passada para o squad de `isOwner={isOwner}` para `canManage={canManageOwner}` (que já é `isOwner || isAdmin`).
-
-### 3. `ProjectSquadTab.tsx`
-
-Renomear a prop `isOwner` para `canManage` e usá-la para gating do `UserSelect` (adicionar membro) e do botão `UserMinus` (remover membro). Sem mudanças visuais.
-
-## Arquivos
-
-- **Nova migration** — atualiza policies de `project_members`
-- **`src/pages/ProjectDetailPage.tsx`** — passa `canManage` para o squad
-- **`src/components/projects/tabs/ProjectSquadTab.tsx`** — aceita `canManage` em vez de `isOwner`
-
-## Fora de escopo
-
-Outros gates `isOwner` (editar título, datas, cliente, deletar projeto, criar RFI) — você não pediu para abrir esses para admin. Se quiser, posso incluir num próximo passo.
+A coluna `Em Progresso` já está configurada com `triggers_started_at = true`. O problema é que o status do projeto depende só de `demands.started_at`; se esse campo não foi gravado em algum fluxo, o projeto continua aparecendo como `Planejamento`. A correção torna a função mais resiliente usando também a configuração da coluna.

@@ -284,6 +284,8 @@ export function useMoveDemand() {
       queryClient.invalidateQueries({ queryKey: ["demand"] });
       queryClient.invalidateQueries({ queryKey: ["client_demands"] });
       queryClient.invalidateQueries({ queryKey: ["sla_demands"] });
+      queryClient.invalidateQueries({ queryKey: ["project_stats"] });
+      queryClient.invalidateQueries({ queryKey: ["project_demands"] });
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : "Erro ao mover demanda"),
   });
