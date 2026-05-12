@@ -111,7 +111,7 @@ export function DemandTimeTrackingSection({ demandId, taskId = null, compact = f
               </Button>
             </div>
           ) : (
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
               <span className="text-xs text-muted-foreground">Nenhum timer rodando</span>
               {otherTimerActive ? (
                 <Tooltip>
