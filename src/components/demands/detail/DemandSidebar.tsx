@@ -790,10 +790,21 @@ export function DemandSidebar({ demand, onActivityTabSelect, onClose }: DemandSi
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Motivo (opcional)</Label>
-              <Textarea value={blockerReason} onChange={(e) => setBlockerReason(e.target.value)} rows={3} placeholder="Detalhes do bloqueio..." />
-            </div>
+            {(() => {
+              const selected = blockerTypes.find((b) => b.id === selectedBlockerType);
+              const requiresReason = selected?.requires_reason === true;
+              return (
+                <div className="space-y-1">
+                  <Label className="text-xs">{requiresReason ? "Motivo *" : "Motivo (opcional)"}</Label>
+                  <Textarea
+                    value={blockerReason}
+                    onChange={(e) => setBlockerReason(e.target.value)}
+                    rows={3}
+                    placeholder={requiresReason ? "Descreva o motivo do bloqueio..." : "Detalhes do bloqueio..."}
+                  />
+                </div>
+              );
+            })()}
             {blockDialogOpen && (
               <BlockerCauseSuggestions
                 demandId={demand.id}
@@ -804,7 +815,7 @@ export function DemandSidebar({ demand, onActivityTabSelect, onClose }: DemandSi
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setBlockDialogOpen(false)}>Cancelar</Button>
-            <Button onClick={handleBlock} disabled={!selectedBlockerType || blockLoading}>
+            <Button onClick={handleBlock} disabled={!selectedBlockerType || blockLoading || (blockerTypes.find((b) => b.id === selectedBlockerType)?.requires_reason === true && !blockerReason.trim())}>
               {blockLoading && <Loader2 className="h-4 w-4 animate-spin mr-1" />} Confirmar
             </Button>
           </DialogFooter>

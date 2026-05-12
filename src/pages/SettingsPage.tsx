@@ -36,6 +36,7 @@ import { SlaSettingsTab } from "@/components/settings/SlaSettingsTab";
 import { ClassifierSettingsTab } from "@/components/settings/ClassifierSettingsTab";
 import { DemandTypesSettingsTab } from "@/components/settings/DemandTypesSettingsTab";
 import { DemandPrioritiesSettingsTab } from "@/components/settings/DemandPrioritiesSettingsTab";
+import { BlockerTypesSettingsTab } from "@/components/settings/BlockerTypesSettingsTab";
 
 
 // ── Types ──────────────────────────────────────────────
@@ -632,6 +633,7 @@ const SettingsPage = () => {
           {isAdmin && <TabsTrigger value="tiers">Tiers de Cliente</TabsTrigger>}
           {isAdmin && <TabsTrigger value="priorities">Prioridades</TabsTrigger>}
           {isAdmin && <TabsTrigger value="types">Tipos</TabsTrigger>}
+          {isAdmin && <TabsTrigger value="blockers">Bloqueios</TabsTrigger>}
           {isAdmin && <TabsTrigger value="columns">Colunas</TabsTrigger>}
           {isAdmin && <TabsTrigger value="areas">Áreas</TabsTrigger>}
           {isAdmin && <TabsTrigger value="agendas">Pautas</TabsTrigger>}
@@ -656,6 +658,12 @@ const SettingsPage = () => {
         {isAdmin && (
           <TabsContent value="types" className="mt-4">
             <DemandTypesSettingsTab />
+          </TabsContent>
+        )}
+
+        {isAdmin && (
+          <TabsContent value="blockers" className="mt-4">
+            <BlockerTypesSettingsTab />
           </TabsContent>
         )}
 
