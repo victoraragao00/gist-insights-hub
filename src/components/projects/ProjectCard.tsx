@@ -100,7 +100,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
               <AlertTriangle className="h-3 w-3" />
             )}
             <CalendarDays className="h-3 w-3" />
-            {format(new Date(project.due_date), "dd MMM", { locale: ptBR })}
+            {format(new Date(project.due_date + "T00:00:00"), "dd MMM", { locale: ptBR })}
           </div>
         )}
       </div>
