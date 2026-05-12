@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
@@ -15,16 +15,68 @@ interface UserOption {
 interface CommentInputProps {
   onSubmit: (input: { content: string; mentionedUserIds: string[] }) => void;
   pending: boolean;
+  initialText?: string;
+  submitLabel?: string;
+  onCancel?: () => void;
+  autoFocus?: boolean;
+  compact?: boolean;
 }
 
-const MENTION_TOKEN_RE = /@\[([^\]]+)\]\(([0-9a-f-]{36})\)/g;
+const TOKEN_RE = /@\[([^\]]+)\]\(([0-9a-f-]{36})\)/g;
+const HANDLE_CHAR = /[\w.\-]/;
 
-export function CommentInput({ onSubmit, pending }: CommentInputProps) {
+/** "laura.delgado@umode.tech" → "laura.delgado"; fallback to slugged full_name. */
+function userHandle(u: UserOption): string {
+  const fromEmail = u.email?.split("@")[0];
+  if (fromEmail) return fromEmail;
+  return (u.full_name ?? "usuario")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, ".")
+    .replace(/^\.+|\.+$/g, "");
+}
+
+/** Token form `@[label](uuid)` → plain `@handle` for editing. */
+export function tokensToPlain(text: string, users: UserOption[]): string {
+  const byId = new Map(users.map((u) => [u.id, userHandle(u)]));
+  return text.replace(TOKEN_RE, (_m, label: string, id: string) => {
+    return `@${byId.get(id) ?? label}`;
+  });
+}
+
+/** Plain `@handle` → token form, using map populated as user picks suggestions. */
+function plainToTokens(
+  text: string,
+  handleMap: Map<string, { id: string; label: string }>,
+): { content: string; mentionedUserIds: string[] } {
+  const ids: string[] = [];
+  const content = text.replace(/@([\w.\-]+)/g, (full, handle: string) => {
+    const hit = handleMap.get(handle);
+    if (!hit) return full;
+    ids.push(hit.id);
+    return `@[${hit.label}](${hit.id})`;
+  });
+  return { content, mentionedUserIds: Array.from(new Set(ids)) };
+}
+
+export function CommentInput({
+  onSubmit,
+  pending,
+  initialText = "",
+  submitLabel = "Comentar",
+  onCancel,
+  autoFocus,
+  compact,
+}: CommentInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const [text, setText] = useState("");
+  const [text, setText] = useState(initialText);
   const [mentionQuery, setMentionQuery] = useState("");
   const [showMentions, setShowMentions] = useState(false);
   const [activeIdx, setActiveIdx] = useState(0);
+
+  // handle → { id, label } populated each time the user picks from suggestions
+  const handleMapRef = useRef<Map<string, { id: string; label: string }>>(new Map());
 
   const { data: users = [] } = useQuery<UserOption[]>({
     queryKey: ["user_profiles_mentions"],
@@ -40,15 +92,33 @@ export function CommentInput({ onSubmit, pending }: CommentInputProps) {
     },
   });
 
-  const filtered = users
-    .filter((u) => {
-      const q = mentionQuery.toLowerCase();
-      return (
-        (u.full_name ?? "").toLowerCase().includes(q) ||
-        (u.email ?? "").toLowerCase().includes(q)
-      );
-    })
-    .slice(0, 5);
+  // Pre-populate handle map from known users so editing a comment that already
+  // contains plain @handles re-resolves them on submit.
+  useEffect(() => {
+    users.forEach((u) => {
+      const h = userHandle(u);
+      const label = u.full_name || u.email || h;
+      if (!handleMapRef.current.has(h)) {
+        handleMapRef.current.set(h, { id: u.id, label });
+      }
+    });
+  }, [users]);
+
+  useEffect(() => {
+    if (autoFocus) textareaRef.current?.focus();
+  }, [autoFocus]);
+
+  const filtered = useMemo(() => {
+    const q = mentionQuery.toLowerCase();
+    return users
+      .filter(
+        (u) =>
+          (u.full_name ?? "").toLowerCase().includes(q) ||
+          (u.email ?? "").toLowerCase().includes(q) ||
+          userHandle(u).toLowerCase().includes(q),
+      )
+      .slice(0, 5);
+  }, [users, mentionQuery]);
 
   useEffect(() => {
     setActiveIdx(0);
@@ -59,7 +129,7 @@ export function CommentInput({ onSubmit, pending }: CommentInputProps) {
     const cursor = e.target.selectionStart ?? val.length;
     setText(val);
     const before = val.slice(0, cursor);
-    const m = before.match(/@(\w*)$/);
+    const m = before.match(/@([\w.\-]*)$/);
     if (m) {
       setMentionQuery(m[1]);
       setShowMentions(true);
@@ -73,15 +143,20 @@ export function CommentInput({ onSubmit, pending }: CommentInputProps) {
     const cursor = ta?.selectionStart ?? text.length;
     const before = text.slice(0, cursor);
     const after = text.slice(cursor);
+    // find the start of the current @token (before cursor) and end of any handle chars after
     const atIdx = before.lastIndexOf("@");
     if (atIdx === -1) return;
-    const label = user.full_name || user.email || "usuário";
-    const token = `@[${label}](${user.id}) `;
-    const next = before.slice(0, atIdx) + token + after;
+    let endIdx = 0;
+    while (endIdx < after.length && HANDLE_CHAR.test(after[endIdx])) endIdx += 1;
+    const handle = userHandle(user);
+    const label = user.full_name || user.email || handle;
+    handleMapRef.current.set(handle, { id: user.id, label });
+    const insertion = `@${handle} `;
+    const next = before.slice(0, atIdx) + insertion + after.slice(endIdx);
     setText(next);
     setShowMentions(false);
     requestAnimationFrame(() => {
-      const newPos = atIdx + token.length;
+      const newPos = atIdx + insertion.length;
       ta?.focus();
       ta?.setSelectionRange(newPos, newPos);
     });
@@ -89,9 +164,9 @@ export function CommentInput({ onSubmit, pending }: CommentInputProps) {
 
   const handleSubmit = () => {
     if (!text.trim() || pending) return;
-    const mentionedUserIds = [...text.matchAll(MENTION_TOKEN_RE)].map((m) => m[2]);
-    onSubmit({ content: text.trim(), mentionedUserIds });
-    setText("");
+    const { content, mentionedUserIds } = plainToTokens(text, handleMapRef.current);
+    onSubmit({ content: content.trim(), mentionedUserIds });
+    if (!onCancel) setText(""); // create flow clears, edit flow keeps until parent unmounts
     setShowMentions(false);
   };
 
@@ -122,6 +197,10 @@ export function CommentInput({ onSubmit, pending }: CommentInputProps) {
       e.preventDefault();
       handleSubmit();
     }
+    if (e.key === "Escape" && onCancel) {
+      e.preventDefault();
+      onCancel();
+    }
   };
 
   const getInitials = (name: string) =>
@@ -133,63 +212,17 @@ export function CommentInput({ onSubmit, pending }: CommentInputProps) {
       .join("")
       .toUpperCase();
 
-  // Render text with mention tokens replaced by styled chips
-  const renderHighlightedText = () => {
-    const parts: ReactNode[] = [];
-    let lastIndex = 0;
-    let match: RegExpExecArray | null;
-    const re = new RegExp(MENTION_TOKEN_RE.source, "g");
-    let i = 0;
-    while ((match = re.exec(text)) !== null) {
-      if (match.index > lastIndex) {
-        parts.push(<span key={`t${i++}`}>{text.slice(lastIndex, match.index)}</span>);
-      }
-      parts.push(
-        <span
-          key={`m${i++}`}
-          className="rounded bg-primary/15 text-primary px-1 py-0.5 font-medium"
-        >
-          @{match[1]}
-        </span>
-      );
-      lastIndex = match.index + match[0].length;
-    }
-    if (lastIndex < text.length) {
-      parts.push(<span key={`t${i++}`}>{text.slice(lastIndex)}</span>);
-    }
-    // trailing newline trick to keep last empty line visible
-    parts.push(<span key="end">{"\u200B"}</span>);
-    return parts;
-  };
-
-  const overlayRef = useRef<HTMLDivElement>(null);
-  const handleScroll = () => {
-    if (overlayRef.current && textareaRef.current) {
-      overlayRef.current.scrollTop = textareaRef.current.scrollTop;
-    }
-  };
-
   return (
     <div className="relative space-y-1.5">
-      <div className="relative">
-        <div
-          ref={overlayRef}
-          aria-hidden="true"
-          className="absolute inset-0 pointer-events-none whitespace-pre-wrap break-words overflow-hidden rounded-md border border-transparent px-3 py-2 text-sm leading-[1.25rem]"
-        >
-          {renderHighlightedText()}
-        </div>
-        <Textarea
-          ref={textareaRef}
-          value={text}
-          onChange={handleChange}
-          onKeyDown={handleKeyDown}
-          onScroll={handleScroll}
-          placeholder="Adicionar comentário... Use @ para mencionar"
-          rows={2}
-          className="relative bg-transparent text-transparent caret-foreground selection:bg-primary/30 selection:text-transparent leading-[1.25rem]"
-        />
-      </div>
+      <Textarea
+        ref={textareaRef}
+        value={text}
+        onChange={handleChange}
+        onKeyDown={handleKeyDown}
+        placeholder="Adicionar comentário... Use @ para mencionar"
+        rows={compact ? 2 : 2}
+        className={cn(compact && "text-xs")}
+      />
 
       {showMentions && filtered.length > 0 && (
         <div className="absolute bottom-full mb-1 left-0 w-64 bg-popover border border-border rounded-lg shadow-lg overflow-hidden z-50">
@@ -199,11 +232,14 @@ export function CommentInput({ onSubmit, pending }: CommentInputProps) {
               <button
                 key={u.id}
                 type="button"
-                onClick={() => insertMention(u)}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  insertMention(u);
+                }}
                 onMouseEnter={() => setActiveIdx(idx)}
                 className={cn(
                   "w-full flex items-center gap-2 px-3 py-2 text-sm text-left transition-colors",
-                  idx === activeIdx ? "bg-muted" : "hover:bg-muted/50"
+                  idx === activeIdx ? "bg-muted" : "hover:bg-muted/50",
                 )}
               >
                 <div className="w-6 h-6 rounded-full bg-primary/10 text-primary text-[10px] font-semibold flex items-center justify-center shrink-0">
@@ -211,9 +247,9 @@ export function CommentInput({ onSubmit, pending }: CommentInputProps) {
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="font-medium text-xs truncate">{label}</p>
-                  {u.email && (
-                    <p className="text-[11px] text-muted-foreground truncate">{u.email}</p>
-                  )}
+                  <p className="text-[11px] text-muted-foreground truncate">
+                    @{userHandle(u)}
+                  </p>
                 </div>
               </button>
             );
@@ -221,14 +257,27 @@ export function CommentInput({ onSubmit, pending }: CommentInputProps) {
         </div>
       )}
 
-      <Button
-        size="sm"
-        onClick={handleSubmit}
-        disabled={!text.trim() || pending}
-      >
-        {pending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
-        Comentar
-      </Button>
+      <div className="flex gap-1.5">
+        <Button
+          size="sm"
+          className={cn(compact && "h-6 text-xs px-2")}
+          onClick={handleSubmit}
+          disabled={!text.trim() || pending}
+        >
+          {pending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
+          {submitLabel}
+        </Button>
+        {onCancel && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className={cn(compact && "h-6 text-xs px-2")}
+            onClick={onCancel}
+          >
+            Cancelar
+          </Button>
+        )}
+      </div>
     </div>
   );
 }
