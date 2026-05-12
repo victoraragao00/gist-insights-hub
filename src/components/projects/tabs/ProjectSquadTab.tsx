@@ -21,13 +21,13 @@ import {
 interface ProjectSquadTabProps {
   projectId: string;
   ownerId: string;
-  isOwner: boolean;
+  canManage: boolean;
 }
 
 export function ProjectSquadTab({
   projectId,
   ownerId,
-  isOwner,
+  canManage,
 }: ProjectSquadTabProps) {
   const { data: members = [] } = useProjectMembers(projectId);
   const addMember = useAddProjectMember();
