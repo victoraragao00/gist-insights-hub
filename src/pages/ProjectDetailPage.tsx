@@ -127,7 +127,7 @@ export default function ProjectDetailPage() {
           Projetos
         </button>
 
-        {editing && isOwner ? (
+        {editing && canManageOwner ? (
           <Input
             value={titleEdit}
             onChange={(e) => setTitleEdit(e.target.value)}
@@ -146,9 +146,9 @@ export default function ProjectDetailPage() {
           <h1
             className={cn(
               "text-2xl font-semibold mb-2",
-              isOwner && "cursor-text hover:text-primary transition-colors",
+              canManageOwner && "cursor-text hover:text-primary transition-colors",
             )}
-            onClick={() => isOwner && setEditing(true)}
+            onClick={() => canManageOwner && setEditing(true)}
           >
             {project.title}
           </h1>
@@ -254,8 +254,8 @@ export default function ProjectDetailPage() {
               Detalhes
             </p>
             <ProjectOwnerField project={project} canEdit={canManageOwner} />
-            <ProjectClientField project={project} canEdit={isOwner} />
-            <ProjectDueDateField project={project} />
+            <ProjectClientField project={project} canEdit={canManageOwner} />
+            <ProjectDueDateField project={project} canEdit={canManageOwner} />
             <SidebarRow
               label="Criado em"
               value={format(new Date(project.created_at), "dd MMM yyyy", {
@@ -264,7 +264,7 @@ export default function ProjectDetailPage() {
             />
           </section>
 
-          <ProjectDatesSection project={project} canEdit={isOwner} />
+          <ProjectDatesSection project={project} canEdit={canManageOwner} />
 
           <section className="rounded-lg border border-border bg-card p-4">
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-2">
@@ -286,6 +286,7 @@ export default function ProjectDetailPage() {
               <span className="text-muted-foreground">Planejadas</span>
               <HoursEditField
                 value={project.hours_estimated}
+                canEdit={canManageOwner}
                 onSave={(val) =>
                   updateProject.mutate({
                     id: project.id,
@@ -354,7 +355,7 @@ export default function ProjectDetailPage() {
             </section>
           )}
 
-          {isOwner && (
+          {canManageOwner && (
             <section className="rounded-lg border border-border bg-card p-4">
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-3">
                 Ações
@@ -456,7 +457,7 @@ function SidebarRow({ label, value, icon: Icon }: SidebarRowProps) {
   );
 }
 
-function ProjectDueDateField({ project }: { project: ProjectRow }) {
+function ProjectDueDateField({ project, canEdit }: { project: ProjectRow; canEdit: boolean }) {
   const updateDueDate = useUpdateProjectDueDate();
   const [editing, setEditing] = useState(false);
 
@@ -484,7 +485,7 @@ function ProjectDueDateField({ project }: { project: ProjectRow }) {
           </TooltipProvider>
         )}
 
-        {editing ? (
+        {editing && canEdit ? (
           <input
             type="date"
             defaultValue={project.due_date ?? ""}
@@ -510,12 +511,15 @@ function ProjectDueDateField({ project }: { project: ProjectRow }) {
         ) : (
           <button
             type="button"
-            onClick={() => setEditing(true)}
+            onClick={() => canEdit && setEditing(true)}
+            disabled={!canEdit}
             className={cn(
-              "text-xs font-medium hover:text-primary transition-colors",
+              "text-xs font-medium transition-colors",
+              canEdit && "hover:text-primary cursor-pointer",
+              !canEdit && "cursor-default",
               !project.due_date && "text-muted-foreground/60 italic",
             )}
-            title="Clique para editar"
+            title={canEdit ? "Clique para editar" : undefined}
           >
             {project.due_date
               ? format(new Date(project.due_date), "dd/MM/yyyy", { locale: ptBR })
@@ -530,9 +534,10 @@ function ProjectDueDateField({ project }: { project: ProjectRow }) {
 interface HoursEditFieldProps {
   value: number | null;
   onSave: (value: number | null) => void;
+  canEdit?: boolean;
 }
 
-function HoursEditField({ value, onSave }: HoursEditFieldProps) {
+function HoursEditField({ value, onSave, canEdit = true }: HoursEditFieldProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
 
