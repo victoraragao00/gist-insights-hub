@@ -271,15 +271,23 @@ function CommentItem({
   comment,
   demandId,
   currentUserId,
+  isAdmin,
+  attachments,
+  signedUrlMap,
 }: {
   comment: DemandComment;
   demandId: string;
   currentUserId: string | undefined;
+  isAdmin: boolean;
+  attachments: DemandCommentAttachment[];
+  signedUrlMap: Record<string, string>;
 }) {
   const [editing, setEditing] = useState(false);
   const updateMutation = useUpdateComment();
   const deleteMutation = useDeleteComment();
+  const deleteAttachmentMutation = useDeleteCommentAttachment();
   const isOwner = comment.created_by === currentUserId;
+  const canDeleteAttachment = isOwner || isAdmin;
 
   const { data: profiles = [] } = useQuery<Array<{ id: string; full_name: string | null; email: string | null }>>({
     queryKey: ["user_profiles_mentions"],
@@ -387,6 +395,48 @@ function CommentItem({
           </div>
         ) : (
           <CommentText text={comment.content} />
+        )}
+        {attachments.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mt-1.5">
+            {attachments.map((a) => {
+              const url = signedUrlMap[a.id];
+              const isImg = a.mime_type?.startsWith("image/");
+              return (
+                <div key={a.id} className="relative group/att">
+                  {isImg && url ? (
+                    <a href={url} target="_blank" rel="noreferrer">
+                      <img
+                        src={url}
+                        alt={a.filename ?? "anexo"}
+                        className="h-20 w-20 rounded-md object-cover border border-border"
+                      />
+                    </a>
+                  ) : (
+                    <a
+                      href={url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center gap-1.5 rounded-md border border-border bg-muted/40 px-2 py-1 text-xs hover:bg-muted"
+                    >
+                      <Paperclip className="h-3 w-3 text-muted-foreground" />
+                      <span className="max-w-[160px] truncate">{a.filename ?? "anexo"}</span>
+                      <Download className="h-3 w-3 text-muted-foreground" />
+                    </a>
+                  )}
+                  {canDeleteAttachment && (
+                    <button
+                      type="button"
+                      className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-background border border-border text-muted-foreground opacity-0 group-hover/att:opacity-100 transition-opacity flex items-center justify-center hover:text-destructive"
+                      onClick={() => deleteAttachmentMutation.mutate(a)}
+                      aria-label="Remover anexo"
+                    >
+                      <X className="h-2.5 w-2.5" />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         )}
       </div>
     </div>
