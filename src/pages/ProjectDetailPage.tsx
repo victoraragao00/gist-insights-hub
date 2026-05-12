@@ -232,7 +232,7 @@ export default function ProjectDetailPage() {
               <ProjectSquadTab
                 projectId={id}
                 ownerId={project.owner_id}
-                isOwner={isOwner}
+                canManage={canManageOwner}
               />
             </TabsContent>
             <TabsContent value="rfis" className="mt-4">
