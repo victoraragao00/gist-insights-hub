@@ -815,7 +815,7 @@ export function DemandSidebar({ demand, onActivityTabSelect, onClose }: DemandSi
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setBlockDialogOpen(false)}>Cancelar</Button>
-            <Button onClick={handleBlock} disabled={!selectedBlockerType || blockLoading}>
+            <Button onClick={handleBlock} disabled={!selectedBlockerType || blockLoading || (blockerTypes.find((b) => b.id === selectedBlockerType)?.requires_reason === true && !blockerReason.trim())}>
               {blockLoading && <Loader2 className="h-4 w-4 animate-spin mr-1" />} Confirmar
             </Button>
           </DialogFooter>
