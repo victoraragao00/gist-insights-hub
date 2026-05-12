@@ -251,6 +251,9 @@ export function DemandConversationsTab({ demand }: DemandConversationsTabProps) 
               comment={c}
               demandId={demand.id}
               currentUserId={user?.id}
+              isAdmin={isAdmin}
+              attachments={attachmentsByComment[c.id] ?? []}
+              signedUrlMap={signedUrlMap}
             />
           ))}
         </div>
