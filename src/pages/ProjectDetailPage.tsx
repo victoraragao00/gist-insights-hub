@@ -569,6 +569,14 @@ function HoursEditField({ value, onSave, canEdit = true }: HoursEditFieldProps) 
     );
   }
 
+  if (!canEdit) {
+    return (
+      <span className={cn("text-sm font-medium", !value && "text-muted-foreground/60 italic text-xs")}>
+        {value ? formatHours(value) : "Definir"}
+      </span>
+    );
+  }
+
   return (
     <button
       type="button"
