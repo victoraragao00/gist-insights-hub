@@ -328,29 +328,25 @@ function CommentItem({
           )}
         </div>
         {editing ? (
-          <div className="space-y-1.5 mt-1">
-            <Textarea
-              value={editContent}
-              onChange={(e) => setEditContent(e.target.value)}
-              rows={2}
-              className="text-xs"
+          <div className="mt-1">
+            <CommentInput
+              initialText={editInitial}
+              submitLabel="Salvar"
+              autoFocus
+              compact
+              pending={updateMutation.isPending}
+              onCancel={() => setEditing(false)}
+              onSubmit={({ content }) => {
+                if (!content.trim()) {
+                  setEditing(false);
+                  return;
+                }
+                updateMutation.mutate(
+                  { id: comment.id, demandId, content },
+                  { onSuccess: () => setEditing(false) },
+                );
+              }}
             />
-            <div className="flex gap-1.5">
-              <Button
-                size="sm" className="h-6 text-xs px-2"
-                onClick={handleSave}
-                disabled={updateMutation.isPending || !editContent.trim()}
-              >
-                {updateMutation.isPending && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
-                Salvar
-              </Button>
-              <Button
-                variant="ghost" size="sm" className="h-6 text-xs px-2"
-                onClick={() => setEditing(false)}
-              >
-                Cancelar
-              </Button>
-            </div>
           </div>
         ) : (
           <CommentText text={comment.content} />
