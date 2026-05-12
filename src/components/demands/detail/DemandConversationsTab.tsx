@@ -299,7 +299,7 @@ function CommentItem({
             <div className="ml-auto flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
               <Button
                 variant="ghost" size="sm" className="h-5 px-1.5 text-xs"
-                onClick={() => { setEditContent(comment.content); setEditing(true); }}
+                onClick={() => setEditing(true)}
               >
                 Editar
               </Button>
