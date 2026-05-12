@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link2, MessageSquare, Sparkles, Loader2, X, ChevronDown } from "lucide-react";
-import { CommentInput } from "./CommentInput";
+import { CommentInput, tokensToPlain } from "./CommentInput";
 import { CommentText } from "./CommentText";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -9,7 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
+
 import { Separator } from "@/components/ui/separator";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import {
@@ -240,7 +240,6 @@ function CommentItem({
   currentUserId: string | undefined;
 }) {
   const [editing, setEditing] = useState(false);
-  const [editContent, setEditContent] = useState(comment.content);
   const updateMutation = useUpdateComment();
   const deleteMutation = useDeleteComment();
   const isOwner = comment.created_by === currentUserId;
@@ -273,17 +272,8 @@ function CommentItem({
     .join("")
     .toUpperCase() || "?";
 
+  const editInitial = tokensToPlain(comment.content, profiles);
 
-  const handleSave = () => {
-    if (!editContent.trim() || editContent === comment.content) {
-      setEditing(false);
-      return;
-    }
-    updateMutation.mutate(
-      { id: comment.id, demandId, content: editContent.trim() },
-      { onSuccess: () => setEditing(false) }
-    );
-  };
 
   return (
     <div className="flex gap-2 text-xs group">
@@ -309,7 +299,7 @@ function CommentItem({
             <div className="ml-auto flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
               <Button
                 variant="ghost" size="sm" className="h-5 px-1.5 text-xs"
-                onClick={() => { setEditContent(comment.content); setEditing(true); }}
+                onClick={() => setEditing(true)}
               >
                 Editar
               </Button>
@@ -338,29 +328,25 @@ function CommentItem({
           )}
         </div>
         {editing ? (
-          <div className="space-y-1.5 mt-1">
-            <Textarea
-              value={editContent}
-              onChange={(e) => setEditContent(e.target.value)}
-              rows={2}
-              className="text-xs"
+          <div className="mt-1">
+            <CommentInput
+              initialText={editInitial}
+              submitLabel="Salvar"
+              autoFocus
+              compact
+              pending={updateMutation.isPending}
+              onCancel={() => setEditing(false)}
+              onSubmit={({ content }) => {
+                if (!content.trim()) {
+                  setEditing(false);
+                  return;
+                }
+                updateMutation.mutate(
+                  { id: comment.id, demandId, content },
+                  { onSuccess: () => setEditing(false) },
+                );
+              }}
             />
-            <div className="flex gap-1.5">
-              <Button
-                size="sm" className="h-6 text-xs px-2"
-                onClick={handleSave}
-                disabled={updateMutation.isPending || !editContent.trim()}
-              >
-                {updateMutation.isPending && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
-                Salvar
-              </Button>
-              <Button
-                variant="ghost" size="sm" className="h-6 text-xs px-2"
-                onClick={() => setEditing(false)}
-              >
-                Cancelar
-              </Button>
-            </div>
           </div>
         ) : (
           <CommentText text={comment.content} />

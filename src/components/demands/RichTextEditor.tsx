@@ -75,14 +75,15 @@ export function RichTextEditor({
         editor
           .chain()
           .focus()
-          .setImage({ src: signedUrl, alt: file.name } as { src: string; alt?: string })
+          .insertContent({
+            type: "image",
+            attrs: {
+              src: signedUrl,
+              alt: file.name,
+              "data-storage-path": storagePath,
+            },
+          })
           .run();
-        queueMicrotask(() => {
-          const dom = editor.view.dom as HTMLElement;
-          const imgs = dom.querySelectorAll<HTMLImageElement>(`img[src="${signedUrl}"]`);
-          imgs.forEach((img) => img.setAttribute("data-storage-path", storagePath));
-          editor.commands.focus();
-        });
         return true;
       } catch (err) {
         toast.error("Erro ao enviar imagem: " + (err instanceof Error ? err.message : String(err)));
