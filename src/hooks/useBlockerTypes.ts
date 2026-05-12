@@ -44,6 +44,7 @@ export function useCreateBlockerType() {
       color: string;
       icon: string;
       position: number;
+      requires_reason?: boolean;
     }) => {
       const { error } = await supabase.from("blocker_types").insert(input);
       if (error) throw error;
@@ -63,7 +64,7 @@ export function useUpdateBlockerType() {
     mutationFn: async (input: {
       id: string;
       fields: Partial<
-        Pick<BlockerType, "name" | "color" | "icon" | "position" | "active">
+        Pick<BlockerType, "name" | "color" | "icon" | "position" | "active" | "requires_reason">
       >;
     }) => {
       const { error } = await supabase
