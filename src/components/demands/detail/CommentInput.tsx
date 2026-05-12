@@ -257,10 +257,42 @@ export function CommentInput({
         value={text}
         onChange={handleChange}
         onKeyDown={handleKeyDown}
+        onPaste={handlePaste}
+        onDrop={handleDrop}
         placeholder="Adicionar comentário... Use @ para mencionar"
         rows={compact ? 2 : 2}
         className={cn(compact && "text-xs")}
       />
+
+      {pendingFiles.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {pendingFiles.map((f, idx) => {
+            const isImg = f.type.startsWith("image/");
+            const url = isImg ? URL.createObjectURL(f) : null;
+            return (
+              <div
+                key={`${f.name}-${idx}`}
+                className="flex items-center gap-1.5 rounded-md border border-border bg-muted/40 px-2 py-1 text-xs"
+              >
+                {url ? (
+                  <img src={url} alt={f.name} className="h-6 w-6 rounded object-cover" />
+                ) : (
+                  <Paperclip className="h-3 w-3 text-muted-foreground" />
+                )}
+                <span className="max-w-[140px] truncate">{f.name}</span>
+                <button
+                  type="button"
+                  className="text-muted-foreground hover:text-destructive"
+                  onClick={() => setPendingFiles((p) => p.filter((_, i) => i !== idx))}
+                  aria-label="Remover anexo"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {showMentions && filtered.length > 0 && (
         <div className="absolute bottom-full mb-1 left-0 w-64 bg-popover border border-border rounded-lg shadow-lg overflow-hidden z-50">
@@ -295,16 +327,61 @@ export function CommentInput({
         </div>
       )}
 
-      <div className="flex gap-1.5">
+      <div className="flex items-center gap-1.5">
         <Button
           size="sm"
           className={cn(compact && "h-6 text-xs px-2")}
           onClick={handleSubmit}
-          disabled={!text.trim() || pending}
+          disabled={(!text.trim() && pendingFiles.length === 0) || pending}
         >
           {pending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
           {submitLabel}
         </Button>
+        {allowAttachments && (
+          <>
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                addFiles(e.target.files);
+                e.target.value = "";
+              }}
+            />
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                addFiles(e.target.files);
+                e.target.value = "";
+              }}
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className={cn("gap-1", compact && "h-6 text-xs px-2")}
+              onClick={() => imageInputRef.current?.click()}
+              title="Anexar imagem"
+            >
+              <ImageIcon className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className={cn("gap-1", compact && "h-6 text-xs px-2")}
+              onClick={() => fileInputRef.current?.click()}
+              title="Anexar arquivo"
+            >
+              <Paperclip className="h-3.5 w-3.5" />
+            </Button>
+          </>
+        )}
         {onCancel && (
           <Button
             variant="ghost"
