@@ -93,8 +93,8 @@ const DemandDetailPage = () => {
         </div>
       </div>
 
-      <aside className="hidden lg:block w-[300px] shrink-0 border-l border-border overflow-y-auto">
-        <div className="p-6">
+      <aside className="hidden lg:block w-[320px] shrink-0 border-l border-border overflow-y-auto overflow-x-hidden">
+        <div className="p-4">
           <DemandSidebar
             demand={demand}
             onActivityTabSelect={() => setActiveTab("activity")}

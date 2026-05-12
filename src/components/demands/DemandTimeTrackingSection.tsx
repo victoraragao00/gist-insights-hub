@@ -111,7 +111,7 @@ export function DemandTimeTrackingSection({ demandId, taskId = null, compact = f
               </Button>
             </div>
           ) : (
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
               <span className="text-xs text-muted-foreground">Nenhum timer rodando</span>
               {otherTimerActive ? (
                 <Tooltip>
@@ -170,7 +170,7 @@ export function DemandTimeTrackingSection({ demandId, taskId = null, compact = f
         {/* Manual entry */}
         <div className="rounded-lg border bg-card p-3 space-y-2">
           <Label className="text-xs text-muted-foreground">Adicionar manual</Label>
-          <div className="flex gap-2">
+          <div className="grid grid-cols-[80px_1fr_auto] gap-1.5">
             <Input
               type="number"
               min="0"
@@ -178,18 +178,19 @@ export function DemandTimeTrackingSection({ demandId, taskId = null, compact = f
               placeholder="Horas"
               value={manualHours}
               onChange={(e) => setManualHours(e.target.value)}
-              className="h-8 w-24"
+              className="h-8"
             />
             <Input
               placeholder="Descrição (opcional)"
               value={manualDescription}
               onChange={(e) => setManualDescription(e.target.value)}
-              className="h-8 flex-1"
+              className="h-8 min-w-0"
             />
             <Button
               size="sm"
               onClick={handleAddManual}
               disabled={addManualMutation.isPending || !manualHours}
+              className="h-8 w-8 p-0 shrink-0"
             >
               {addManualMutation.isPending ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />

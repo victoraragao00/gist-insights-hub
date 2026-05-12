@@ -479,7 +479,7 @@ function ProjectDueDateField({ project, canEdit }: { project: ProjectRow; canEdi
               </TooltipTrigger>
               <TooltipContent side="left" className="text-xs">
                 Data original:{" "}
-                {format(new Date(project.original_due_date), "dd/MM/yyyy", { locale: ptBR })}
+                {format(new Date(project.original_due_date + "T00:00:00"), "dd/MM/yyyy", { locale: ptBR })}
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
@@ -522,7 +522,7 @@ function ProjectDueDateField({ project, canEdit }: { project: ProjectRow; canEdi
             title={canEdit ? "Clique para editar" : undefined}
           >
             {project.due_date
-              ? format(new Date(project.due_date), "dd/MM/yyyy", { locale: ptBR })
+              ? format(new Date(project.due_date + "T00:00:00"), "dd/MM/yyyy", { locale: ptBR })
               : "Sem prazo"}
           </button>
         )}

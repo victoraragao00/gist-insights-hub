@@ -256,7 +256,7 @@ export function DemandSidebar({ demand, onActivityTabSelect, onClose }: DemandSi
       .toUpperCase();
 
   return (
-    <aside className="w-full lg:w-[280px] lg:shrink-0 lg:bg-muted/20 lg:border-l lg:border-border lg:pl-4 space-y-4">
+    <aside className="w-full min-w-0 space-y-4">
       {/* Details */}
       <section className="rounded-lg border border-border bg-card p-4 space-y-3">
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
