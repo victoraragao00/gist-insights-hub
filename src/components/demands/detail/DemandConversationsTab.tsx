@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link2, MessageSquare, Sparkles, Loader2, X, ChevronDown } from "lucide-react";
+import { Link2, MessageSquare, Sparkles, Loader2, X, ChevronDown, Paperclip, Download } from "lucide-react";
 import { CommentInput, tokensToPlain } from "./CommentInput";
 import { CommentText } from "./CommentText";
 import { formatDistanceToNow } from "date-fns";
@@ -18,6 +18,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useAuth } from "@/context/AuthContext";
+import { useUserRole } from "@/hooks/useUserRole";
 import type { DemandRow } from "@/hooks/useDemands";
 import { useDemandInteractions, useUnlinkInteraction } from "@/hooks/useDemandInteractions";
 import {
@@ -27,6 +28,13 @@ import {
   useDemandComments, useCreateComment, useUpdateComment, useDeleteComment,
   type DemandComment,
 } from "@/hooks/useDemandComments";
+import {
+  useDemandCommentAttachments,
+  useSignedCommentAttachmentUrls,
+  useUploadCommentAttachments,
+  useDeleteCommentAttachment,
+  type DemandCommentAttachment,
+} from "@/hooks/useDemandCommentAttachments";
 import { LinkConversationDialog } from "../LinkConversationDialog";
 
 const SIDE_BADGE: Record<string, string> = {
@@ -40,12 +48,24 @@ interface DemandConversationsTabProps {
 
 export function DemandConversationsTab({ demand }: DemandConversationsTabProps) {
   const { user } = useAuth();
+  const { isAdmin } = useUserRole();
   const { data: linkedInteractions = [] } = useDemandInteractions(demand.id);
   const { data: convSummaries = [] } = useConversationSummaries(demand.id);
   const summarizeMutation = useSummarizeConversation();
   const unlinkMutation = useUnlinkInteraction();
   const { data: comments = [] } = useDemandComments(demand.id);
   const createCommentMutation = useCreateComment();
+  const uploadCommentAttachments = useUploadCommentAttachments();
+  const { data: commentAttachments = [] } = useDemandCommentAttachments(demand.id);
+  const { data: signedUrlMap = {} } = useSignedCommentAttachmentUrls(commentAttachments);
+
+  const attachmentsByComment = useMemo(() => {
+    const map: Record<string, DemandCommentAttachment[]> = {};
+    commentAttachments.forEach((a) => {
+      (map[a.comment_id] ||= []).push(a);
+    });
+    return map;
+  }, [commentAttachments]);
 
   const [linkConvOpen, setLinkConvOpen] = useState(false);
 
@@ -59,9 +79,23 @@ export function DemandConversationsTab({ demand }: DemandConversationsTabProps) 
   const handlePostComment = ({
     content,
     mentionedUserIds,
-  }: { content: string; mentionedUserIds: string[] }) => {
+    files,
+  }: { content: string; mentionedUserIds: string[]; files?: File[] }) => {
     if (createCommentMutation.isPending) return;
-    createCommentMutation.mutate({ demandId: demand.id, content, mentionedUserIds });
+    createCommentMutation.mutate(
+      { demandId: demand.id, content, mentionedUserIds },
+      {
+        onSuccess: (res) => {
+          if (files && files.length > 0 && res?.id) {
+            uploadCommentAttachments.mutate({
+              commentId: res.id,
+              demandId: demand.id,
+              files,
+            });
+          }
+        },
+      },
+    );
   };
 
   return (
@@ -217,6 +251,9 @@ export function DemandConversationsTab({ demand }: DemandConversationsTabProps) 
               comment={c}
               demandId={demand.id}
               currentUserId={user?.id}
+              isAdmin={isAdmin}
+              attachments={attachmentsByComment[c.id] ?? []}
+              signedUrlMap={signedUrlMap}
             />
           ))}
         </div>
@@ -234,15 +271,23 @@ function CommentItem({
   comment,
   demandId,
   currentUserId,
+  isAdmin,
+  attachments,
+  signedUrlMap,
 }: {
   comment: DemandComment;
   demandId: string;
   currentUserId: string | undefined;
+  isAdmin: boolean;
+  attachments: DemandCommentAttachment[];
+  signedUrlMap: Record<string, string>;
 }) {
   const [editing, setEditing] = useState(false);
   const updateMutation = useUpdateComment();
   const deleteMutation = useDeleteComment();
+  const deleteAttachmentMutation = useDeleteCommentAttachment();
   const isOwner = comment.created_by === currentUserId;
+  const canDeleteAttachment = isOwner || isAdmin;
 
   const { data: profiles = [] } = useQuery<Array<{ id: string; full_name: string | null; email: string | null }>>({
     queryKey: ["user_profiles_mentions"],
@@ -350,6 +395,48 @@ function CommentItem({
           </div>
         ) : (
           <CommentText text={comment.content} />
+        )}
+        {attachments.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mt-1.5">
+            {attachments.map((a) => {
+              const url = signedUrlMap[a.id];
+              const isImg = a.mime_type?.startsWith("image/");
+              return (
+                <div key={a.id} className="relative group/att">
+                  {isImg && url ? (
+                    <a href={url} target="_blank" rel="noreferrer">
+                      <img
+                        src={url}
+                        alt={a.filename ?? "anexo"}
+                        className="h-20 w-20 rounded-md object-cover border border-border"
+                      />
+                    </a>
+                  ) : (
+                    <a
+                      href={url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center gap-1.5 rounded-md border border-border bg-muted/40 px-2 py-1 text-xs hover:bg-muted"
+                    >
+                      <Paperclip className="h-3 w-3 text-muted-foreground" />
+                      <span className="max-w-[160px] truncate">{a.filename ?? "anexo"}</span>
+                      <Download className="h-3 w-3 text-muted-foreground" />
+                    </a>
+                  )}
+                  {canDeleteAttachment && (
+                    <button
+                      type="button"
+                      className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-background border border-border text-muted-foreground opacity-0 group-hover/att:opacity-100 transition-opacity flex items-center justify-center hover:text-destructive"
+                      onClick={() => deleteAttachmentMutation.mutate(a)}
+                      aria-label="Remover anexo"
+                    >
+                      <X className="h-2.5 w-2.5" />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         )}
       </div>
     </div>

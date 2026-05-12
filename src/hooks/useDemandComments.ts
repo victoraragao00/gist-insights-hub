@@ -79,11 +79,15 @@ export function useCreateComment() {
       content: string;
       mentionedUserIds?: string[];
     }) => {
-      const { error: commentErr } = await supabase.from("demand_comments").insert({
-        demand_id: demandId,
-        content,
-        created_by: user?.id ?? null,
-      });
+      const { data: inserted, error: commentErr } = await supabase
+        .from("demand_comments")
+        .insert({
+          demand_id: demandId,
+          content,
+          created_by: user?.id ?? null,
+        })
+        .select("id")
+        .single();
       if (commentErr) throw commentErr;
 
       // Log activity
@@ -111,6 +115,8 @@ export function useCreateComment() {
           actorId: user?.id ?? null,
         });
       }
+
+      return { id: inserted.id as string };
     },
     onSuccess: (_data, vars) => {
       queryClient.invalidateQueries({ queryKey: ["demand_comments", vars.demandId] });

@@ -753,6 +753,60 @@ export type Database = {
           },
         ]
       }
+      demand_comment_attachments: {
+        Row: {
+          comment_id: string
+          created_at: string
+          created_by: string | null
+          demand_id: string
+          filename: string | null
+          id: string
+          mime_type: string | null
+          size_bytes: number | null
+          type: string
+          url: string
+        }
+        Insert: {
+          comment_id: string
+          created_at?: string
+          created_by?: string | null
+          demand_id: string
+          filename?: string | null
+          id?: string
+          mime_type?: string | null
+          size_bytes?: number | null
+          type: string
+          url: string
+        }
+        Update: {
+          comment_id?: string
+          created_at?: string
+          created_by?: string | null
+          demand_id?: string
+          filename?: string | null
+          id?: string
+          mime_type?: string | null
+          size_bytes?: number | null
+          type?: string
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "demand_comment_attachments_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "demand_comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "demand_comment_attachments_demand_id_fkey"
+            columns: ["demand_id"]
+            isOneToOne: false
+            referencedRelation: "demands"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       demand_comments: {
         Row: {
           content: string
