@@ -1,51 +1,53 @@
-## Objetivo
+## Problema
 
-Permitir um motivo de bloqueio "Outro" com texto livre obrigatório, e dar ao admin uma tela de configuração para criar/editar/desativar tipos de bloqueio.
+Hoje o squad de um projeto só pode ser editado pelo **Owner**. Como gestor de projetos (admin do CX Hub), você precisa adicionar/remover membros mesmo sem ser owner do projeto.
+
+A restrição existe em duas camadas:
+
+1. **Frontend** — `ProjectSquadTab` recebe apenas `isOwner` e esconde o `UserSelect` e o botão de remover.
+2. **RLS** — As policies `project_members_insert` e `project_members_delete` só permitem quando `auth.uid() = projects.owner_id`.
+
+A troca de owner já considera admin (`canManageOwner = isOwner || isAdmin`), mas o squad ficou de fora.
 
 ## Mudanças
 
-### 1. Banco — `blocker_types`
+### 1. RLS — `project_members` (migration nova)
 
-Migration:
-- Adicionar coluna `requires_reason boolean not null default false`.
-- Atualizar tipos existentes que devem exigir motivo (set `true` no tipo "Outro" se já existir).
-- Inserir o tipo `"Outro"` com `requires_reason = true`, `icon = '✏️'`, cor neutra, posição no fim — apenas se ainda não existir (`ON CONFLICT (name) DO NOTHING` ou `WHERE NOT EXISTS`).
+Substituir as policies de INSERT e DELETE para permitir owner **ou** admin global:
 
-RLS já existe e cobre admins. Sem alteração de policies.
+```sql
+DROP POLICY IF EXISTS "project_members_insert" ON public.project_members;
+DROP POLICY IF EXISTS "project_members_delete" ON public.project_members;
 
-### 2. Hook
+CREATE POLICY "project_members_insert" ON public.project_members FOR INSERT
+  WITH CHECK (
+    EXISTS (SELECT 1 FROM public.projects WHERE id = project_id AND owner_id = auth.uid())
+    OR public.is_admin(auth.uid())
+  );
 
-`src/hooks/useBlockerTypes.ts`:
-- `BlockerType` já vem de `Tables<"blocker_types">`, então pega `requires_reason` automaticamente após regen de types.
-- Adicionar `requires_reason` aos parâmetros de `useCreateBlockerType` e `useUpdateBlockerType`.
+CREATE POLICY "project_members_delete" ON public.project_members FOR DELETE
+  USING (
+    EXISTS (SELECT 1 FROM public.projects WHERE id = project_id AND owner_id = auth.uid())
+    OR public.is_admin(auth.uid())
+  );
+```
 
-### 3. Diálogo "Marcar como bloqueado" — `DemandSidebar.tsx`
+(Usar a função `is_admin()` já existente no projeto, conforme padrão de RLS recursion prevention.)
 
-- Recuperar o tipo selecionado: `const selected = blockerTypes.find(b => b.id === selectedBlockerType)`.
-- Quando `selected?.requires_reason === true`:
-  - Trocar label do textarea para `Motivo *` (obrigatório).
-  - Trocar placeholder para `Descreva o motivo do bloqueio...`.
-  - Botão Confirmar fica `disabled` se `blockerReason.trim()` estiver vazio.
-- Caso contrário: comportamento atual ("Motivo (opcional)").
-- O backend já grava `blocker_reason` — sem mudança no `handleBlock`.
+### 2. Frontend — `ProjectDetailPage.tsx`
 
-(O diálogo do `DemandDetailSheet.tsx` é uma versão legada que nem usa `blocker_type_id`. Fora do escopo desta task — deixar como está.)
+Trocar a prop passada para o squad de `isOwner={isOwner}` para `canManage={canManageOwner}` (que já é `isOwner || isAdmin`).
 
-### 4. Settings — nova aba "Bloqueios"
+### 3. `ProjectSquadTab.tsx`
 
-Criar `src/components/settings/BlockerTypesSettingsTab.tsx`, espelhando `DemandTypesSettingsTab`:
-- Form de adição: Nome, Cor, Ícone, Switch "Exige motivo", botão Adicionar.
-- Tabela com colunas: Ordem (↑ ↓), Nome (inline edit), Cor, Ícone, Exige motivo (Switch), Ativo (Switch).
-- Reaproveita `useAllBlockerTypes`, `useCreateBlockerType`, `useUpdateBlockerType`, `useToggleBlockerTypeActive`.
-
-Em `src/pages/SettingsPage.tsx`:
-- Importar `BlockerTypesSettingsTab`.
-- Adicionar `<TabsTrigger value="blockers">Bloqueios</TabsTrigger>` (admin only) próximo de "Tipos".
-- Adicionar `<TabsContent value="blockers"><BlockerTypesSettingsTab /></TabsContent>`.
+Renomear a prop `isOwner` para `canManage` e usá-la para gating do `UserSelect` (adicionar membro) e do botão `UserMinus` (remover membro). Sem mudanças visuais.
 
 ## Arquivos
-- migration nova
-- `src/hooks/useBlockerTypes.ts`
-- `src/components/demands/detail/DemandSidebar.tsx`
-- `src/components/settings/BlockerTypesSettingsTab.tsx` (novo)
-- `src/pages/SettingsPage.tsx`
+
+- **Nova migration** — atualiza policies de `project_members`
+- **`src/pages/ProjectDetailPage.tsx`** — passa `canManage` para o squad
+- **`src/components/projects/tabs/ProjectSquadTab.tsx`** — aceita `canManage` em vez de `isOwner`
+
+## Fora de escopo
+
+Outros gates `isOwner` (editar título, datas, cliente, deletar projeto, criar RFI) — você não pediu para abrir esses para admin. Se quiser, posso incluir num próximo passo.

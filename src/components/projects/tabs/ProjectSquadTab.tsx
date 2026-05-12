@@ -21,13 +21,13 @@ import {
 interface ProjectSquadTabProps {
   projectId: string;
   ownerId: string;
-  isOwner: boolean;
+  canManage: boolean;
 }
 
 export function ProjectSquadTab({
   projectId,
   ownerId,
-  isOwner,
+  canManage,
 }: ProjectSquadTabProps) {
   const { data: members = [] } = useProjectMembers(projectId);
   const addMember = useAddProjectMember();
@@ -56,13 +56,13 @@ export function ProjectSquadTab({
             key={m.user_id}
             user={m.user_profiles}
             roleLabel="Membro"
-            canRemove={isOwner}
+            canRemove={canManage}
             onRemove={() => setRemoveId(m.user_id)}
           />
         ))}
       </div>
 
-      {isOwner && (
+      {canManage && (
         <div className="mt-3">
           <UserSelect
             placeholder="Adicionar membro ao squad..."
