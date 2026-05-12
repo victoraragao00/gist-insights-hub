@@ -240,7 +240,6 @@ function CommentItem({
   currentUserId: string | undefined;
 }) {
   const [editing, setEditing] = useState(false);
-  const [editContent, setEditContent] = useState(comment.content);
   const updateMutation = useUpdateComment();
   const deleteMutation = useDeleteComment();
   const isOwner = comment.created_by === currentUserId;
@@ -273,17 +272,8 @@ function CommentItem({
     .join("")
     .toUpperCase() || "?";
 
+  const editInitial = tokensToPlain(comment.content, profiles);
 
-  const handleSave = () => {
-    if (!editContent.trim() || editContent === comment.content) {
-      setEditing(false);
-      return;
-    }
-    updateMutation.mutate(
-      { id: comment.id, demandId, content: editContent.trim() },
-      { onSuccess: () => setEditing(false) }
-    );
-  };
 
   return (
     <div className="flex gap-2 text-xs group">
