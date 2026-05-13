@@ -60,6 +60,7 @@ import {
   useUnlinkDemandFromProject,
 } from "@/hooks/useProjects";
 import { DemandDependenciesSection } from "./DemandDependenciesSection";
+import { DemandDatesSection } from "./DemandDatesSection";
 import { useDemandRelationships } from "@/hooks/useDemandRelationships";
 
 
