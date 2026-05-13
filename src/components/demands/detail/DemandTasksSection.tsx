@@ -156,6 +156,9 @@ export function DemandTasksSection({ demandId }: Props) {
             key={task.id}
             task={task}
             userProfiles={userProfiles}
+            updating={
+              updateMutation.isPending && updateMutation.variables?.id === task.id
+            }
             onUpdate={(fields) =>
               updateMutation.mutate({ id: task.id, demand_id: demandId, ...fields })
             }
