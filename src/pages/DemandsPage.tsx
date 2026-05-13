@@ -297,6 +297,16 @@ const DemandsPage = () => {
           </div>
         </div>
 
+        {view === "kanban" && sortMode !== "manual" && (
+          <div className="text-xs text-muted-foreground bg-muted/40 border border-border rounded-md px-3 py-1.5">
+            Ordenação automática ativa: <strong className="text-foreground">{
+              sortMode === "oldest_first" ? "Mais antigos primeiro" :
+              sortMode === "newest_first" ? "Mais novos primeiro" :
+              "Por criticidade"
+            }</strong>. Cards podem ser movidos entre colunas, mas a ordem dentro da coluna é definida pelas configurações.
+          </div>
+        )}
+
         {view === "kanban" && (
           <div className="flex flex-wrap gap-3">
             <Input
