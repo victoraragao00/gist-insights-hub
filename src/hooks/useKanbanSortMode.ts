@@ -31,7 +31,7 @@ export function useUpdateKanbanSortMode() {
     mutationFn: async (mode: KanbanSortMode) => {
       const { error } = await supabase
         .from("app_settings")
-        .update({ value: mode as unknown as object, updated_at: new Date().toISOString() })
+        .update({ value: mode, updated_at: new Date().toISOString() })
         .eq("key", SETTING_KEY);
       if (error) throw error;
     },
