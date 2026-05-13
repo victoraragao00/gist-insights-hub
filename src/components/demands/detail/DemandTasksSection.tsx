@@ -229,6 +229,7 @@ interface ItemUpdate {
 interface DemandTaskItemProps {
   task: DemandTaskRow;
   userProfiles: UserProfileMini[];
+  updating?: boolean;
   onUpdate: (fields: ItemUpdate) => void;
   onDelete: () => void;
 }
