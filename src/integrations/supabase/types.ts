@@ -1254,6 +1254,8 @@ export type Database = {
           is_blocked: boolean | null
           last_updated: string | null
           notes: string | null
+          planned_end_date: string | null
+          planned_start_date: string | null
           position: number
           priority: Database["public"]["Enums"]["demand_priority"]
           project_id: string | null
@@ -1290,6 +1292,8 @@ export type Database = {
           is_blocked?: boolean | null
           last_updated?: string | null
           notes?: string | null
+          planned_end_date?: string | null
+          planned_start_date?: string | null
           position?: number
           priority?: Database["public"]["Enums"]["demand_priority"]
           project_id?: string | null
@@ -1326,6 +1330,8 @@ export type Database = {
           is_blocked?: boolean | null
           last_updated?: string | null
           notes?: string | null
+          planned_end_date?: string | null
+          planned_start_date?: string | null
           position?: number
           priority?: Database["public"]["Enums"]["demand_priority"]
           project_id?: string | null
