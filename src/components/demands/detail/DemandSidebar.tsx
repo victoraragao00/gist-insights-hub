@@ -60,6 +60,7 @@ import {
   useUnlinkDemandFromProject,
 } from "@/hooks/useProjects";
 import { DemandDependenciesSection } from "./DemandDependenciesSection";
+import { DemandDatesSection } from "./DemandDatesSection";
 import { useDemandRelationships } from "@/hooks/useDemandRelationships";
 
 
@@ -510,6 +511,9 @@ export function DemandSidebar({ demand, onActivityTabSelect, onClose }: DemandSi
         </AlertDialogContent>
       </AlertDialog>
 
+
+      {/* Datas */}
+      <DemandDatesSection demand={demand} />
 
       {/* RFI */}
       <section className="rounded-lg border border-border bg-card p-4 space-y-3">

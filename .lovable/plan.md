@@ -1,55 +1,52 @@
-## 1. SLA por tipo de demanda (e prioridade)
+## Datas planejadas e reais nas demandas
 
-**Hoje:** `sla_configs (client_id, priority, hours_limit)` define SLA só por prioridade. Não é possível diferenciar Suporte × Melhoria, nem desativar SLA para um tipo.
+Hoje a demanda só tem `started_at` e `finished_at` (timestamps automáticos disparados quando o card entra numa coluna com `triggers_started_at` / `triggers_finished_at`). Não existe data planejada.
 
-**Mudança no banco** (migration):
-- Adicionar coluna `demand_type_id uuid NULL` em `sla_configs` (NULL = vale para todos os tipos, mantém retrocompatibilidade).
-- Adicionar coluna `enabled boolean NOT NULL DEFAULT true`. Quando `false`, demandas daquele tipo/cliente/prioridade ficam **sem SLA** (não entram no painel de SLA, não viram "vencido").
-- Trocar a unique constraint `(client_id, priority)` por `(client_id, demand_type_id, priority)` usando expressão `COALESCE(demand_type_id, '00000000-...')` ou índice único parcial.
-- Atualizar `get_demands_with_sla(p_user_id)`:
-  - Resolução em cascata: `(client + type + priority)` → `(client + priority, type NULL)` → `(global + type + priority)` → `(global + priority, type NULL)` → default 8h.
-  - Se a config resolvida tiver `enabled = false`, **excluir** a demanda do retorno (fica fora do painel SLA).
+### 1. Banco (migration)
 
-**Mudança no frontend (`SlaSettingsTab.tsx` + `useSlaConfigs.ts`):**
-- Reorganizar a aba em duas dimensões: seletor de **Cliente** (já existe) + seletor de **Tipo de demanda** (novo, com opção "Todos os tipos" = `demand_type_id IS NULL`).
-- Para cada combinação, a tabela de 4 prioridades passa a ter 3 colunas: Horas, Toggle "SLA ativo", Origem (Personalizado / Global / Desativado).
-- Permitir reset (remove a linha custom e cai no nível anterior).
-- `useSlaConfigs` aceita `(clientId?, demandTypeId?)` e a query passa a filtrar pelas duas dimensões.
+Adicionar 2 colunas em `demands` (datas planejadas, sem hora):
+- `planned_start_date date NULL`
+- `planned_end_date date NULL`
 
-**Comunicação visual:** quando o tipo está desativado, mostrar badge "Sem SLA" e esconder o input de horas.
+As datas reais permanecem nas colunas existentes:
+- **Início real** = `started_at` (já preenchido automaticamente quando o card entra numa coluna com `triggers_started_at = true`, tipicamente "Em progresso").
+- **Conclusão real** = `finished_at` (já preenchido quando entra em coluna com `triggers_finished_at = true`, tipicamente "Concluído").
 
----
+Trigger de validação `validate_demand_planned_end()` em `BEFORE INSERT/UPDATE`:
+- Se `planned_end_date IS NOT NULL` e `project_id IS NOT NULL`, buscar `projects.planned_end_date` (fallback `due_date`) e bloquear se a data planejada da demanda for posterior. Erro claro em PT-BR.
+- Se `planned_start_date` e `planned_end_date` estiverem ambos preenchidos, garantir `start <= end`.
 
-## 2. Ordenação configurável dos cards no Kanban
+Sem CHECK constraint (datas comparativas precisam ser trigger, conforme regra do projeto).
 
-**Hoje:** `useDemands.ts` ordena por `position ASC` dentro de cada coluna (drag & drop manual). Não há opção de ordenar por idade ou prioridade.
+### 2. Hook / tipos
 
-**Mudança no banco** (migration):
-- Inserir em `app_settings` a chave `kanban_sort_mode` com valores possíveis: `manual` (default, posição via DnD), `oldest_first` (created_at ASC), `newest_first` (created_at DESC), `priority` (urgent → high → medium → low, depois created_at ASC como tiebreaker).
-- Já existe RLS de `app_settings` permitindo leitura por todos e update por admin → reaproveitar.
+- `src/hooks/useDemands.ts`: incluir os 2 novos campos no tipo `DemandRow` e no `select`. `useUpdateDemand` já aceita campos genéricos — sem mudança estrutural.
 
-**Mudança no frontend:**
-- Nova subseção em **Configurações → Demandas** chamada "Ordenação dos cards no Kanban", com 4 radio options claros e descrição do que cada um faz. Apenas admin edita; demais usuários veem o valor atual.
-- Hook novo `useKanbanSortMode()` (React Query, staleTime alto) que lê/escreve a chave.
-- Em `useDemands.ts` (e nos lugares que listam demandas por coluna), aplicar a ordenação no client após o fetch:
-  - `manual` → mantém `position ASC` (comportamento atual; DnD continua funcionando).
-  - `oldest_first` / `newest_first` → ordena por `created_at`; **desabilita o drag & drop** entre posições dentro da coluna (mover entre colunas continua) e mostra um aviso discreto no topo do board.
-  - `priority` → ordena por peso de prioridade + `created_at` ASC; idem desabilita reorder manual dentro da coluna.
+### 3. UI — `DemandSidebar.tsx`
 
----
+Nova seção "Datas" (acima ou abaixo de "Esforço"), com 4 linhas no mesmo padrão visual do `ProjectDatesSection`:
 
-## Arquivos a editar
+| Campo | Editável | Origem |
+|---|---|---|
+| Início previsto | Sim (popover Calendar) | `planned_start_date` |
+| Fim previsto | Sim (popover Calendar) | `planned_end_date` |
+| Início real | Não (read-only, badge "automático") | `started_at` |
+| Conclusão real | Não (read-only, badge "automático") | `finished_at` |
 
-**Backend (Lovable — migration):**
-- `supabase/migrations/<novo>.sql` — alter `sla_configs`, recriar `get_demands_with_sla`, seed de `app_settings.kanban_sort_mode`.
+- Datas planejadas usam `new Date(value + "T00:00:00")` para evitar bug de fuso (mesmo padrão já corrigido em `ProjectDatesSection` / `ProjectCard`).
+- Datas reais exibem data + hora curta + "automático ao entrar em <coluna>".
+- Botão "Limpar" nas planejadas.
+- Quando há `project_id`, mostrar texto auxiliar abaixo de "Fim previsto": *"Limite: <data do projeto>"*. Se o usuário tenta salvar acima, `useUpdateDemand` propaga o erro do trigger via toast.
 
-**Frontend:**
-- `src/hooks/useSlaConfigs.ts` — assinatura com `demandTypeId`, suporte a `enabled`.
-- `src/components/settings/SlaSettingsTab.tsx` — seletor de tipo + toggle de ativação.
-- `src/hooks/useKanbanSortMode.ts` — novo hook (read/write `app_settings`).
-- `src/components/settings/DemandTypesSettingsTab.tsx` ou nova `KanbanSortSettingsTab.tsx` — UI das 4 opções.
-- `src/pages/SettingsPage.tsx` — registrar nova aba/subseção.
-- `src/hooks/useDemands.ts` — aplicar sort mode; expor flag `canReorder`.
-- `src/pages/DemandsPage.tsx` (Kanban) — desabilitar DnD dentro de coluna quando modo ≠ manual + aviso visual.
+### 4. Card no Kanban (opcional, escopo mínimo)
 
-Sem mudanças em hooks de notificação, comments ou attachments.
+`DemandCard` (lib/demandCardData.ts já agrega o card): exibir badge discreto com `planned_end_date` quando definido (ex: 📅 12/06), em estilo neutro. Vermelho se atrasado (today > planned_end e não concluído). Se você preferir manter o card limpo, posso pular essa parte — confirme.
+
+### Arquivos
+
+- `supabase/migrations/<novo>.sql` — colunas + trigger
+- `src/hooks/useDemands.ts` — tipo + select
+- `src/components/demands/detail/DemandSidebar.tsx` — nova seção "Datas"
+- `src/components/demands/DemandCard.tsx` (apenas se quiser badge no card)
+
+Sem mudanças em projects, sla_configs, ordenação Kanban ou anexos.
