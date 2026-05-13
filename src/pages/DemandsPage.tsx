@@ -18,6 +18,7 @@ import {
   useTicketColumns, useDemandTypes, useDemands, useMoveDemand,
   type DemandRow, type DemandPriority, type DemandFilters,
 } from "@/hooks/useDemands";
+import { useKanbanSortMode, sortDemandsByMode } from "@/hooks/useKanbanSortMode";
 import { useAreasByWorkspace } from "@/hooks/useDemandAreas";
 import { useCollapsedColumns } from "@/hooks/useCollapsedColumns";
 import { useDemandTaskCounts } from "@/hooks/useDemandTasks";
