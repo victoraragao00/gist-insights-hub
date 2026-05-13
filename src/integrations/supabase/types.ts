@@ -2177,6 +2177,8 @@ export type Database = {
         Row: {
           client_id: string | null
           created_at: string
+          demand_type_id: string | null
+          enabled: boolean
           hours_limit: number
           id: string
           priority: string
@@ -2185,6 +2187,8 @@ export type Database = {
         Insert: {
           client_id?: string | null
           created_at?: string
+          demand_type_id?: string | null
+          enabled?: boolean
           hours_limit: number
           id?: string
           priority: string
@@ -2193,6 +2197,8 @@ export type Database = {
         Update: {
           client_id?: string | null
           created_at?: string
+          demand_type_id?: string | null
+          enabled?: boolean
           hours_limit?: number
           id?: string
           priority?: string
@@ -2204,6 +2210,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sla_configs_demand_type_id_fkey"
+            columns: ["demand_type_id"]
+            isOneToOne: false
+            referencedRelation: "demand_types"
             referencedColumns: ["id"]
           },
         ]
