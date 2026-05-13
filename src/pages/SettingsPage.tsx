@@ -34,6 +34,7 @@ import { AgendaSettingsTab } from "@/components/settings/AgendaSettingsTab";
 import { RfiStatusSettingsTab } from "@/components/settings/RfiStatusSettingsTab";
 import { SlaSettingsTab } from "@/components/settings/SlaSettingsTab";
 import { ClassifierSettingsTab } from "@/components/settings/ClassifierSettingsTab";
+import { KanbanSortSettingsTab } from "@/components/settings/KanbanSortSettingsTab";
 import { DemandTypesSettingsTab } from "@/components/settings/DemandTypesSettingsTab";
 import { DemandPrioritiesSettingsTab } from "@/components/settings/DemandPrioritiesSettingsTab";
 import { BlockerTypesSettingsTab } from "@/components/settings/BlockerTypesSettingsTab";
@@ -640,6 +641,7 @@ const SettingsPage = () => {
           {isAdmin && <TabsTrigger value="rfi-statuses">Status RFI</TabsTrigger>}
           {isAdmin && <TabsTrigger value="users">Equipe & Acessos</TabsTrigger>}
           {isAdmin && <TabsTrigger value="sla">SLA</TabsTrigger>}
+          {isAdmin && <TabsTrigger value="kanban-sort">Ordenação Kanban</TabsTrigger>}
           {isAdmin && <TabsTrigger value="classifier">Classificador IA</TabsTrigger>}
         </TabsList>
 
@@ -1167,6 +1169,11 @@ const SettingsPage = () => {
         {isAdmin && (
           <TabsContent value="classifier">
             <ClassifierSettingsTab />
+          </TabsContent>
+        )}
+        {isAdmin && (
+          <TabsContent value="kanban-sort">
+            <KanbanSortSettingsTab />
           </TabsContent>
         )}
       </Tabs>

@@ -1,30 +1,55 @@
-## 1. Scroll horizontal no painel de demanda
+## 1. SLA por tipo de demanda (e prioridade)
 
-**Problema:** O `DemandDetailSheet` (`sm:max-w-lg` ≈ 512px) está exibindo scroll lateral em viewports menores. O conteúdo (Board, RFI, Tempo trabalhado, Adicionar manual, BLOQUEIO, SLA) tem elementos lado a lado que estouram a largura — ex.: "Board: CX Hub | Mover para TECH", "Adicionar manual: Horas | Des(crição) | +", "Iniciar timer".
+**Hoje:** `sla_configs (client_id, priority, hours_limit)` define SLA só por prioridade. Não é possível diferenciar Suporte × Melhoria, nem desativar SLA para um tipo.
 
-**Fix em `src/components/demands/DemandDetailSheet.tsx`:**
-- Adicionar `overflow-x-hidden` no `SheetContent` (linha 90) e padding interno mais conservador.
-- No bloco Board: empilhar nome + botão "Mover para TECH" em coluna no breakpoint default (já que o sheet é estreito), em vez de inline.
-- Na seção "Adicionar manual": trocar layout flex inline por grid `grid-cols-[1fr_1fr_auto] gap-1.5` para que os inputs encolham e o botão `+` não force overflow.
-- Na seção "Tempo trabalhado": permitir wrap entre o texto "Nenhum timer rodando" e o botão "Iniciar timer".
-- Em todos os Inputs/Selects da meta grid, garantir `min-w-0` nos containers `flex-1` para evitar overflow do conteúdo do `<SelectValue>`.
-- Garantir `truncate` em labels longos (Board name, criador).
+**Mudança no banco** (migration):
+- Adicionar coluna `demand_type_id uuid NULL` em `sla_configs` (NULL = vale para todos os tipos, mantém retrocompatibilidade).
+- Adicionar coluna `enabled boolean NOT NULL DEFAULT true`. Quando `false`, demandas daquele tipo/cliente/prioridade ficam **sem SLA** (não entram no painel de SLA, não viram "vencido").
+- Trocar a unique constraint `(client_id, priority)` por `(client_id, demand_type_id, priority)` usando expressão `COALESCE(demand_type_id, '00000000-...')` ou índice único parcial.
+- Atualizar `get_demands_with_sla(p_user_id)`:
+  - Resolução em cascata: `(client + type + priority)` → `(client + priority, type NULL)` → `(global + type + priority)` → `(global + priority, type NULL)` → default 8h.
+  - Se a config resolvida tiver `enabled = false`, **excluir** a demanda do retorno (fica fora do painel SLA).
 
-Sem mudanças em hooks/lógica — puramente CSS/layout.
+**Mudança no frontend (`SlaSettingsTab.tsx` + `useSlaConfigs.ts`):**
+- Reorganizar a aba em duas dimensões: seletor de **Cliente** (já existe) + seletor de **Tipo de demanda** (novo, com opção "Todos os tipos" = `demand_type_id IS NULL`).
+- Para cada combinação, a tabela de 4 prioridades passa a ter 3 colunas: Horas, Toggle "SLA ativo", Origem (Personalizado / Global / Desativado).
+- Permitir reset (remove a linha custom e cai no nível anterior).
+- `useSlaConfigs` aceita `(clientId?, demandTypeId?)` e a query passa a filtrar pelas duas dimensões.
 
-## 2. Data de entrega aparece errada após salvar
+**Comunicação visual:** quando o tipo está desativado, mostrar badge "Sem SLA" e esconder o input de horas.
 
-**Causa raiz:** Em `src/pages/ProjectDetailPage.tsx` (linha 525) e no tooltip (linha 482), o código faz `format(new Date(project.due_date), "dd/MM/yyyy")`. Como `due_date` vem como `"YYYY-MM-DD"`, o construtor `new Date()` interpreta como **UTC midnight**. No fuso de Brasília (UTC-3) isso vira o dia anterior ao formatar localmente — usuário escolhe 17/06 e vê 16/06.
+---
 
-**Fix:**
-- Criar helper local (ou usar inline) `new Date(dateStr + "T00:00:00")` para parse como horário local.
-- Aplicar nos dois pontos do `ProjectDueDateField` (linhas 482 e 525).
-- Verificar e aplicar o mesmo fix em outros usos de `format(new Date(date_string)...)` no mesmo arquivo se houver (ex.: `actual_*_date`, `planned_*_date` na seção Datas — `ProjectDatesSection.tsx` já faz isso corretamente).
-- Também aplicar em `ProjectCard.tsx` (linha 90+) onde `due_date` é exibido/comparado.
+## 2. Ordenação configurável dos cards no Kanban
 
-Sem mudanças no banco ou na mutation — apenas formatação no frontend.
+**Hoje:** `useDemands.ts` ordena por `position ASC` dentro de cada coluna (drag & drop manual). Não há opção de ordenar por idade ou prioridade.
 
-## Arquivos editados
-- `src/components/demands/DemandDetailSheet.tsx` — espaçamentos / overflow
-- `src/pages/ProjectDetailPage.tsx` — parse local de `due_date`
-- `src/components/projects/ProjectCard.tsx` — parse local de `due_date` (se aplicável)
+**Mudança no banco** (migration):
+- Inserir em `app_settings` a chave `kanban_sort_mode` com valores possíveis: `manual` (default, posição via DnD), `oldest_first` (created_at ASC), `newest_first` (created_at DESC), `priority` (urgent → high → medium → low, depois created_at ASC como tiebreaker).
+- Já existe RLS de `app_settings` permitindo leitura por todos e update por admin → reaproveitar.
+
+**Mudança no frontend:**
+- Nova subseção em **Configurações → Demandas** chamada "Ordenação dos cards no Kanban", com 4 radio options claros e descrição do que cada um faz. Apenas admin edita; demais usuários veem o valor atual.
+- Hook novo `useKanbanSortMode()` (React Query, staleTime alto) que lê/escreve a chave.
+- Em `useDemands.ts` (e nos lugares que listam demandas por coluna), aplicar a ordenação no client após o fetch:
+  - `manual` → mantém `position ASC` (comportamento atual; DnD continua funcionando).
+  - `oldest_first` / `newest_first` → ordena por `created_at`; **desabilita o drag & drop** entre posições dentro da coluna (mover entre colunas continua) e mostra um aviso discreto no topo do board.
+  - `priority` → ordena por peso de prioridade + `created_at` ASC; idem desabilita reorder manual dentro da coluna.
+
+---
+
+## Arquivos a editar
+
+**Backend (Lovable — migration):**
+- `supabase/migrations/<novo>.sql` — alter `sla_configs`, recriar `get_demands_with_sla`, seed de `app_settings.kanban_sort_mode`.
+
+**Frontend:**
+- `src/hooks/useSlaConfigs.ts` — assinatura com `demandTypeId`, suporte a `enabled`.
+- `src/components/settings/SlaSettingsTab.tsx` — seletor de tipo + toggle de ativação.
+- `src/hooks/useKanbanSortMode.ts` — novo hook (read/write `app_settings`).
+- `src/components/settings/DemandTypesSettingsTab.tsx` ou nova `KanbanSortSettingsTab.tsx` — UI das 4 opções.
+- `src/pages/SettingsPage.tsx` — registrar nova aba/subseção.
+- `src/hooks/useDemands.ts` — aplicar sort mode; expor flag `canReorder`.
+- `src/pages/DemandsPage.tsx` (Kanban) — desabilitar DnD dentro de coluna quando modo ≠ manual + aviso visual.
+
+Sem mudanças em hooks de notificação, comments ou attachments.

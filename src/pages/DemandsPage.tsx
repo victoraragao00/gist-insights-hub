@@ -18,6 +18,7 @@ import {
   useTicketColumns, useDemandTypes, useDemands, useMoveDemand,
   type DemandRow, type DemandPriority, type DemandFilters,
 } from "@/hooks/useDemands";
+import { useKanbanSortMode, sortDemandsByMode } from "@/hooks/useKanbanSortMode";
 import { useAreasByWorkspace } from "@/hooks/useDemandAreas";
 import { useCollapsedColumns } from "@/hooks/useCollapsedColumns";
 import { useDemandTaskCounts } from "@/hooks/useDemandTasks";
@@ -191,6 +192,8 @@ const DemandsPage = () => {
     return demands;
   }, [demands, alertFilter]);
 
+  const { data: sortMode = "manual" } = useKanbanSortMode();
+
   const demandsByColumn = useMemo(() => {
     const map = new Map<string, DemandRow[]>();
     for (const col of columns) {
@@ -201,8 +204,12 @@ const DemandsPage = () => {
       if (arr) arr.push(d);
       else map.set(d.column_id, [d]);
     }
+    // Apply configured sort within each column
+    for (const [colId, list] of map) {
+      map.set(colId, sortDemandsByMode(list, sortMode));
+    }
     return map;
-  }, [columns, filteredDemands]);
+  }, [columns, filteredDemands, sortMode]);
 
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event;
@@ -289,6 +296,16 @@ const DemandsPage = () => {
             </Button>
           </div>
         </div>
+
+        {view === "kanban" && sortMode !== "manual" && (
+          <div className="text-xs text-muted-foreground bg-muted/40 border border-border rounded-md px-3 py-1.5">
+            Ordenação automática ativa: <strong className="text-foreground">{
+              sortMode === "oldest_first" ? "Mais antigos primeiro" :
+              sortMode === "newest_first" ? "Mais novos primeiro" :
+              "Por criticidade"
+            }</strong>. Cards podem ser movidos entre colunas, mas a ordem dentro da coluna é definida pelas configurações.
+          </div>
+        )}
 
         {view === "kanban" && (
           <div className="flex flex-wrap gap-3">

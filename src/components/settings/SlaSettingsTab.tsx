@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -13,6 +14,7 @@ import {
 } from "@/components/ui/table";
 import { Loader2, RotateCcw } from "lucide-react";
 import { useSlaConfigs, useUpsertSlaConfig, useResetSlaConfig } from "@/hooks/useSlaConfigs";
+import { useDemandTypes } from "@/hooks/useDemands";
 
 const PRIORITIES = ["urgent", "high", "medium", "low"] as const;
 const PRIORITY_LABELS: Record<string, string> = {
@@ -22,22 +24,30 @@ const PRIORITY_LABELS: Record<string, string> = {
   low: "Baixa",
 };
 const DEFAULT_HOURS: Record<string, number> = { urgent: 2, high: 4, medium: 8, low: 24 };
+const ALL_TYPES = "__all__";
+
+interface RowDraft {
+  hours?: number;
+  enabled?: boolean;
+}
 
 export function SlaSettingsTab() {
   const [selectedClientId, setSelectedClientId] = useState<string>("");
-  const [globalDraft, setGlobalDraft] = useState<Record<string, number>>({});
-  const [clientDraft, setClientDraft] = useState<Record<string, number>>({});
+  const [selectedTypeId, setSelectedTypeId] = useState<string>(ALL_TYPES); // ALL_TYPES = demand_type_id null
+  const [globalDraft, setGlobalDraft] = useState<Record<string, RowDraft>>({});
+  const [clientDraft, setClientDraft] = useState<Record<string, RowDraft>>({});
 
   const upsertMutation = useUpsertSlaConfig();
   const resetMutation = useResetSlaConfig();
+  const { data: demandTypes = [] } = useDemandTypes();
 
-  // Global configs
-  const { data: globalData = [] } = useSlaConfigs();
+  const typeIdParam: string | null = selectedTypeId === ALL_TYPES ? null : selectedTypeId;
 
-  // Client configs (only when a client is selected)
-  const { data: clientData = [] } = useSlaConfigs(selectedClientId || undefined);
+  // Globals (client_id NULL) for current type filter (or all-types)
+  const { data: globalData = [] } = useSlaConfigs(undefined, typeIdParam);
+  // Client-specific configs
+  const { data: clientData = [] } = useSlaConfigs(selectedClientId || undefined, typeIdParam);
 
-  // Clients list
   const { data: clients = [] } = useQuery({
     queryKey: ["clients_list_sla"],
     staleTime: 60_000,
@@ -67,41 +77,83 @@ export function SlaSettingsTab() {
 
   const handleSaveGlobal = async () => {
     for (const priority of PRIORITIES) {
-      if (globalDraft[priority] !== undefined) {
-        await upsertMutation.mutateAsync({
-          client_id: null,
-          priority,
-          hours_limit: globalDraft[priority],
-        });
-      }
+      const draft = globalDraft[priority];
+      if (!draft) continue;
+      const current = globalConfigs.find((c) => c.priority === priority);
+      await upsertMutation.mutateAsync({
+        client_id: null,
+        demand_type_id: typeIdParam,
+        priority,
+        hours_limit: draft.hours ?? current?.hours_limit ?? DEFAULT_HOURS[priority],
+        enabled: draft.enabled ?? current?.enabled ?? true,
+      });
     }
     setGlobalDraft({});
   };
 
   const handleSaveClient = async () => {
     for (const priority of PRIORITIES) {
-      if (clientDraft[priority] !== undefined) {
-        await upsertMutation.mutateAsync({
-          client_id: selectedClientId,
-          priority,
-          hours_limit: clientDraft[priority],
-        });
-      }
+      const draft = clientDraft[priority];
+      if (!draft) continue;
+      const current = clientConfigs.find((c) => c.priority === priority);
+      const fallback = globalConfigs.find((c) => c.priority === priority);
+      await upsertMutation.mutateAsync({
+        client_id: selectedClientId,
+        demand_type_id: typeIdParam,
+        priority,
+        hours_limit:
+          draft.hours ??
+          current?.hours_limit ??
+          fallback?.hours_limit ??
+          DEFAULT_HOURS[priority],
+        enabled: draft.enabled ?? current?.enabled ?? fallback?.enabled ?? true,
+      });
     }
     setClientDraft({});
   };
 
-  const getGlobalHours = (priority: string) =>
-    globalConfigs.find((c) => c.priority === priority)?.hours_limit ?? DEFAULT_HOURS[priority];
+  const getGlobalRow = (priority: string) => {
+    const cfg = globalConfigs.find((c) => c.priority === priority);
+    return {
+      hours: cfg?.hours_limit ?? DEFAULT_HOURS[priority],
+      enabled: cfg?.enabled ?? true,
+    };
+  };
+
+  const typeLabel =
+    selectedTypeId === ALL_TYPES
+      ? "Todos os tipos"
+      : demandTypes.find((t) => t.id === selectedTypeId)?.name ?? "";
 
   return (
     <div className="space-y-6 mt-4">
+      {/* Type selector — applies to both sections */}
+      <div className="space-y-2">
+        <h3 className="text-sm font-medium">Tipo de demanda</h3>
+        <p className="text-xs text-muted-foreground">
+          Configure SLAs específicos por tipo. "Todos os tipos" é o padrão usado quando não houver regra para o tipo da demanda.
+        </p>
+        <Select value={selectedTypeId} onValueChange={(v) => { setSelectedTypeId(v); setGlobalDraft({}); setClientDraft({}); }}>
+          <SelectTrigger className="w-72">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL_TYPES}>Todos os tipos (padrão)</SelectItem>
+            {demandTypes.map((t) => (
+              <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <Separator />
+
       {/* Global Section */}
       <div className="space-y-4">
         <div>
-          <h3 className="text-sm font-medium">SLA Padrão Global</h3>
+          <h3 className="text-sm font-medium">SLA Global · {typeLabel}</h3>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Aplicado a todos os clientes sem configuração própria
+            Aplicado a todos os clientes sem configuração própria. Desligue para excluir o tipo do painel de SLA.
           </p>
         </div>
 
@@ -110,11 +162,15 @@ export function SlaSettingsTab() {
             <TableRow>
               <TableHead>Prioridade</TableHead>
               <TableHead>Horas limite</TableHead>
+              <TableHead>SLA ativo</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {PRIORITIES.map((priority) => {
-              const current = getGlobalHours(priority);
+              const current = getGlobalRow(priority);
+              const draft = globalDraft[priority] ?? {};
+              const hours = draft.hours ?? current.hours;
+              const enabled = draft.enabled ?? current.enabled;
               return (
                 <TableRow key={priority}>
                   <TableCell className="font-medium">{PRIORITY_LABELS[priority]}</TableCell>
@@ -124,22 +180,34 @@ export function SlaSettingsTab() {
                         type="number"
                         min={1}
                         max={168}
-                        value={globalDraft[priority] ?? current}
+                        disabled={!enabled}
+                        value={hours}
                         onChange={(e) => {
                           const val = parseInt(e.target.value);
-                          if (val === current) {
-                            setGlobalDraft((prev) => {
-                              const next = { ...prev };
-                              delete next[priority];
-                              return next;
-                            });
-                          } else {
-                            setGlobalDraft((prev) => ({ ...prev, [priority]: val }));
-                          }
+                          setGlobalDraft((prev) => ({
+                            ...prev,
+                            [priority]: { ...prev[priority], hours: val },
+                          }));
                         }}
                         className="w-20 h-8"
                       />
                       <span className="text-xs text-muted-foreground">horas</span>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={enabled}
+                        onCheckedChange={(v) => {
+                          setGlobalDraft((prev) => ({
+                            ...prev,
+                            [priority]: { ...prev[priority], enabled: v },
+                          }));
+                        }}
+                      />
+                      {!enabled && (
+                        <Badge variant="outline" className="text-xs">Sem SLA</Badge>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>
@@ -162,7 +230,7 @@ export function SlaSettingsTab() {
 
       {/* Per-Client Section */}
       <div className="space-y-4">
-        <h3 className="text-sm font-medium">SLA por Cliente</h3>
+        <h3 className="text-sm font-medium">SLA por Cliente · {typeLabel}</h3>
 
         <Select
           value={selectedClientId}
@@ -188,6 +256,7 @@ export function SlaSettingsTab() {
                 <TableRow>
                   <TableHead>Prioridade</TableHead>
                   <TableHead>Horas limite</TableHead>
+                  <TableHead>SLA ativo</TableHead>
                   <TableHead>Origem</TableHead>
                   <TableHead></TableHead>
                 </TableRow>
@@ -196,7 +265,12 @@ export function SlaSettingsTab() {
                 {PRIORITIES.map((priority) => {
                   const clientConfig = clientConfigs.find((c) => c.priority === priority);
                   const isCustom = !!clientConfig;
-                  const currentHours = clientConfig?.hours_limit ?? getGlobalHours(priority);
+                  const fallback = getGlobalRow(priority);
+                  const currentHours = clientConfig?.hours_limit ?? fallback.hours;
+                  const currentEnabled = clientConfig?.enabled ?? fallback.enabled;
+                  const draft = clientDraft[priority] ?? {};
+                  const hours = draft.hours ?? currentHours;
+                  const enabled = draft.enabled ?? currentEnabled;
 
                   return (
                     <TableRow key={priority}>
@@ -207,22 +281,34 @@ export function SlaSettingsTab() {
                             type="number"
                             min={1}
                             max={168}
-                            value={clientDraft[priority] ?? currentHours}
+                            disabled={!enabled}
+                            value={hours}
                             onChange={(e) => {
                               const val = parseInt(e.target.value);
-                              if (val === currentHours) {
-                                setClientDraft((prev) => {
-                                  const next = { ...prev };
-                                  delete next[priority];
-                                  return next;
-                                });
-                              } else {
-                                setClientDraft((prev) => ({ ...prev, [priority]: val }));
-                              }
+                              setClientDraft((prev) => ({
+                                ...prev,
+                                [priority]: { ...prev[priority], hours: val },
+                              }));
                             }}
                             className="w-20 h-8"
                           />
                           <span className="text-xs text-muted-foreground">horas</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            checked={enabled}
+                            onCheckedChange={(v) => {
+                              setClientDraft((prev) => ({
+                                ...prev,
+                                [priority]: { ...prev[priority], enabled: v },
+                              }));
+                            }}
+                          />
+                          {!enabled && (
+                            <Badge variant="outline" className="text-xs">Sem SLA</Badge>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -246,6 +332,7 @@ export function SlaSettingsTab() {
                             onClick={() =>
                               resetMutation.mutate({
                                 clientId: selectedClientId,
+                                demandTypeId: typeIdParam,
                                 priority,
                               })
                             }
