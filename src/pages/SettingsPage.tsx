@@ -34,6 +34,7 @@ import { AgendaSettingsTab } from "@/components/settings/AgendaSettingsTab";
 import { RfiStatusSettingsTab } from "@/components/settings/RfiStatusSettingsTab";
 import { SlaSettingsTab } from "@/components/settings/SlaSettingsTab";
 import { ClassifierSettingsTab } from "@/components/settings/ClassifierSettingsTab";
+import { KanbanSortSettingsTab } from "@/components/settings/KanbanSortSettingsTab";
 import { DemandTypesSettingsTab } from "@/components/settings/DemandTypesSettingsTab";
 import { DemandPrioritiesSettingsTab } from "@/components/settings/DemandPrioritiesSettingsTab";
 import { BlockerTypesSettingsTab } from "@/components/settings/BlockerTypesSettingsTab";
