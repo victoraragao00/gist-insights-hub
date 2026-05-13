@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Clock, Plus, Trash2, Check, Circle, CircleDot, CheckCircle2, ExternalLink } from "lucide-react";
+import { Clock, Plus, Trash2, Check, Circle, CircleDot, CheckCircle2, ExternalLink, Loader2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -156,6 +156,9 @@ export function DemandTasksSection({ demandId }: Props) {
             key={task.id}
             task={task}
             userProfiles={userProfiles}
+            updating={
+              updateMutation.isPending && updateMutation.variables?.id === task.id
+            }
             onUpdate={(fields) =>
               updateMutation.mutate({ id: task.id, demand_id: demandId, ...fields })
             }
@@ -226,6 +229,7 @@ interface ItemUpdate {
 interface DemandTaskItemProps {
   task: DemandTaskRow;
   userProfiles: UserProfileMini[];
+  updating?: boolean;
   onUpdate: (fields: ItemUpdate) => void;
   onDelete: () => void;
 }
@@ -265,22 +269,29 @@ const TASK_BG: Record<DemandTaskStatus, string> = {
 function TaskStatusSelect({
   value,
   onChange,
+  loading = false,
 }: {
   value: DemandTaskStatus;
   onChange: (v: DemandTaskStatus) => void;
+  loading?: boolean;
 }) {
   const current = STATUS_CONFIG[value];
   const CurrentIcon = current.Icon;
   return (
-    <Select value={value} onValueChange={(v) => onChange(v as DemandTaskStatus)}>
+    <Select value={value} onValueChange={(v) => onChange(v as DemandTaskStatus)} disabled={loading}>
       <SelectTrigger
         className={cn(
           "h-7 w-auto gap-1.5 text-xs font-medium border rounded-full px-2.5",
           "focus:ring-0 focus:ring-offset-0 [&>svg:last-child]:hidden",
           current.trigger,
+          loading && "opacity-70 cursor-wait",
         )}
       >
-        <CurrentIcon className="h-3.5 w-3.5" />
+        {loading ? (
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+        ) : (
+          <CurrentIcon className="h-3.5 w-3.5" />
+        )}
         <span>{current.label}</span>
       </SelectTrigger>
       <SelectContent>
@@ -373,7 +384,7 @@ function HoursField({
   );
 }
 
-function DemandTaskItem({ task, userProfiles, onUpdate, onDelete }: DemandTaskItemProps) {
+function DemandTaskItem({ task, userProfiles, updating = false, onUpdate, onDelete }: DemandTaskItemProps) {
   const navigate = useNavigate();
   const status = (task.status ?? "open") as DemandTaskStatus;
   const goToTask = () => navigate(`/tasks/${task.id}`);
@@ -390,6 +401,7 @@ function DemandTaskItem({ task, userProfiles, onUpdate, onDelete }: DemandTaskIt
         <div onClick={(e) => e.stopPropagation()} className="shrink-0">
           <TaskStatusSelect
             value={status}
+            loading={updating}
             onChange={(v) => onUpdate({ status: v })}
           />
         </div>

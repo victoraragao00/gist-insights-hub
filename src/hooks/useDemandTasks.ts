@@ -257,8 +257,18 @@ export function useUpdateDemandTask() {
   return useMutation({
     mutationFn: async (input: UpdateInput) => {
       const { id, demand_id: _demandId, ...fields } = input;
-      const { error } = await supabase.from("demand_tasks").update(fields).eq("id", id);
+      const { data, error } = await supabase
+        .from("demand_tasks")
+        .update(fields)
+        .eq("id", id)
+        .select("id")
+        .maybeSingle();
       if (error) throw error;
+      if (!data) {
+        throw new Error(
+          "Subdemanda não foi atualizada (sem permissão ou registro não encontrado).",
+        );
+      }
     },
     onSuccess: (_data, vars) => {
       queryClient.invalidateQueries({ queryKey: ["demand-tasks", vars.demand_id] });
@@ -268,8 +278,13 @@ export function useUpdateDemandTask() {
       queryClient.invalidateQueries({ queryKey: ["demands"] });
       queryClient.invalidateQueries({ queryKey: ["task", vars.id] });
     },
-    onError: (err) =>
-      toast.error(err instanceof Error ? err.message : "Erro ao atualizar subdemanda"),
+    onError: (err: unknown) => {
+      const e = err as { message?: string; details?: string; hint?: string };
+      const parts = [e?.message, e?.details, e?.hint].filter(Boolean);
+      toast.error(
+        parts.length > 0 ? parts.join(" — ") : "Erro ao atualizar subdemanda",
+      );
+    },
   });
 }
 
