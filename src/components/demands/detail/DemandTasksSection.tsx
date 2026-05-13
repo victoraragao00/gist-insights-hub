@@ -384,7 +384,7 @@ function HoursField({
   );
 }
 
-function DemandTaskItem({ task, userProfiles, onUpdate, onDelete }: DemandTaskItemProps) {
+function DemandTaskItem({ task, userProfiles, updating = false, onUpdate, onDelete }: DemandTaskItemProps) {
   const navigate = useNavigate();
   const status = (task.status ?? "open") as DemandTaskStatus;
   const goToTask = () => navigate(`/tasks/${task.id}`);
@@ -401,6 +401,7 @@ function DemandTaskItem({ task, userProfiles, onUpdate, onDelete }: DemandTaskIt
         <div onClick={(e) => e.stopPropagation()} className="shrink-0">
           <TaskStatusSelect
             value={status}
+            loading={updating}
             onChange={(v) => onUpdate({ status: v })}
           />
         </div>
