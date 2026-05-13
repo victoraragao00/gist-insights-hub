@@ -1171,6 +1171,11 @@ const SettingsPage = () => {
             <ClassifierSettingsTab />
           </TabsContent>
         )}
+        {isAdmin && (
+          <TabsContent value="kanban-sort">
+            <KanbanSortSettingsTab />
+          </TabsContent>
+        )}
       </Tabs>
 
       {/* ── Contact Wizard ── */}
