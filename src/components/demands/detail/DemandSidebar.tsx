@@ -512,6 +512,9 @@ export function DemandSidebar({ demand, onActivityTabSelect, onClose }: DemandSi
       </AlertDialog>
 
 
+      {/* Datas */}
+      <DemandDatesSection demand={demand} />
+
       {/* RFI */}
       <section className="rounded-lg border border-border bg-card p-4 space-y-3">
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
