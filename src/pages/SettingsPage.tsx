@@ -641,6 +641,7 @@ const SettingsPage = () => {
           {isAdmin && <TabsTrigger value="rfi-statuses">Status RFI</TabsTrigger>}
           {isAdmin && <TabsTrigger value="users">Equipe & Acessos</TabsTrigger>}
           {isAdmin && <TabsTrigger value="sla">SLA</TabsTrigger>}
+          {isAdmin && <TabsTrigger value="kanban-sort">Ordenação Kanban</TabsTrigger>}
           {isAdmin && <TabsTrigger value="classifier">Classificador IA</TabsTrigger>}
         </TabsList>
 
