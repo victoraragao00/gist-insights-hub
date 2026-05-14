@@ -277,6 +277,9 @@ export function useUpdateDemandTask() {
       queryClient.invalidateQueries({ queryKey: ["demand", vars.demand_id] });
       queryClient.invalidateQueries({ queryKey: ["demands"] });
       queryClient.invalidateQueries({ queryKey: ["task", vars.id] });
+      queryClient.invalidateQueries({ queryKey: ["demand-total-hours", vars.demand_id] });
+      queryClient.invalidateQueries({ queryKey: ["project_stats"] });
+      queryClient.invalidateQueries({ queryKey: ["client-hours"] });
     },
     onError: (err: unknown) => {
       const e = err as { message?: string; details?: string; hint?: string };

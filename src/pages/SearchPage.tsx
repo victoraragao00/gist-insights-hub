@@ -106,7 +106,7 @@ const SearchPage = () => {
   const showResults = debouncedQuery.length >= 3;
 
   return (
-    <div className="space-y-6">
+    <div className="h-full overflow-y-auto p-6 space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Busca de Interações</h1>
         <p className="text-muted-foreground">

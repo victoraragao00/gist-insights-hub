@@ -50,6 +50,7 @@ import { ClientAgendasTab } from "@/components/agendas/ClientAgendasTab";
 import { ClientRfisTab } from "@/components/rfis/ClientRfisTab";
 import { ClientDocumentsTab } from "@/components/clients/ClientDocumentsTab";
 import { ClientRulesTab } from "@/components/clients/ClientRulesTab";
+import { ClientHoursTab } from "@/components/clients/ClientHoursTab";
 
 import { TONE_CONFIG, TONE_CHART_COLORS, TONE_BAR_COLORS } from "@/lib/colorPalette";
 
@@ -675,7 +676,7 @@ const ClientDetailPage = () => {
   const sla = meta.sla;
 
   return (
-    <div className="space-y-6">
+    <div className="h-full overflow-y-auto p-6 space-y-6">
       {/* Breadcrumb */}
       <nav className="flex items-center gap-1.5 text-sm text-muted-foreground">
         <Link to="/clients" className="hover:text-foreground transition-colors">Clientes</Link>
@@ -729,6 +730,7 @@ const ClientDetailPage = () => {
             <AgendaCountBadge clientId={client.id} />
           </TabsTrigger>
           <TabsTrigger value="rfis">RFIs</TabsTrigger>
+          <TabsTrigger value="hours">Horas</TabsTrigger>
           <TabsTrigger value="participants">Participantes ({participantsTotalCount})</TabsTrigger>
           <TabsTrigger value="channels">Canais ({bindings.length})</TabsTrigger>
           <TabsTrigger value="documents">Documentos</TabsTrigger>
@@ -1143,6 +1145,11 @@ const ClientDetailPage = () => {
         {/* ── TAB: RFIs ── */}
         <TabsContent value="rfis" className="space-y-4">
           <ClientRfisTab clientId={client.id} clientName={client.name} />
+        </TabsContent>
+
+        {/* ── TAB: Horas gastas ── */}
+        <TabsContent value="hours" className="space-y-4">
+          <ClientHoursTab clientId={client.id} />
         </TabsContent>
 
 

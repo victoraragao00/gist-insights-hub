@@ -2516,6 +2516,10 @@ export type Database = {
           worst_tone: string
         }[]
       }
+      get_client_hours_breakdown: {
+        Args: { p_client_id: string }
+        Returns: Json
+      }
       get_client_public_demands: { Args: { p_token: string }; Returns: Json }
       get_cx_analytics_metrics: {
         Args: { p_client_id?: string; p_period_days?: number }
