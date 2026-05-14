@@ -1,9 +1,12 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { evaluateRule, checkCooldown, formatAlertMessage, type AuditRule, type Operator } from './logic.ts';
 
-const ALLOWED_ORIGIN = Deno.env.get("ALLOWED_ORIGIN") ?? "*";
+const ALLOWED_ORIGIN = Deno.env.get("ALLOWED_ORIGIN");
+if (!ALLOWED_ORIGIN) {
+  console.error("[SECURITY] ALLOWED_ORIGIN env var not configured");
+}
 const corsHeaders = {
-  'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
+  "Access-Control-Allow-Origin": ALLOWED_ORIGIN ?? "",
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
@@ -200,6 +203,14 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
+
+  if (!ALLOWED_ORIGIN) {
+    return new Response(
+      JSON.stringify({ error: "Server misconfiguration: ALLOWED_ORIGIN not set" }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
+    );
+  }
+
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;

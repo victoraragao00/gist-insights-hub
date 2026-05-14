@@ -1,6 +1,9 @@
-const ALLOWED_ORIGIN = Deno.env.get("ALLOWED_ORIGIN") ?? "*";
+const ALLOWED_ORIGIN = Deno.env.get("ALLOWED_ORIGIN");
+if (!ALLOWED_ORIGIN) {
+  console.error("[SECURITY] ALLOWED_ORIGIN env var not configured");
+}
 const corsHeaders = {
-  'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
+  "Access-Control-Allow-Origin": ALLOWED_ORIGIN ?? "",
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
@@ -8,6 +11,14 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
+
+  if (!ALLOWED_ORIGIN) {
+    return new Response(
+      JSON.stringify({ error: "Server misconfiguration: ALLOWED_ORIGIN not set" }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
+    );
+  }
+
 
   try {
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
