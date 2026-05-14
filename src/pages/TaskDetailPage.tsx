@@ -369,6 +369,7 @@ export default function TaskDetailPage() {
           </section>
         </aside>
       </div>
+      </div>
     </div>
   );
 }
