@@ -15,7 +15,7 @@ const Audits = () => {
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
+      <div className="h-full overflow-y-auto p-6 space-y-6">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Auditorias</h1>
           <p className="text-muted-foreground">
@@ -41,7 +41,7 @@ const Audits = () => {
 
   if (isError) {
     return (
-      <div className="space-y-6">
+      <div className="h-full overflow-y-auto p-6 space-y-6">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Auditorias</h1>
           <p className="text-muted-foreground">
@@ -67,7 +67,7 @@ const Audits = () => {
   const alerts = summary?.alerts ?? [];
 
   return (
-    <div className="space-y-6">
+    <div className="h-full overflow-y-auto p-6 space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Auditorias</h1>
         <p className="text-muted-foreground">
