@@ -1,15 +1,18 @@
 # PENDENTES — Violações em Aberto
 
 > Atualizado por: Claude Code
-> Última atualização: 2026-05-07
+> Última atualização: 2026-05-14
 
 ## Críticas (abertas)
 
 | ID | Data | Severidade | Arquivo | Descrição | Status |
 |----|------|-----------|---------|-----------|--------|
-| CTX1 | 2026-05-07 | CRÍTICO | supabase/migrations/20260507120240_*.sql | `get_cx_analytics_metrics` SECURITY DEFINER sem filtro `user_accessible_client_ids` — qualquer authenticated user vê analytics CX de todos clientes | ABERTO |
+| CTX1 | 2026-05-07 | CRÍTICO | supabase/migrations/20260507120240_*.sql | `get_cx_analytics_metrics` SECURITY DEFINER sem filtro `user_accessible_client_ids` — qualquer authenticated user vê analytics CX de todos clientes | RESOLVIDO 2026-05-14 (S8-A) |
 | CTX2 | 2026-05-07 | CRÍTICO | supabase/migrations/20260507114714_*.sql | `get_tech_dashboard_metrics` mesma falha — sem RLS por user (defensável só se documentado como decisão de produto) | ABERTO |
 | CTX3 | 2026-05-07 | CRÍTICO | supabase/migrations/20260505215732_*.sql | `user_accessible_client_ids` reescrita sem trail — introduz `bypass_client_access` mudando contrato de função core de RLS | ABERTO |
+| SEC-S1 | 2026-05-14 | CRÍTICO | supabase/functions/summarize-conversation/index.ts:119 | `summarize-conversation` usa service_role sem validar acesso do user ao conversation_id — qualquer autenticado resume conversa de qualquer cliente | RESOLVIDO 2026-05-14 (S8-A) |
+| SEC-S2 | 2026-05-14 | CRÍTICO | supabase/migrations/20260408200955_*.sql | `get_client_conversations_with_status` aceita `p_client_id` sem verificar acesso do usuário — acesso cross-cliente via parâmetro | RESOLVIDO 2026-05-14 (S8-A) |
+| SEC-S3 | 2026-05-14 | CRÍTICO | supabase/migrations/20260401184149_*.sql:105-118 | Storage RLS `client-documents`: qualquer autenticado lê/grava documentos de qualquer cliente — sem filtro por client_id no path | RESOLVIDO 2026-05-14 (S8-A) |
 
 ## Críticas (resolvidas — histórico)
 
@@ -25,9 +28,11 @@
 
 | ID | Data | Severidade | Arquivo | Descrição | Status |
 |----|------|-----------|---------|-----------|--------|
-| CTX6 | 2026-05-07 | ALTO | migrations/20260504131751_*.sql | `deactivate_stale_clients` SECURITY DEFINER sem `is_admin()` guard — qualquer authenticated user pode invocar via RPC | ABERTO |
+| CTX6 | 2026-05-07 | ALTO | migrations/20260504131751_*.sql | `deactivate_stale_clients` SECURITY DEFINER sem `is_admin()` guard — qualquer authenticated user pode invocar via RPC | RESOLVIDO 2026-05-14 (S8-A) |
 | CTX7 | 2026-05-07 | ALTO | migrations/20260507113359_*.sql | Mudança silenciosa de contrato de `projects.workspace` (de "determina visibilidade" para "apenas informativo") sem aviso aos consumers | ABERTO |
 | CTX8 | 2026-05-07 | ALTO | migrations/20260507113359_*.sql | Backfill `is_internal=true WHERE client_id IS NULL` pode marcar projetos rascunho/transição como internos | ABERTO |
+| PERF-B1 | 2026-05-14 | ALTO | supabase/migrations/20260513124524_*.sql:40-60 | `get_demands_with_sla()` executa 4 subqueries correlacionadas por row — N×4 queries internas. LIMIT 1 sem ORDER BY não-determinístico | ABERTO |
+| IDX-1 | 2026-05-14 | ALTO | supabase/migrations/* | Ausência de índices em `user_client_access(user_id)` e `(client_id)` — table scan em toda query autenticada com RLS | RESOLVIDO 2026-05-14 (S8-B) |
 
 ## Altas (resolvidas — histórico)
 
@@ -37,10 +42,18 @@
 | AP3 | 2026-03-22 | ALTO | gist-confirm-mapping/index.ts | ~~INSERTs sem conflict~~ → upsert com onConflict em 3 tabelas | RESOLVIDO 2026-03-24 |
 | M12 | 2026-03-22 | ALTO | InteractionsFeed.tsx | ~~Query sem limit~~ → .limit(500) + order desc + reverse + banner | RESOLVIDO 2026-03-24 |
 
-## Médias (abertas — burst 2026-05-07)
+## Médias (abertas)
 
 | ID | Data | Severidade | Arquivo | Descrição | Status |
 |----|------|-----------|---------|-----------|--------|
+| HOOK-R1 | 2026-05-14 | MÉDIO | src/hooks/useClientDemands.ts | 5 queries paralelas para contadores + select duplicado com useDemands — usar get_demand_analytics RPC já existente | ABERTO |
+| HC-1 | 2026-05-14 | MÉDIO | supabase/functions/process-jobs/index.ts:8-9 | MAX_PAGES_PER_RUN, MAX_BATCHES_PER_JOB, CLASSIFY_CONV_BATCH_SIZE hardcoded — deveriam ser env vars | ABERTO |
+| HC-2 | 2026-05-14 | MÉDIO | gist-discover, gist-proxy, process-jobs | GIST_BASE URL hardcoded em 3 funções — usar GIST_API_BASE_URL env var | ABERTO |
+| HC-3 | 2026-05-14 | MÉDIO | analyze-demand, process-meeting-transcription, process-jobs, summarize-conversation | Versão do modelo Claude hardcoded — usar CLAUDE_MODEL env var | ABERTO |
+| HC-4 | 2026-05-14 | MÉDIO | src/components/tech-dashboard/AlertCards.tsx, PeopleCard.tsx, settings/SlaSettingsTab.tsx | Thresholds de negócio (WIP>3, dias>7, SLA hours) hardcoded em componentes | ABERTO |
+| CAST-1 | 2026-05-14 | MÉDIO | src/hooks/useProjects, useTechDashboard, useCxAnalytics, useDemandAnalytics, useSla, useDemandCollaborators | 15+ `as unknown as` sem guard de shape — falha silenciosa em dados malformados (= CTX14) | ABERTO |
+| TRIG-1 | 2026-05-14 | MÉDIO | supabase/migrations/20260401184149, 20260326201723 | 3 triggers updated_at sem SECURITY DEFINER — podem falhar com RLS restritiva | ABERTO |
+| PERF-F1 | 2026-05-14 | MÉDIO | src/hooks/useDemandAnalysis.ts:9 | staleTime: 0 em análise IA — força refetch a cada montagem, custo alto por edge function + Gemini | ABERTO |
 | CTX9 | 2026-05-07 | MÉDIO | 7 RLS policies novas | `client_id IN (SELECT user_accessible_client_ids(auth.uid()))` — pattern frágil. Padrão do projeto: `IN (SELECT * FROM user_accessible_client_ids(...))` | ABERTO |
 | CTX10 | 2026-05-07 | MÉDIO | migrations/20260505215732_*.sql | `meeting_agendas.project_id` sem CHECK constraint — comment promete "apenas internal" mas não força | ABERTO |
 | CTX11 | 2026-05-07 | MÉDIO | migrations/20260507115132_*.sql | `auto_unblock_dependent_demands` usa `LIKE 'Aguardando conclusão de:%'` — frágil a edição manual e i18n | ABERTO |
@@ -50,7 +63,7 @@
 | CTX15 | 2026-05-07 | MÉDIO | migrations/20260505215732_*.sql | `demand_block_history` sem UPDATE policy explícita — intencional (só trigger) mas não documentado | ABERTO |
 | CTX16 | 2026-05-07 | MÉDIO | migrations/20260505104942_*.sql | `cancel_project` exclui admin global — só owner pode cancelar | ABERTO |
 | CTX17 | 2026-05-07 | MÉDIO | mark_sla_first_response, check_demand_auto_complete | `LIMIT 1` sem `ORDER BY` em busca de columns por trigger flag — não-determinístico se +1 coluna marcada | ABERTO |
-| CTX18 | 2026-05-07 | MÉDIO | 5+ edge functions | `ALLOWED_ORIGIN ?? "*"` — fallback para wildcard CORS se env var faltar em prod | ABERTO |
+| CTX18 | 2026-05-07 | MÉDIO | 5+ edge functions | `ALLOWED_ORIGIN ?? "*"` — fallback para wildcard CORS se env var faltar em prod | RESOLVIDO 2026-05-14 (S8-B) |
 | CTX19 | 2026-05-07 | MÉDIO | get_demand_total_hours, get_demand_task_stats, get_demand_block_metrics, get_demand_relationships | SECURITY DEFINER sem check de acesso à demand — vazamento de métricas agregadas | ABERTO |
 
 ## Médias (resolvidas — histórico)
@@ -66,10 +79,12 @@
 | F17 | 2026-03-30 | MÉDIO | DemandsDashboardPage.tsx | ~~blocked_demands sem toast~~ → useEffect + toast.error | RESOLVIDO 2026-03-30 |
 | DS-R1 | 2026-03-30 | BAIXO | Index.tsx | ~~HSL hardcoded~~ → TONE_CHART_COLORS importado | RESOLVIDO 2026-03-30 |
 
-## Baixas (abertas — burst 2026-05-07)
+## Baixas (abertas)
 
 | ID | Data | Severidade | Arquivo | Descrição | Status |
 |----|------|-----------|---------|-----------|--------|
+| SP-1 | 2026-05-14 | BAIXO | supabase/migrations/20260420211903_*.sql:25 | `mark_sla_first_response` SECURITY DEFINER sem `SET search_path = public` — risco de schema-wrapping | ABERTO |
+| LOG-1 | 2026-05-14 | BAIXO | evaluate-audit-rules, bootstrap-user-access, process-jobs | console.log com IDs e valores de métricas de negócio em produção — usar logger condicional por env | ABERTO |
 | CTX20 | 2026-05-07 | BAIXO | blocker_types RLS, squads RLS (extinto) | RLS usa `EXISTS user_profiles WHERE global_role='admin'` em vez do helper `is_admin()` — inconsistência | ABERTO |
 | CTX21 | 2026-05-07 | BAIXO | deactivate_stale_clients vs cleanup manual 2026-05-04 | Migração usa `active=false`. Cleanup manual usou `status='inativo' + flag cleanup`. Documentar pattern oficial | ABERTO |
 | CTX22 | 2026-05-07 | BAIXO | classification_prompt_config | `created_by` aponta `auth.users(id)`. Resto usa `user_profiles(id)` | ABERTO |
