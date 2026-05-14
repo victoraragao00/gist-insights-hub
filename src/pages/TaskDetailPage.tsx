@@ -182,7 +182,8 @@ export default function TaskDetailPage() {
   const overrun = estimated != null && actualHours > estimated;
 
   return (
-    <div className="max-w-6xl mx-auto p-6 space-y-6">
+    <div className="h-full overflow-y-auto">
+      <div className="max-w-6xl mx-auto p-6 space-y-6">
       {/* Header */}
       <div className="pb-4 border-b border-border">
         <div className="flex items-center gap-2 text-sm text-muted-foreground mb-3">
