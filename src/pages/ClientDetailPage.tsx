@@ -1146,6 +1146,11 @@ const ClientDetailPage = () => {
           <ClientRfisTab clientId={client.id} clientName={client.name} />
         </TabsContent>
 
+        {/* ── TAB: Horas gastas ── */}
+        <TabsContent value="hours" className="space-y-4">
+          <ClientHoursTab clientId={client.id} />
+        </TabsContent>
+
 
         {/* ── TAB 2: Participantes ── */}
         <TabsContent value="participants" className="space-y-6">
