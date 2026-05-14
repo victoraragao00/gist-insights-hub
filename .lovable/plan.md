@@ -1,105 +1,40 @@
-## 1. Correção de scroll (varredura completa)
+## S8-A — Correções críticas de segurança (RLS e acesso cross-cliente)
 
-**Causa:** `<main>` em `DashboardLayout` usa `overflow-hidden` + `min-h-0`. Páginas que apenas envolvem o conteúdo em `<div className="space-y-6">` (sem `h-full overflow-y-auto`) ficam cortadas — o scroll vertical desaparece.
+Aplicar exatamente o pacote especificado no prompt, sem desvios.
 
-**Páginas afetadas identificadas na varredura:**
-- `src/pages/ClientDetailPage.tsx` (causa principal do relato — abas do cliente)
-- `src/pages/SearchPage.tsx`
-- `src/pages/Audits.tsx`
-- `src/pages/TaskDetailPage.tsx`
+### 1. Migration única com 5 correções SQL
 
-**Correção:** trocar o wrapper externo de cada uma para o padrão usado em `ProjectDetailPage`/`ClientsPage`/`SettingsPage`:
+Criar migration contendo, na ordem:
 
-```tsx
-<div className="h-full overflow-y-auto p-6 space-y-6">
-```
+1. **`get_cx_analytics_metrics`** — recriar com filtro `AND d.client_id IN (SELECT * FROM user_accessible_client_ids(auth.uid()))` na CTE `base`. Manter assinatura, retorno e `SECURITY DEFINER SET search_path = public`.
+2. **`get_client_conversations_with_status`** — recriar adicionando `AND p_client_id IN (SELECT * FROM user_accessible_client_ids(auth.uid()))` no WHERE. Manter `GRANT EXECUTE ... TO authenticated`.
+3. **`deactivate_stale_clients`** — adicionar `IF NOT is_admin() THEN RAISE EXCEPTION ... USING ERRCODE='insufficient_privilege'` como primeira instrução do bloco; lógica restante inalterada.
+4. **Storage `client-documents`** — `DROP POLICY IF EXISTS` para `client_docs_upload`, `client_docs_read`, `client_docs_delete`; recriar as 3 com filtro `split_part(name, '/', 1)::uuid IN (SELECT * FROM user_accessible_client_ids(auth.uid()))` e `auth.role() = 'authenticated'`.
 
-Páginas que já estão corretas (auditadas e mantidas): `ProjectDetailPage`, `ProjectsPage`, `ClientsPage`, `AgendasPage`, `SettingsPage`, `RFIsPage`, `DemandsDashboardPage`, `TechDashboardPage`, `DemandsPage`, `DemandDetailPage`, `AgendaDetailPage`.
+SQL é copiado literalmente do prompt.
 
----
+### 2. Edge function `summarize-conversation`
 
-## 2. Refatoração das horas (pré-requisito do item 3)
+No `supabase/functions/summarize-conversation/index.ts`, inserir bloco de validação imediatamente após o parse do body e antes de instanciar `adminClient`:
 
-Hoje há **três fontes** de horas e elas não convergem:
-
-| Fonte | Local | Onde é somado hoje |
-|---|---|---|
-| `demand_time_entries` (timer + manual) | linhas com `demand_id` e opcional `task_id` | `get_demand_total_hours()` e `get_project_stats.total_hours` |
-| `demand_tasks.hours_actual` (numérico, editado direto na subdemanda) | coluna em `demand_tasks` | mostrado isoladamente em `DemandTasksSection`, **nunca somado à demanda nem ao projeto** |
-| `demands.actual_effort` (texto livre) | coluna em `demands` | apenas exibição — fora de escopo |
-
-**Regra desejada:**
-- Horas da demanda = `Σ demand_time_entries.demand_id = X` + `Σ demand_tasks.hours_actual WHERE demand_id = X`
-- Horas do projeto = `Σ` das horas das demandas vinculadas (mesma fórmula acima)
-
-**Migrations:**
-
-1. `get_demand_total_hours(p_demand_id)` — adicionar segundo `SELECT SUM(hours_actual) FROM demand_tasks WHERE demand_id = p_demand_id` ao retorno.
-2. `get_project_stats(p_project_id)` — substituir o `v_total_hours` para somar:
-   - `demand_time_entries` joined a `demands` do projeto (já existe), **mais**
-   - `demand_tasks.hours_actual` joined a `demands` do projeto.
-3. Nova RPC `get_client_hours_breakdown(p_client_id)` para o item 3 (ver abaixo) usando a mesma fórmula.
-
-**Frontend (somente leitura — nada de business logic novo):**
-- `useDemandTotalHours` continua chamando o RPC; nenhuma mudança de tipo.
-- `DemandTasksSection.tsx`: o resumo "X reais" passa a refletir o total da RPC (não recálculo client-side), evitando divergência.
-- Invalidação: ao salvar `hours_actual` de uma task em `useUpdateDemandTask`, invalidar também `["demand-total-hours", demandId]` e `["project_stats"]`.
-
----
-
-## 3. Nova aba "Horas gastas" no cliente
-
-**RPC nova:** `get_client_hours_breakdown(p_client_id uuid)` retorna JSON:
-
-```json
-{
-  "client_id": "...",
-  "total_hours": 0,
-  "avulsas": {
-    "hours": 0,
-    "demand_count": 0,
-    "demands": [{ "id", "title", "hours", "started_at", "finished_at" }]
-  },
-  "projetos": [
-    {
-      "project_id", "project_name", "hours", "demand_count",
-      "demands": [{ "id", "title", "hours" }]
-    }
-  ]
+```ts
+const { data: demandCheck, error: demandAccessErr } = await userClient
+  .from("demands").select("id").eq("id", demand_id).single();
+if (demandAccessErr || !demandCheck) {
+  return new Response(JSON.stringify({ error: "Access denied or demand not found" }),
+    { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 }
 ```
 
-Filtros: somente demandas com `client_id = p_client_id` e `cancellation_reason IS NULL`. Avulsas = `project_id IS NULL`.
+### 3. Hook `useClientDocuments.ts`
 
-**Hook:** `src/hooks/useClientHours.ts` — `useQuery(["client-hours", user?.id, clientId])`, `staleTime: 60_000`.
+Já verificado: `useUploadDocument` (linha 137) usa `${clientId}/${timestamp}_${file.name}` — formato compatível com a nova policy. **Nenhuma alteração necessária**.
 
-**Componente:** `src/components/clients/ClientHoursTab.tsx`
-- KPI grande: total de horas gastas no cliente (`formatHours`)
-- Card "Demandas avulsas" com subtotal e tabela colapsável
-- Lista de cards por projeto, cada um com subtotal e tabela colapsável das demandas
-- Estados: loading skeleton, vazio com ilustração discreta
-- Linha clicável abre `/demands/:id` (ou `/projects/:id`)
+### Fora do escopo
 
-**Integração:** em `ClientDetailPage.tsx`
-- Novo `<TabsTrigger value="hours">Horas</TabsTrigger>` entre "RFIs" e "Participantes"
-- `<TabsContent value="hours" className="space-y-4"><ClientHoursTab clientId={client.id} /></TabsContent>`
+- Não alterar assinaturas, `SECURITY DEFINER`, demais tabelas, `CONTEXT.md`/`AGENTS.md`/`CLAUDE.md`.
+- Não tocar em outros uploads/policies além das 3 do bucket `client-documents`.
 
----
+### Verificação pós-deploy
 
-## Arquivos
-
-**Migrations (novas):**
-- `supabase/migrations/<ts>_recalc_demand_hours_with_tasks.sql` — atualiza `get_demand_total_hours` e `get_project_stats`
-- `supabase/migrations/<ts>_add_get_client_hours_breakdown.sql`
-
-**Frontend:**
-- `src/pages/ClientDetailPage.tsx` — wrapper com scroll + novo tab
-- `src/pages/SearchPage.tsx`, `src/pages/Audits.tsx`, `src/pages/TaskDetailPage.tsx` — wrapper com scroll
-- `src/components/clients/ClientHoursTab.tsx` (novo)
-- `src/hooks/useClientHours.ts` (novo)
-- `src/hooks/useDemandTasks.ts` — invalidar `demand-total-hours` e `project_stats` após update de `hours_actual`
-
-**Fora de escopo:**
-- `demands.actual_effort` (texto livre) continua somente exibição
-- Reescrita do design das abas existentes
-- Permissões/roles (mantém RLS atual via `client_id IN user_accessible_client_ids`)
+Rodar as 8 queries da seção "Verificação pós-deploy" do prompt para confirmar filtros, guard de admin e existência das 3 policies recriadas.
