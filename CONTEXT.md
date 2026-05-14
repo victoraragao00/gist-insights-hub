@@ -1,11 +1,11 @@
-# CONTEXT.md — Estado do Projeto (v30 — 2026-05-07)
+# CONTEXT.md — Estado do Projeto (v31 — 2026-05-14)
 
 > Mantido pelo Claude Code ao final de cada sessao. Lido por todos os agentes para manter contexto.
 >
-> last_updated: 2026-05-07
-> last_updated_by: Claude Code (auditoria do burst 2026-04-09 → 2026-05-07)
+> last_updated: 2026-05-14
+> last_updated_by: Claude Code (auditoria completa + S8-A/S8-B + diagnostico sync Gist)
 
-> ⚠️ **Atencao:** auditoria desta sessao identificou **3 criticos abertos** (CTX1, CTX2, CTX3) e **3 altos abertos** em violacoes de RLS / SECURITY DEFINER nas Fases 7.7-7.10 abaixo. Detalhes em `auditorias/AUDITORIA_20260507.md` e `auditorias/PENDENTES.md`. Os criticos sao exploraveis por qualquer authenticated user — precisam ser priorizados antes de novas features.
+> ⚠️ **Atencao:** CTX1 e CTX6 resolvidos (S8-A, 2026-05-14). CTX2 e CTX3 ainda abertos — aguardam decisao de produto. Dois novos problemas operacionais identificados: (1) ~1.000 participants orfaos causando quarentena de conversas; (2) clientes duplicados por variacao de nome de empresa (Reserva/Reserva INK, NV/ByNV). Diagnostico em andamento — queries pendentes de resultado. Detalhes em `auditorias/AUDITORIA_20260514.md` e `auditorias/PENDENTES.md`.
 
 ---
 
@@ -33,6 +33,7 @@
 | 7.8 | Limpeza historica + SLA fix posicional | Concluido — DELETE interactions <2026-01-01 (CTX4) + `mark_sla_first_response` por position (2026-04-20 / 05-04) |
 | 7.9 | Time Tracking | Concluido — `demand_time_entries` com timer ativo unico + `get_demand_total_hours` (2026-05-04) |
 | 7.10 | Workspaces + Projetos + Demand Tasks + Block History + Tech Dashboard + CX Analytics + Demand Relationships | Concluido com 6 violacoes abertas — vide secao "Burst 2026-05" e auditoria |
+| 7.11 | Client Hours Breakdown + fixes de horas em projeto e demand | Concluido — `get_client_hours_breakdown` + `ClientHoursTab` + `useClientHours` + fixes `get_demand_total_hours`/`get_project_stats` (2026-05-14) |
 | 8 | Insights IA avancados | Placeholder |
 | 9 | Modulo de Pautas de Reuniao | Concluido — SA-1 (tabelas) + SA-2 (CRUD) + SA-3 (IA + homework→tickets) + SA-4 (settings) + pagina dedicada /agendas/:id + markdown + prompt enriquecido |
 
@@ -461,6 +462,42 @@ UPDATE user_profiles SET global_role = 'admin' WHERE email = '<email_do_operador
 
 ---
 
+## Fase 7.11 — Client Hours Breakdown (2026-05-14 — Concluido)
+
+### Fixes em funcoes existentes
+
+**`get_demand_total_hours(p_demand_id)`** — corrigido para incluir `demand_tasks.hours_actual` (campo numerico manual em sub-tarefas):
+- Antes: somava apenas entradas de `demand_time_entries` (timer + manual)
+- Agora: soma `demand_time_entries` + `SUM(demand_tasks.hours_actual)` onde nao nulo
+
+**`get_project_stats(p_project_id)`** — mesma correcao de horas + guard de acesso:
+- `v_total_hours` agora inclui `demand_tasks.hours_actual` via JOIN com `demands WHERE project_id`
+- Guard: `owner_id != auth.uid() AND NOT EXISTS(project_members) AND NOT is_admin()` → RAISE EXCEPTION 'Access denied'
+
+### Nova funcao `get_client_hours_breakdown(p_client_id)`
+
+SECURITY DEFINER, retorna JSON com horas totais agregadas por tipo:
+- **Avulsas:** demands sem `project_id`, ordenadas por horas DESC
+- **Projetos:** demands agrupadas por projeto, com sub-lista de demands e horas por demand
+- Guard de acesso: `p_client_id NOT IN (SELECT user_accessible_client_ids(auth.uid()))` → RAISE EXCEPTION
+
+**Estrutura de retorno:**
+```json
+{
+  "client_id": "uuid",
+  "total_hours": 42.5,
+  "avulsas": { "hours": 10.0, "demand_count": 3, "demands": [...] },
+  "projetos": [{ "project_id": "uuid", "project_name": "...", "hours": 32.5, "demand_count": 8, "demands": [...] }]
+}
+```
+
+### Frontend
+
+- **`src/components/clients/ClientHoursTab.tsx`** — Nova aba "Horas" na `ClientDetailPage`: breakdown visual avulsas vs projetos com totais
+- **`src/hooks/useClientHours.ts`** — Chama `get_client_hours_breakdown` via RPC, `staleTime: 5min`
+
+---
+
 ## Fase 9 — Modulo de Pautas de Reuniao (SA-1 a SA-4 — Concluido)
 
 ### SA-1: Backend Schema (2026-03-26)
@@ -823,7 +860,7 @@ gist-insights-hub/
 ├── src/                                           # Frontend + UI (Lovable)
 │   ├── components/
 │   │   ├── demands/                               # Modulo de Tickets
-│   │   ├── clients/                               # ClientDocumentsTab, ClientRulesTab
+│   │   ├── clients/                               # ClientDocumentsTab, ClientRulesTab, ClientHoursTab (Fase 7.11)
 │   │   ├── projects/                              # ProjectCard, CreateProjectDialog (Fase 7.10)
 │   │   └── tech-dashboard/                        # AlertCards, ThroughputChart, etc. (Fase 7.10)
 │   ├── hooks/
@@ -839,7 +876,8 @@ gist-insights-hub/
 │   │   ├── useCxAnalytics.ts                       # RPC analitico CX (Fase 7.10)
 │   │   ├── useBlockerTypes.ts                      # Catalogo de tipos de bloqueio
 │   │   ├── useBlockingStalledAlert.ts
-│   │   └── useWorkspace.ts                         # Switcher CX/TECH
+│   │   ├── useWorkspace.ts                         # Switcher CX/TECH
+│   │   └── useClientHours.ts                       # Horas por cliente (avulsas + projetos — Fase 7.11)
 │   └── pages/
 │       ├── DemandsDashboardPage.tsx                # Dashboard analitico (KPIs clicaveis)
 │       ├── PublicDemandsPage.tsx                   # One-Page publica (sem auth)
@@ -856,6 +894,69 @@ gist-insights-hub/
         ├── summarize-conversation/                # Resumo IA via Gemini direto
         └── test-classify/                         # Sandbox de prompts (Fase 7.7, JWT+admin)
 ```
+
+---
+
+## Sessao 2026-05-14 — Auditoria Completa + S8-A/S8-B + Diagnostico Sync
+
+### Auditoria Completa (Claude Code)
+
+Relatorio: `auditorias/AUDITORIA_20260514.md`
+PENDENTES.md atualizado com novos achados.
+
+**Escopo:** Frontend completo (hooks, pages, components) + Backend (migrations 2026-04/05 + todas as edge functions).
+
+**Resultado resumido:**
+- 3 novos criticos (SEC-S1, SEC-S2, SEC-S3) — todos resolvidos no mesmo dia pelo S8-A
+- 2 novos altos (PERF-B1, IDX-1) — IDX-1 resolvido pelo S8-B; PERF-B1 pendente
+- 8 novos medios (HOOK-R1, HC-1 a HC-4, CAST-1, TRIG-1, PERF-F1) — Issues C-F pendentes
+- 2 novos baixos (SP-1, LOG-1)
+
+**Checklist CTO apos S8-A/S8-B:**
+- m1 (zero any): ❌ 15+ casts `as unknown as` sem guard de shape (CAST-1)
+- m4 (staleTime > 0): ❌ `useDemandAnalysis` com `staleTime: 0` (PERF-F1)
+- m12 (paginacao): ⚠️ `useClientDemands` 5 queries paralelas para contadores (HOOK-R1)
+- Demais: ✅
+
+### S8-A — Correcoes de Seguranca RLS (Lovable — 2026-05-14)
+
+5 vulnerabilidades criticas corrigidas em uma migration + edicao de edge function:
+- `get_cx_analytics_metrics`: filtro `user_accessible_client_ids(auth.uid())` adicionado na CTE `base`
+- `deactivate_stale_clients`: guard `IF NOT is_admin() THEN RAISE EXCEPTION` no inicio
+- `summarize-conversation`: validacao de acesso via `userClient` antes de usar `adminClient`
+- `get_client_conversations_with_status`: `AND p_client_id IN (SELECT * FROM user_accessible_client_ids(auth.uid()))`
+- Storage `client-documents`: policies recriadas com `split_part(name,'/',1)::uuid IN (SELECT * FROM user_accessible_client_ids(auth.uid()))`
+
+Prompt em: `docs/prompts/LOVABLE_S8A_SEGURANCA_RLS_20260514.md`
+
+### S8-B — CORS e Indices (Lovable — 2026-05-14)
+
+- 15 edge functions autenticadas: `?? "*"` removido, falha hard se `ALLOWED_ORIGIN` ausente
+- `client-demands-public`: `"*"` mantido explicitamente (endpoint publico intencional)
+- 3 indices criados em `user_client_access`: `(user_id)`, `(client_id)`, UNIQUE `(user_id, client_id)`
+
+Prompt em: `docs/prompts/LOVABLE_S8B_CORS_INDICES_20260514.md`
+
+### Diagnostico Sync Gist — Problemas Operacionais (Em andamento)
+
+**SYNC-1 — Participants orfaos (~1.000 registros):**
+
+Root cause: O sync em `process-jobs/index.ts` quarentena silenciosamente conversas de qualquer contato cujo participant tem `client_id = NULL`. Contatos sem `company_name` E com dominio de email generico ficam orfaos. Com ~1.000 orfaos de 2.000 participants totais, 50% das conversas do Gist podem estar sendo descartadas.
+
+Caso confirmado: Gustavo da Lofty — cliente "Lofty" existe na plataforma, mas 0 interactions no banco. Participant provavelmente orfao.
+
+**SYNC-2 — Clientes duplicados por variacao de nome:**
+
+Root cause: A chave de dedup de `clients` e o `slug` derivado do `company_name` via `toSlug()`. Nao existe alias ou canonical_id. Cada variacao de nome gera um client separado:
+- "Reserva" (slug: `reserva`) e "Reserva INK" (slug: `reserva-ink`) → 2 clients
+- "NV" (slug: `nv`) e "ByNV" / "By NV" → 2 clients
+
+Decisao de produto confirmada pelo Operador (2026-05-14): sao o mesmo grupo/empresa, devem ser um unico client.
+
+**Status:** Queries de diagnostico enviadas ao Operador — aguardando resultados para gerar:
+1. Script SQL de merge dos clients duplicados (preservando o canonical com mais dados)
+2. Fix no participant orfao do Gustavo + re-sync das conversas
+3. Issue para Lovable: tabela `client_aliases` para mapear slugs alternativos ao client canonico
 
 ---
 
@@ -932,10 +1033,22 @@ gist-insights-hub/
 49. **Concluido:** Fase 7.10 — `user_accessible_client_ids` reescrito com `bypass_client_access` (CTX3 — sem trail de aprovacao)
 50. **Concluido:** 14 Edge Functions migradas para chamada direta a Gemini (sem Lovable AI Gateway) + ALLOWED_ORIGIN env (CTX18 — fallback `?? "*"` em todas)
 51. **Concluido:** Cleanup de clientes Gist: 97 clientes-lixo inativados, 1280 participantes em quarentena (auditoria `AUDITORIA_GIST_CLIENT_CLEANUP_20260504.md`)
-52. **🚨 BLOQUEADOR — CTX1:** `get_cx_analytics_metrics` SECURITY DEFINER **sem filtro RLS** — vazamento cross-cliente. Issue urgente para Lovable
-53. **🚨 BLOQUEADOR — CTX6:** `deactivate_stale_clients` SECURITY DEFINER **sem `is_admin()` guard** — qualquer authenticated user pode invocar
-54. **A decidir — CTX2:** `get_tech_dashboard_metrics` mesma falha; defensavel apenas se Tech for documentado como workspace interno do time uMode
-55. **A decidir — CTX3:** documentar quem/quando/por que do `bypass_client_access` introduzido em 2026-05-05; auditar usuarios atuais com a flag = true
-56. **Pendente:** Lovable S6 — Edge function deliver-audit-alerts (baixa prioridade)
-57. **Pendente:** Testar notificacoes in-app com 2 usuarios simultaneos
-58. **Fase 8:** Insights IA avancados
+52. **Concluido:** Auditoria completa 2026-05-14 — varredura total frontend + backend. Relatorio em `auditorias/AUDITORIA_20260514.md`. 6 criticos, 4 altos, 17 medios, 17 baixos identificados.
+53. **Concluido:** S8-A (2026-05-14) — 5 correcoes criticas de segurança/RLS:
+    - CTX1: `get_cx_analytics_metrics` com filtro `user_accessible_client_ids`
+    - CTX6: `deactivate_stale_clients` com guard `is_admin()`
+    - SEC-S1: `summarize-conversation` valida acesso via `userClient` antes de usar service_role
+    - SEC-S2: `get_client_conversations_with_status` filtra `p_client_id` por `user_accessible_client_ids`
+    - SEC-S3: Storage `client-documents` RLS por `client_id` no path (`split_part(name,'/',1)::uuid`)
+54. **Concluido:** S8-B (2026-05-14) — CORS + indices:
+    - CTX18: 15 edge functions com autenticacao removem fallback `?? "*"` — falham hard se `ALLOWED_ORIGIN` nao configurado
+    - IDX-1: 3 indices criados em `user_client_access(user_id)`, `(client_id)`, `(user_id, client_id)` UNIQUE
+55. **A decidir — CTX2:** `get_tech_dashboard_metrics` sem filtro RLS; defensavel apenas se Tech for documentado como workspace interno do time uMode
+56. **A decidir — CTX3:** documentar quem/quando/por que do `bypass_client_access` introduzido em 2026-05-05; auditar usuarios atuais com a flag = true
+57. **Pausado — SYNC-1:** ~1.000 participants orfaos (client_id = NULL, side = 'client') causando quarentena silenciosa de conversas. Gustavo da Lofty confirmado como afetado (0 interactions no banco). Retomar quando Operador rodar queries de diagnostico (`SELECT id, name, email FROM participants WHERE client_id IS NULL AND side = 'client'`).
+58. **Pausado — SYNC-2:** Clientes duplicados por variacao de company_name do Gist: "Reserva" vs "Reserva INK", "NV" vs "ByNV". Sao o mesmo grupo/empresa — deveriam ser um unico client. A chave de dedup e apenas `slug` derivado de company_name sem alias. Retomar quando Operador rodar queries de diagnostico (`SELECT id, name, slug FROM clients WHERE name ILIKE '%reserva%' OR name ILIKE '%nv%' OR name ILIKE '%lofty%'`).
+59. **Pendente:** Issues C-F (Lovable) — performance `get_demands_with_sla`, env vars hardcoded, `useClientDemands` redundante, thresholds frontend. Prompts ainda nao gerados.
+63. **Concluido:** Fase 7.11 (2026-05-14) — `get_client_hours_breakdown` + `ClientHoursTab` + `useClientHours` + fixes `get_demand_total_hours` e `get_project_stats` (inclui `demand_tasks.hours_actual` + guard de acesso em `get_project_stats`)
+60. **Pendente:** Lovable S6 — Edge function deliver-audit-alerts (baixa prioridade)
+61. **Pendente:** Testar notificacoes in-app com 2 usuarios simultaneos
+62. **Fase 8:** Insights IA avancados
