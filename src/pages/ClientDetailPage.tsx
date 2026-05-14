@@ -675,7 +675,7 @@ const ClientDetailPage = () => {
   const sla = meta.sla;
 
   return (
-    <div className="space-y-6">
+    <div className="h-full overflow-y-auto p-6 space-y-6">
       {/* Breadcrumb */}
       <nav className="flex items-center gap-1.5 text-sm text-muted-foreground">
         <Link to="/clients" className="hover:text-foreground transition-colors">Clientes</Link>
