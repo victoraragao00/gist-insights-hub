@@ -20,6 +20,14 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  if (!ALLOWED_ORIGIN) {
+    return new Response(
+      JSON.stringify({ error: "Server misconfiguration: ALLOWED_ORIGIN not set" }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
+    );
+  }
+
+
   try {
     const apiKey = Deno.env.get('GIST_API_KEY');
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
