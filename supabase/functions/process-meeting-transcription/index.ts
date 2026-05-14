@@ -79,6 +79,13 @@ serve(async (req) => {
   if (req.method === "OPTIONS")
     return new Response("ok", { headers: corsHeaders });
 
+  if (!ALLOWED_ORIGIN) {
+    return new Response(
+      JSON.stringify({ error: "Server misconfiguration: ALLOWED_ORIGIN not set" }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
+    );
+  }
+
   try {
     // JWT validation
     const authHeader = req.headers.get('Authorization');
