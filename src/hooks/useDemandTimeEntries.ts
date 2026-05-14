@@ -143,6 +143,8 @@ function invalidateAll(qc: ReturnType<typeof useQueryClient>) {
   qc.invalidateQueries({ queryKey: ["demand-task-stats"] });
   qc.invalidateQueries({ queryKey: ["demands"] });
   qc.invalidateQueries({ queryKey: ["demand"] });
+  qc.invalidateQueries({ queryKey: ["project_stats"] });
+  qc.invalidateQueries({ queryKey: ["client-hours"] });
 }
 
 export function useStartTimer() {
