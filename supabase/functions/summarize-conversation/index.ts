@@ -116,6 +116,20 @@ serve(async (req) => {
       });
     }
 
+    // ── Validar acesso do usuário à demand (userClient respeita RLS) ──
+    const { data: demandCheck, error: demandAccessErr } = await userClient
+      .from("demands")
+      .select("id")
+      .eq("id", demand_id)
+      .single();
+
+    if (demandAccessErr || !demandCheck) {
+      return new Response(JSON.stringify({ error: "Access denied or demand not found" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // ── Fetch messages using service role ──
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
 
