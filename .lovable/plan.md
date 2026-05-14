@@ -1,40 +1,53 @@
-## S8-A — Correções críticas de segurança (RLS e acesso cross-cliente)
+## S8-B — CORS seguro + índices de performance em `user_client_access`
 
-Aplicar exatamente o pacote especificado no prompt, sem desvios.
+### 1. Migration de índices
 
-### 1. Migration única com 5 correções SQL
+Migration única, idempotente, em `user_client_access`:
 
-Criar migration contendo, na ordem:
-
-1. **`get_cx_analytics_metrics`** — recriar com filtro `AND d.client_id IN (SELECT * FROM user_accessible_client_ids(auth.uid()))` na CTE `base`. Manter assinatura, retorno e `SECURITY DEFINER SET search_path = public`.
-2. **`get_client_conversations_with_status`** — recriar adicionando `AND p_client_id IN (SELECT * FROM user_accessible_client_ids(auth.uid()))` no WHERE. Manter `GRANT EXECUTE ... TO authenticated`.
-3. **`deactivate_stale_clients`** — adicionar `IF NOT is_admin() THEN RAISE EXCEPTION ... USING ERRCODE='insufficient_privilege'` como primeira instrução do bloco; lógica restante inalterada.
-4. **Storage `client-documents`** — `DROP POLICY IF EXISTS` para `client_docs_upload`, `client_docs_read`, `client_docs_delete`; recriar as 3 com filtro `split_part(name, '/', 1)::uuid IN (SELECT * FROM user_accessible_client_ids(auth.uid()))` e `auth.role() = 'authenticated'`.
-
-SQL é copiado literalmente do prompt.
-
-### 2. Edge function `summarize-conversation`
-
-No `supabase/functions/summarize-conversation/index.ts`, inserir bloco de validação imediatamente após o parse do body e antes de instanciar `adminClient`:
-
-```ts
-const { data: demandCheck, error: demandAccessErr } = await userClient
-  .from("demands").select("id").eq("id", demand_id).single();
-if (demandAccessErr || !demandCheck) {
-  return new Response(JSON.stringify({ error: "Access denied or demand not found" }),
-    { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-}
+```sql
+CREATE INDEX IF NOT EXISTS idx_user_client_access_user_id   ON public.user_client_access(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_client_access_client_id ON public.user_client_access(client_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_user_client_access_unique ON public.user_client_access(user_id, client_id);
 ```
 
-### 3. Hook `useClientDocuments.ts`
+### 2. CORS hardening em edge functions
 
-Já verificado: `useUploadDocument` (linha 137) usa `${clientId}/${timestamp}_${file.name}` — formato compatível com a nova policy. **Nenhuma alteração necessária**.
+Substituir nas funções autenticadas:
+
+```ts
+const ALLOWED_ORIGIN = Deno.env.get("ALLOWED_ORIGIN");
+if (!ALLOWED_ORIGIN) console.error("[SECURITY] ALLOWED_ORIGIN env var not configured");
+const corsHeaders = {
+  "Access-Control-Allow-Origin": ALLOWED_ORIGIN ?? "",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+```
+
+E após o handler `OPTIONS`, retornar 500 explícito se a env var estiver ausente.
+
+**Funções a alterar (12 das 15 listadas existem e usam `ALLOWED_ORIGIN`):**
+`analyze-demand`, `bootstrap-user-access`, `calculate-priority-scores`, `evaluate-audit-rules`, `gist-confirm-mapping`, `gist-discover`, `gist-proxy`, `ingest-gist-historical`, `process-jobs`, `process-meeting-transcription`, `summarize-conversation`, `test-classify`.
+
+**Discrepâncias com o prompt (informar ao final):**
+- `trigger-process-jobs` e `update-demand-analytics` não existem no repo — pulados.
+- `auth-email-hook` está na lista mas não usa `ALLOWED_ORIGIN` — pulado.
+- 3 funções fora da lista também usam `ALLOWED_ORIGIN` com o mesmo padrão vulnerável: `schedule-sync`, `invite-user`, `sync-gist-contacts`. Aplicar o mesmo hardening nelas (mesma vulnerabilidade, mesmo fix), por consistência e segurança.
+
+### 3. `client-demands-public`
+
+Manter `"*"` explícito com comentário documentando intencionalidade; remover qualquer leitura de `Deno.env.get("ALLOWED_ORIGIN")`.
+
+```ts
+// Endpoint público: serve página de demandas sem autenticação.
+// CORS aberto é intencional — acessado de domínios de clientes externos.
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+```
 
 ### Fora do escopo
 
-- Não alterar assinaturas, `SECURITY DEFINER`, demais tabelas, `CONTEXT.md`/`AGENTS.md`/`CLAUDE.md`.
-- Não tocar em outros uploads/policies além das 3 do bucket `client-documents`.
-
-### Verificação pós-deploy
-
-Rodar as 8 queries da seção "Verificação pós-deploy" do prompt para confirmar filtros, guard de admin e existência das 3 policies recriadas.
+- Não tocar JWT/auth, lógica de negócio, ou outras tabelas/RLS.
+- Não alterar `CONTEXT.md`/`AGENTS.md`/`CLAUDE.md`.
+- Configuração da env var `ALLOWED_ORIGIN` no painel: responsabilidade do operador (alertar ao final).
