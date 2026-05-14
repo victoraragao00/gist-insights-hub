@@ -729,6 +729,7 @@ const ClientDetailPage = () => {
             <AgendaCountBadge clientId={client.id} />
           </TabsTrigger>
           <TabsTrigger value="rfis">RFIs</TabsTrigger>
+          <TabsTrigger value="hours">Horas</TabsTrigger>
           <TabsTrigger value="participants">Participantes ({participantsTotalCount})</TabsTrigger>
           <TabsTrigger value="channels">Canais ({bindings.length})</TabsTrigger>
           <TabsTrigger value="documents">Documentos</TabsTrigger>
